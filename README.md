@@ -14,7 +14,7 @@ but other can be equivalently added (pay attention at the global constant for
 the potential though!).
 
 The folder "meshes" contains the mesh data structures used by the two aforementioned codes.
-Three types of mesh families are available:
+Three types of mesh families are available: \
 1 -> regular triangulation of the domain, with only acute angles
      (https://www.i2m.univ-amu.fr/fvca5/benchmark/Meshes/index.html) \
 2 -> nested-constructed meshes, based on the previous family
