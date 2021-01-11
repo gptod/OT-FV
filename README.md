@@ -1,10 +1,8 @@
 # Computation of Optimal Transport with finite volumes. 
-prova
 Approximate solution of the dynamical form of the L2 optimal trasport problem with finite volumes discretization.
 This code implements the scheme presented in: A. Natale, and G. Todeschi, "Computation of Optimal 
 Transport with Finite Volumes", arxiv preprint, arXiv:2012.00349 (https://arxiv.org/abs/2012.00349).
 
-prova facca
 The files "geod.m" and "convergence.m" are the main sources. "geod.m" is the code 
 which can be used to perform general tests (as the ones contained in the paper),
 whereas "convergence.m" is the specific code which performs the convergence tests
