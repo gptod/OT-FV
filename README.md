@@ -1,4 +1,4 @@
-# Computation of Optimal Transport with finite volumes. 
+# Computation of Optimal Transport with finite volumes.
 
 Approximate solution of the dynamical form of the L2 optimal trasport problem with finite volumes discretization.
 This code implements the scheme presented in: A. Natale, and G. Todeschi, "Computation of Optimal 
@@ -13,7 +13,7 @@ In the latter case, only the two tests presented in the paper are available,
 but other can be equivalently added (pay attention at the global constant for
 the potential though!).
 
-The folder "meshes" contains the mesh data structures used by the two aforementioned codes.
+The folder "meshes" contains the meshes data structures used by the two aforementioned codes.
 Three types of mesh families are available: \
 1 -> regular triangulation of the domain, with only acute angles
      (https://www.i2m.univ-amu.fr/fvca5/benchmark/Meshes/index.html) \
