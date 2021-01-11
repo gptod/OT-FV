@@ -1,4 +1,4 @@
-# Computation of Optimal Transport with finite volumes.
+# Computation of Optimal Transport with finite volumes. 
 
 Approximate solution of the dynamical form of the L2 optimal trasport problem with finite volumes discretization.
 This code implements the scheme presented in: A. Natale, and G. Todeschi, "Computation of Optimal 
