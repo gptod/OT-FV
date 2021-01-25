@@ -66,6 +66,8 @@ JOC.pp = JOCpp; JOC.pr = JOCpr; JOC.ps = JOCps;
 JOC.rp = JOCrp; JOC.rr = JOCrr; JOC.rs = JOCrs;
 JOC.sp = JOCsp; JOC.sr = JOCsr; JOC.ss = JOCss;
 
-
+JOC.ntimestep=N;
+JOC.ncellrho = size(rho_in,1);
+JOC.ncellphi = size(cc,1);
 
 end

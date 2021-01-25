@@ -1,54 +1,10 @@
-clear
-close all
-
-% Computation of Optimal Transport with finite volumes
-% (https://hal.archives-ouvertes.fr/hal-03032446)
-
-% Time discretization. Uniform grid with Nt=N+1 intervals. N is the number
-% of intermediate densities. Choose N odd, N>=1, in order to have the
-% approximate geodesic midpoint.
-N = 1;
-Nt = N+1;
-
-% Space discretization. Three types of mesh families available:
-% 1 -> regular triangulation of the domain, with only acute angles
-%      (https://www.i2m.univ-amu.fr/fvca5/benchmark/Meshes/index.html)
-% 2 -> nested-constructed meshes, based on the previous family
-%      (find details at https://hal.archives-ouvertes.fr/hal-03032446)
-% 3 -> cartesian grids
-% For each mesh, five levels of refinement h_i, 1->5, are available.
-mesh_type = 1;
-h_i = 1;
-% Mesh structure:
-% nodes -> array of nodes coordinates [x y]
-% cells -> array of cells nodes [#nodes node1 node2 node3 ...]
-% edges -> array of edges [node1 node2 K L d_sigma m_sigma m_sigma/d_sigma]
-% ind -> indices struct: ind.internal -> indices of internal edges
-%                        ind.bound    -> indices of boundary edges 
-% cc -> array of cell centers coordinates [x y]
-% area -> array of cell measures
-% mid -> array of midpoints coordinates [x y]
-% h -> meshsize, max(diam(K)) or max(sqrt(area))
-% The outer mesh structure, if any, is labelled with 2h to distinguish it
-% from the inner nested one
-
-
-% Type of reconstruction for the density on the diamond cells.
-% 1 -> weighted arithmetic mean
-% 2 -> weighted harmonic mean
-rec = 1;
-
-verb = 1; % verbosity level: {0,1,2}
-
-
 %% Code starts
-
 if mesh_type == 1
-    mesh_name = strcat('../meshes/tri2_mesh',num2str(h_i));
+    mesh_name = strcat('meshes/tri2_mesh',num2str(h_i));
 elseif mesh_type == 2
-    mesh_name = strcat('../meshes/subtri2_mesh',num2str(h_i));
+    mesh_name = strcat('meshes/subtri2_mesh',num2str(h_i));
 else
-    mesh_name = strcat('../meshes/sq_mesh',num2str(h_i));
+    mesh_name = strcat('meshes/sq_mesh',num2str(h_i));
 end
 
 % load mesh
@@ -176,7 +132,8 @@ while true
         JOC = JFkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk);
 
         % Solve the linear system
-        omegak = solvesys(JOC,OC,1,1);
+        [omegak, info_solver] = solvesys(JOC,OC,grounded_node,solver_approach,ctrl_SA);
+	%print_info_solver(info_solver)
         
         % Linesearch just to ensure that rho and s stay positive
         alfak = 1;
@@ -219,7 +176,8 @@ rho = uk(tnp+1:tnp+tnr2h);
 rho_all = [rho_in;rho;rho_f];
 W2 = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
 
-% plot 
+% plot
+if (plot)
 figure
 fig=patch('Faces',cells2h(:,2:end),'Vertices',nodes2h,'edgecolor','none','FaceVertexCData',rho_in,'FaceColor','flat');
 colorbar
@@ -253,6 +211,8 @@ for k=dsp:dsp:N-dsp+1
     %outname=strcat('gauss_linear_rhok',str,'.jpg');
     %saveas(fig,outname)
 end
+
+end 
 
 
 
