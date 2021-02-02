@@ -3,12 +3,13 @@ classdef info_solver <handle
      flag;
      res;
      realres;
+     resvec;
      iter;
      rhsnorm;
      approach_used;
    end
    methods
-     function obj = print(obj)
+     function obj = print(obj);
        fprintf('%s flag=%d iter=%d realres=%9.4e res=%9.4e rhs=%9.4e\n',...
 	       obj.approach_used,...
 	       obj.flag,...

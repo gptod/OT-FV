@@ -4,12 +4,19 @@ classdef ctrl_solver <handle
      tolerance;
      itermax;
      nrestart=20;
+     omega=1.0
    end
    methods
-     function obj = init(obj,approach,tolerance,itermax)
+     function obj = init(obj,approach,tolerance,itermax,omega)
        obj.approach=approach;
        obj.tolerance=tolerance;
        obj.itermax=itermax;
+       
+       if (~exist('omega','var') )
+	 obj.omega=1
+       else
+	 obj.omega=omega
+       end
      end
      function obj = info(obj)
        fprintf('approch=%s tolerance=%9.3e itermax=%d \n',...

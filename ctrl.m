@@ -18,7 +18,7 @@ Nt = N+1;
 %      (find details at https://hal.archives-ouvertes.fr/hal-03032446)
 % 3 -> cartesian grids
 % For each mesh, five levels of refinement h_i, 1->5, are available.
-mesh_type = 1;
+mesh_type = 2;
 h_i = 1;
 % Mesh structure:
 % nodes -> array of nodes coordinates [x y]
@@ -43,8 +43,11 @@ verb = 1; % verbosity level: {0,1,2}
 
 
 grounded_node=1
-solver_approach=6
+solver_approach=8
 plot=0
 
-ctrl_SA=ctrl_solver;
-ctrl_SA.init('krylov',1e-5,300);
+ctrl_inner=ctrl_solver;
+ctrl_outer=ctrl_solver;
+ctrl_inner.init('\',1e-5,3000,0.1);
+ctrl_outer.init('jacobi',1e-5,3000);
+compute_eigen=0

@@ -132,7 +132,7 @@ while true
         JOC = JFkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk);
 
         % Solve the linear system
-        [omegak, info_solver] = solvesys(JOC,OC,grounded_node,solver_approach,ctrl_SA);
+        [omegak, info_solver] = solvesys(JOC,OC,grounded_node,solver_approach,ctrl_inner,ctrl_outer,compute_eigen);
 	%print_info_solver(info_solver)
         
         % Linesearch just to ensure that rho and s stay positive
