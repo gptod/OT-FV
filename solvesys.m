@@ -922,72 +922,68 @@ elseif sol==12
   B1T(indc,:) = sparse(1,Nr);
   B2(:,indc)  = sparse(Nr,1);
   
-  
-  % init C^{-1}
-  if ( verbose >= 1)
-    fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
+  % init inverse A
+  relax4prec=1e-12;
+  inverseA_approach='full'
+  %inverseA_approach='block'
+  if ( strcmp(inverseA_approach,'full'))
+    % set inverse
+    inv_A=sparse_inverse;
+    inv_A.init(A+relax4prec*speye(Np,Np),ctrl_inner);
+    inv_A.cumulative_iter=0;
+    inv_A.cumulative_cpu=0;
+
+    % define function
+    invA = @(x) inv_A.apply(x);
+  elseif( strcmp(inverseA_approach,'block'))
+    % partion matrix 
+    diag_block_A = cell(Nt, 1);
+    nAi=ncellphi;
+    for i=1:Nt
+      diag_block_A{i}      =A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
+    end
+    % use block inverse
+    diag_block_invA(Nt,1)=sparse_inverse;
+    for i=1:Nt
+      diag_block_invA(i).init(diag_block_A{i}+relax4prec*speye(nAi,nAi),ctrl_inner);
+    end
+
+    % define function
+    invA  = @(x) apply_block_diag_inverse(diag_block_invA,x);
   end
-  invC     = sparse(1:Nr,1:Nr,(1.0./spdiags(C,0))',Nr,Nr);
-  invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
 
-
-  % assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
-  % reduced to system only in rho
-  SCA = C+B2*invDiagA*B1T;
-  nnz(SCA)
-  fr = f2-B2*(invDiagA*f1);
-
-
-  % preprocess of precondtioner defienition
-  preprocess_cpu=toc;
-
-  approach='full';  
-  relax4prec=0e-5;
-  debug=0;
-  if ( verbose >= 2)
-    fprintf('APPROACH %s \n',appraoch)
-  end
   
-  
-  % init inverse of full S
-  if ( verbose >= 2)
-    fprintf('INIT inverse S\n')
-  end
-  inv_SCA=sparse_inverse;
-  inv_SCA.init(SCA+relax4prec*speye(Nr,Nr),ctrl_inner);
-  inv_SCA.cumulative_iter=0;
-  inv_SCA.cumulative_cpu=0;
-  
-  inverse_cpu=inv_SCA.init_cpu;
-  if ( verbose >= 2)
-    fprintf('DONE inverse S\n') 
-  end 
-  inverse_block22 = @(x) -inv_SCA.apply(x);
+  % assembly, implicetely, SAC=-(C+B2 * (A)^{-1} B1T)
+  SCA = @(x) -(C*x + B2*inv_A.apply(B1T*x))
+
+  % assembly inverse of  SAC using pcg
+  ctrl_fmgres=ctrl_solver;
+  ctrl_fmgres.init('krylov',1e-5,1000,1.0,1);
+  inv_SCA = @(x) fgmres(@(y,tol) SCA(y) ,x,ctrl_fmgres.tolerance,...
+		      'max_iters',ctrl_fmgres.itermax,...
+                      'restart',20,...
+		      'verb',0)
   inner_nequ=Nr;
 
-  % inverse diag(A) action
-  invA = @(x) invDiagA*x;
-
   % Define action of preconditoner
-  prec = @(x,tol) SchurCA_based_preconditioner(x, invA,inverse_block22,B1T,B2);
+  prec = @(x,tol) SchurCA_based_preconditioner(x, invA,inv_SCA,B1T,B2);
+
+  
+  %preprocess finished
+  preprocess_cpu=toc;
+
+
 
   % solve with fgmres or bicgstab if prec is linear
   outer_timing=tic;
   info_J=info_solver;
-  if ( strcmp(ctrl_inner.approach,'\') | (ctrl_inner.tolerance < 1e-12) )
-    disp( 'USING BICGSTAB')
-    [d,info_J.flag,info_J.res,info_J.iter,info_J.resvec] = bicgstab(jacobian,rhs,...
-				 ctrl_outer.tolerance,...
-				 ctrl_outer.itermax,...
-				 @(x) prec(x));    
-  else
-    [d,i,info_J.resvec,info_J.iter] = fgmres(jacobian,rhs,ctrl_outer.tolerance,...
+  [d,i,info_J.resvec,info_J.iter] = fgmres(jacobian,rhs,ctrl_outer.tolerance,...
 		      'max_iters',ctrl_outer.itermax,...
                       'restart',20,...
 		      'verb',0,...
 		      'P',@(x,tol) prec(x));
-  end
 
+  
   inner_iter=inv_SCA.cumulative_iter;
   inner_cpu=inv_SCA.cumulative_cpu;
  
