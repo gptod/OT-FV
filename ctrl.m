@@ -1,5 +1,5 @@
-clear
-close all
+%clear
+%close all
 
 
 % Computation of Optimal Transport with finite volumes
@@ -8,7 +8,7 @@ close all
 % Time discretization. Uniform grid with Nt=N+1 intervals. N is the number
 % of intermediate densities. Choose N odd, N>=1, in order to have the
 % approximate geodesic midpoint.
-N = 100;
+%N = 16;
 Nt = N+1;
 
 % Space discretization. Three types of mesh families available:
@@ -18,8 +18,8 @@ Nt = N+1;
 %      (find details at https://hal.archives-ouvertes.fr/hal-03032446)
 % 3 -> cartesian grids
 % For each mesh, five levels of refinement h_i, 1->5, are available.
-mesh_type = 2;
-h_i = 1;
+mesh_type = 1;
+h_i = 2;
 % Mesh structure:
 % nodes -> array of nodes coordinates [x y]
 % cells -> array of cells nodes [#nodes node1 node2 node3 ...]
@@ -43,11 +43,18 @@ verb = 1; % verbosity level: {0,1,2}
 
 
 grounded_node=1
-solver_approach=8
+solver_approach=11
 plot=0
 
 ctrl_inner=ctrl_solver;
 ctrl_outer=ctrl_solver;
-ctrl_inner.init('\',1e-5,3000,0.1);
-ctrl_outer.init('jacobi',1e-5,3000);
-compute_eigen=0
+ctrl_inner.init('krylov',1e-07,1000,1.0,1);
+ctrl_inner.init('agmg',1e-13,1000,1.0,1);
+%ctrl_inner.init('\',1e-14,1000,1.0,0);
+				%ctrl_outer.init('jacobi',1e-5,3000);
+ctrl_outer.init('fgmres',1e-5,3000);
+compute_eigen=0;
+
+
+str_test=sprintf('h%d_N%0.5d_',h_i,N)
+disp(str_test)

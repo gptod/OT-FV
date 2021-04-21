@@ -7,6 +7,10 @@ else
     mesh_name = strcat('meshes/sq_mesh',num2str(h_i));
 end
 
+cpu_total=0.0;
+cpu_assembly=0.0;
+
+
 % load mesh
 load(mesh_name)
 
@@ -24,6 +28,24 @@ if exist('I','var')==0
     h2h = h;
     I = speye(ncell,ncell);
 end
+
+if (~exist('approach_string','var') )
+  fprintf('Set varible: ( approach_string ) with linear solver approach resume\n')
+  return
+end
+
+filename=strcat('runs/',str_test,approach_string);
+log_filename=strcat(filename,'.log')
+logID = fopen(log_filename,'w');
+fprintf(logID,'mesh type       = %d\n',mesh_type);
+fprintf(logID,'solver approach = %d\n',solver_approach);
+ctrl_inner.info(logID)
+ctrl_outer.info(logID)
+
+
+csv_filename=strcat(filename,'.csv')
+csvID = fopen(csv_filename,'w');
+fprintf(csvID,'    np,  nrho,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,      mu,   theta, cpulinsys, cpuassemb\n');
 
 % Boundary conditions:
 [rho_in,rho_f,mass] = bc_density(cc2h,area2h);
@@ -71,8 +93,11 @@ theta = theta0;
 mu = mu0/theta;
 delta_0 = 2*eps_0;
 
-while true
 
+
+while true
+  assembly=tic;
+  total=tic;
     if delta_0 < eps_0
         break
     end
@@ -93,8 +118,17 @@ while true
     eps_mu = eps_0;
     itk2 = 0;
     flag2 = 0;
-    
+
+    sum_assembly=0;
+    sum_total=0;
+    sum_linsys=0;
+    sum_iter_newton=0;
+    sum_iter_outer_linear=0;
+    sum_iter_inner_linear=0;
     while true
+        total=tic;
+        assembly=tic;
+	
         
         OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
         delta_mu = norm([OC.p;OC.r;OC.s]);
@@ -130,11 +164,20 @@ while true
 
         % Compute the jacobian of the system of equations
         JOC = JFkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk);
+	sum_assembly=sum_assembly+toc(assembly);
 
-        % Solve the linear system
-        [omegak, info_solver] = solvesys(JOC,OC,grounded_node,solver_approach,ctrl_inner,ctrl_outer,compute_eigen);
-	%print_info_solver(info_solver)
-        
+	
+				% Solve the linear system
+	timelinsys=tic;
+        [omegak, info_solver] = solvesys(JOC,OC,grounded_node,solver_approach,ctrl_inner,ctrl_outer,compute_eigen,logID);
+	sum_linsys=sum_linsys+toc(timelinsys);
+	sum_total=sum_total+toc(total);
+	sum_iter_outer_linear= sum_iter_outer_linear+info_solver.outer_iter;
+	sum_iter_inner_linear= sum_iter_inner_linear+info_solver.inner_iter;
+	
+	print_info_solver(info_solver)
+	print_info_solver(info_solver,logID)
+	
         % Linesearch just to ensure that rho and s stay positive
         alfak = 1;
         while any(uk(tnp+1:end)+alfak*omegak(tnp+1:end)<=0)
@@ -159,12 +202,34 @@ while true
     
     % error bound on optimality
     delta_0 = (N/Nt)*sum(area)*mu;
-    
+
+    % 
+    state_message=sprintf('%5s %3i %7s %1.4e %7s %3i  %10s %1.4e %4s %1.2e %7s %1.2e',...
+	    'STEP:',itk1,...
+	    ' Err',delta_0,...
+	    ' NEWTON ',itk2,...
+	    ' min(rho) ',min(uk(tnp+1:tnp+tnr2h)),' mu ',mu,' theta ',theta);
     if verb>0
-        fprintf('%11s %3i %7s %1.4e %9s %3i %10s %1.4e %4s %1.2e %7s %1.2e \n','OUTER STEP:',itk1,' Error:',...
-            delta_0,' #NewIts:',itk2,' min(rho):',min(uk(tnp+1:tnp+tnr2h)),' mu:',mu,' theta:',theta)
+        fprintf('%s \n', state_message)
+	
     end
-    
+    cpu_total=cpu_total+sum_total;
+    cpu_assembly=cpu_assembly+sum_assembly;
+    fprintf(logID,'%s \n',state_message);
+  
+    cost_message=sprintf('LINSYS: NEWTON %2d OUT %3d IN %5d - %3d | CPU: LINSYS %1.4e ASSEMBLY %1.4e',...
+			 itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
+			 uint64(sum_iter_outer_linear/sum_iter_inner_linear),...
+			 sum_linsys,sum_assembly);
+    fprintf('%s \n',cost_message);
+    fprintf(logID,'%s \n',cost_message);
+
+    fprintf(csvID,'%6d,%6d,%6d,%5d,%8.3e,%6d,%7d,%8d,%11d,%1.2e,%1.2e,%1.2e,%1.4e,%1.4e \n',...
+	    ncell2h,ncell,N,...
+	    itk1,delta_0,itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
+	   info_solver.inner_nequ,min(uk(tnp+1:tnp+tnr2h)),mu,theta,...
+	   sum_linsys,sum_assembly);
+
 end
 
 fprintf('%17s %4i %7s %1.4e \n','Total Newton its:',tit,'Error: ',delta_0)
@@ -215,6 +280,7 @@ end
 end 
 
 
-
+fclose(logID);
+fclose(csvID);
 
 
