@@ -1,10 +1,11 @@
 classdef sparse_inverse <handle
-   properties
+  properties
+    name;
      matrix;
      nequ;
      is_symmetric;
      ctrl;
-     info;
+     info_inverse;
      % agmg solver
      mgsolver;
      % incomplete factor in LU factorization A~IL*IU
@@ -12,15 +13,22 @@ classdef sparse_inverse <handle
      IU;
      % M, N matrix for Gauss-Seidel and Jacobi
      M; 
-     N; 
+     N;
+     cumulative_iter=0;
+     init_cpu=0;
+     cumulative_cpu=0;
    end
    methods
      function obj = init(obj,matrix,ctrl)
+       obj.init_cpu=0;
+       init_cpu=tic;
        obj.matrix=matrix;
        obj.nequ=size(matrix,1);
-       obj.is_symmetric = norm(nonzeros(matrix)-nonzeros(matrix'))<1e-14;
+       obj.is_symmetric = norm(nonzeros(matrix)-nonzeros(matrix'))<1e-12;
        obj.ctrl=ctrl;
-       obj.info=info_solver;
+       obj.info_inverse=info_solver;
+       obj.cumulative_iter=0;
+       obj.cumulative_cpu=0;
 
        if ( strcmp(ctrl.approach,'\'))
        elseif ( strcmp(ctrl.approach,'agmg') )
@@ -57,6 +65,7 @@ classdef sparse_inverse <handle
 	 obj.M=obj.D;
 	 obj.N=obj.M-obj.matrix;
        end
+       obj.init_cpu=toc(init_cpu);
        
      end
      % sol ~= A^{-1}(rhs) 
@@ -64,30 +73,33 @@ classdef sparse_inverse <handle
        if (~exist('initial_guess','var'))
 	 initial_guess=zeros(obj.nequ,1);
        end
-		 
+      
+       apply_cpu=tic;	 
        if ( strcmp(obj.ctrl.approach ,'\'))
 	 sol=obj.matrix\rhs;
-	 obj.info.approach_used = 'backslash';
+	 obj.info_inverse.approach_used = 'backslash';
+	 obj.info_inverse.iter=0;
        elseif ( strcmp(obj.ctrl.approach ,'agmg'))
 	 if (obj.is_symmetric)
 	   icg=1;
 	 else
 	   icg=obj.ctrl.nrestart;
 	 end
-	 [sol,obj.info.flag, obj.info.res, obj.info.iter,obj.info.resvec]=...
+	 [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
 	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,0,initial_guess,0);	 
-	 obj.info.approach_used = 'agmg';
+	 obj.info_inverse.approach_used = 'agmg';
+	 
        elseif( strcmp(obj.ctrl.approach, 'krylov'))
 	 if ( obj.is_symmetric )
-	   [sol,obj.info.flag,obj.info.res,obj.info.iter,obj.info.resvec]=...
+	   [sol,obj.info_inverse.flag,obj.info_inverse.res,obj.info_inverse.iter,obj.info_inverse.resvec]=...
            pcg(obj.matrix,rhs,...
-               obj.ctrl.tolerance,obj.ctrl.itermax,[],@(x) obj.IL\(obj.IL'\x),[],initial_guess);
-	   obj.info.approach_used = 'pcg+ic';
+               obj.ctrl.tolerance,obj.ctrl.itermax, obj.IL, obj.IL',initial_guess);
+	   obj.info_inverse.approach_used = 'pcg+ic';
 	 else
-	   [sol,obj.info.flag,obj.info.res,obj.info.iter,obj.info.resvec]=...
+	   [sol,obj.info_inverse.flag,obj.info_inverse.res,obj.info_inverse.iter,obj.info_inverse.resvec]=...
            bicgstab(obj.matrix,rhs,...
-		 obj.ctrl.tolerance,obj.ctrl.itermax,[],@(x) obj.IU\(obj.IL\x),[],initial_guess);
-	   obj.info.approach_used = 'bicgtab+ilu';
+		 obj.ctrl.tolerance,obj.ctrl.itermax,obj.IL,obj.IU,initial_guess);
+	   obj.info_inverse.approach_used = 'bicgtab+ilu';
 	 end
 
 	%
@@ -96,30 +108,43 @@ classdef sparse_inverse <handle
        elseif( strcmp(obj.ctrl.approach , 'incomplete'))
 	 if ( obj.is_symmetric )
 	   sol=obj.IL\(obj.IL'\rhs);
-	   obj.info.approach_used = 'ic';
+	   obj.info_inverse.approach_used = 'ic';
 	 else
 	   sol=obj.IL\(obj.IU\rhs);
-	   obj.info.approach_used = 'ilu';
+	   obj.info_inverse.approach_used = 'ilu';
 	 end
        elseif ( strcmp(obj.ctrl.approach, 'gs') || strcmp(obj.ctrl.approach, 'jacobi')  )
 	   matrix version
-	   obj.info.iter=0;
+	   obj.info_inverse.iter=0;
 	   sol=initial_guess;
 	   res=norm(obj.matrix*sol-rhs);
 	   resv=res;
 	   omega=ctrl_solver.omega
-	   obj.info.iter=0
+	   obj.info_inverse.iter=0
 	   while res > obj.ctrl.tolerance && k<obj.ctrl.itermax
-	     obj.info.iter=obj.info.iter+1;
+	     obj.info_inverse.iter=obj.info_inverse.iter+1;
 	     sol=obj.M\(obj.N*sol+rhs);
 	     res=norm(obj.matri*x-rhs);
 	     resv=[resv;res];
 	   end
-	   obj.info.approach_used = 'gs';
-	   obj.info.resvec = resvec;
+	   obj.info_inverse.approach_used = 'gs';
+	   obj.info_inverse.resvec = resvec;
        end
-       obj.info.rhsnorm=norm(rhs);
-       obj.info.realres=norm(obj.matrix*sol-rhs)/norm(rhs);
+       cpu=toc(apply_cpu);
+       
+       obj.info_inverse.rhsnorm=norm(rhs);
+       obj.info_inverse.realres=norm(obj.matrix*sol-rhs)/norm(rhs);
+       obj.cumulative_iter=obj.cumulative_iter+obj.info_inverse.iter;
+       obj.cumulative_cpu=obj.cumulative_cpu+cpu;
+
+       if (obj.ctrl.verbose)
+	 obj.info_inverse.print();
+       end
+       
+       if ( obj.info_inverse.flag ~= 0 )
+	 obj.info_inverse();
+	 error('INNER ERROR FOR LINEAR SOLVER');
+       end
      end
      % destructor
      function obj = kill(obj)
@@ -129,9 +154,28 @@ classdef sparse_inverse <handle
        clear obj.matrix;
        clear obj.is_symmetric;
        clear obj.ctrl;
-       clear obj.info;
+       clear obj.info_inverse;
        clear obj.IL;
        clear obj.IU;
+     end
+
+     % info
+     function obj = info(obj,fid)
+        if (~exist('fid','var') )
+	  fid=1;
+       end
+       obj.ctrl.info(fid);
+       if ( strcmp(obj.ctrl.approach ,'krylov'))
+	 if ( obj.is_symmetric) 
+	   fprintf(fid,'nnz(IL)/nnz(A),nnz(A) %f3 %d \n',...
+		   nnz(obj.IL)/nnz(obj.matrix),nnz(obj.matrix));
+	 else
+	   fprintf(fid,'(nnz(IL),nnz(IU))/nnz(A)| nnz(A) %f3 %f3 %d\n',...
+		   nnz(obj.IL)/nnz(obj.matrix),...
+		   nnz(obj.IU)/nnz(obj.matrix),...
+		   nnz(obj.matrix));
+	 end
+       end
      end
    end
 end
