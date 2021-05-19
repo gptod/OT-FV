@@ -19,7 +19,7 @@ Nt = N+1;
 % 3 -> cartesian grids
 % For each mesh, five levels of refinement h_i, 1->5, are available.
 mesh_type = 1;
-h_i = 2;
+h_i = 5;
 % Mesh structure:
 % nodes -> array of nodes coordinates [x y]
 % cells -> array of cells nodes [#nodes node1 node2 node3 ...]
@@ -46,15 +46,35 @@ grounded_node=1
 solver_approach=11
 plot=0
 
-ctrl_inner=ctrl_solver;
+ctrl_inner11=ctrl_solver;
+ctrl_inner22=ctrl_solver;
 ctrl_outer=ctrl_solver;
-ctrl_inner.init('krylov',1e-07,1000,1.0,1);
-ctrl_inner.init('agmg',1e-13,1000,1.0,1);
-%ctrl_inner.init('\',1e-14,1000,1.0,0);
-				%ctrl_outer.init('jacobi',1e-5,3000);
+
+
+ctrl_inner11.init('krylov',1e-07,1000,1.0,1);
+%ctrl_inner11.init('agmg',1e-12,1000,1.0,0);
+%ctrl_outer.init('1',1e-14,3000);
+ctrl_inner11.init('incomplete',1e-12,10,1.0,1);
+
+
+ctrl_inner22.init('incomplete',1e-12,10,1.0,0);
+
+
 ctrl_outer.init('fgmres',1e-5,3000);
+
+
 compute_eigen=0;
+
+verbose=1;
 
 
 str_test=sprintf('h%d_N%0.5d_',h_i,N)
 disp(str_test)
+
+controls = struct('indc',grounded_node,...
+		  'sol',solver_approach,...
+		  'ctrl_inner11',ctrl_inner11,...
+		  'ctrl_inner22',ctrl_inner22,...
+		  'ctrl_outer',ctrl_outer,...
+		  'compute_eigen',compute_eigen,...
+		  'verbose',verbose)
