@@ -39,7 +39,8 @@ log_filename=strcat(filename,'.log')
 logID = fopen(log_filename,'w');
 fprintf(logID,'mesh type       = %d\n',mesh_type);
 fprintf(logID,'solver approach = %d\n',solver_approach);
-ctrl_inner.info(logID)
+ctrl_inner11.info(logID)
+ctrl_inner22.info(logID)
 ctrl_outer.info(logID)
 
 
@@ -169,7 +170,7 @@ while true
 	
 				% Solve the linear system
 	timelinsys=tic;
-        [omegak, info_solver] = solvesys(JOC,OC,grounded_node,solver_approach,ctrl_inner,ctrl_outer,compute_eigen,logID);
+        [omegak, info_solver] = solvesys(JOC,OC,controls,logID);
 	sum_linsys=sum_linsys+toc(timelinsys);
 	sum_total=sum_total+toc(total);
 	sum_iter_outer_linear= sum_iter_outer_linear+info_solver.outer_iter;
@@ -177,6 +178,10 @@ while true
 	
 	print_info_solver(info_solver)
 	print_info_solver(info_solver,logID)
+
+
+	OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
+        delta_mu = norm([OC.p;OC.r;OC.s]);
 	
         % Linesearch just to ensure that rho and s stay positive
         alfak = 1;
@@ -217,9 +222,8 @@ while true
     cpu_assembly=cpu_assembly+sum_assembly;
     fprintf(logID,'%s \n',state_message);
   
-    cost_message=sprintf('LINSYS: NEWTON %2d OUT %3d IN %5d - %3d | CPU: LINSYS %1.4e ASSEMBLY %1.4e',...
-			 itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
-			 uint64(sum_iter_outer_linear/sum_iter_inner_linear),...
+    cost_message=sprintf('LINSYS: NEWTON %8.1e %2d OUT %3d IN %5d | CPU: LINSYS %1.4e ASSEMBLY %1.4e',...
+			 delta_mu,itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
 			 sum_linsys,sum_assembly);
     fprintf('%s \n',cost_message);
     fprintf(logID,'%s \n',cost_message);
