@@ -1,7 +1,8 @@
 classdef sparse_inverse <handle
   properties
     name;
-     matrix;
+    matrix;
+    inverse_matrix_diagonal;
      nequ;
      is_symmetric;
      ctrl;
@@ -37,24 +38,26 @@ classdef sparse_inverse <handle
 	 else
 	   icg=obj.ctrl.nrestart;
 	 end
-	 %obj.mgsolver=agmg(matrix,[],icg,[],ctrl.itermax,0,[],1);
+	     %obj.mgsolver=agmg(matrix,[],icg,[],ctrl.itermax,0,[],1);
+       elseif ( strcmp(ctrl.approach,'diag') )
+	 obj.inverse_matrix_diagonal= sparse(1:obj.nequ,1:obj.nequ,(1.0./spdiags(matrix,0))',obj.nequ,obj.nequ);
        elseif ( strcmp(ctrl.approach,'krylov'))
 	 if ( obj.is_symmetric)
 	   obj.IL = ichol(matrix, struct('type','ict','droptol',1e-3));
 	 else
 	   setup.type = 'crout';
 	   setup.milu = 'row';
-	   setup.droptol = 1e-5;
+	   setup.droptol = 1e-3;
 	   [obj.IL,obj.IU] = ilu(matrix,setup);
 	 end
-       elseif( strcmp(ctrl.approach , 'incomplete') )
+       elseif( strcmp(obj.ctrl.approach , 'incomplete') )
 	 if ( obj.is_symmetric)
-	   obj.L = ichol(matrix, struct('type','ict','droptol',1e-3));
+	   obj.IL = ichol(matrix, struct('type','ict','droptol',1e-5));
 	 else
 	   setup.type = 'crout';
 	   setup.milu = 'row';
 	   setup.droptol = 1e-5;
-	   [obj.L,obj.U] = ilu(matrix,setup);
+	   [obj.IL,obj.IU] = ilu(matrix,setup);
 	 end
        elseif ( strcmp(obj.ctrl.approach, 'gs') )
 	 obj.D=spdiags(diag(obj.matrix),0,obj.nequ,obj.nequ);
@@ -77,8 +80,9 @@ classdef sparse_inverse <handle
        apply_cpu=tic;	 
        if ( strcmp(obj.ctrl.approach ,'\'))
 	 sol=obj.matrix\rhs;
-	 obj.info_inverse.approach_used = 'backslash';
+	 obj.info_inverse.approach_used = '\';
 	 obj.info_inverse.iter=0;
+	 obj.info_inverse.flag=0;
        elseif ( strcmp(obj.ctrl.approach ,'agmg'))
 	 if (obj.is_symmetric)
 	   icg=1;
@@ -86,9 +90,11 @@ classdef sparse_inverse <handle
 	   icg=obj.ctrl.nrestart;
 	 end
 	 [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
-	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,0,initial_guess,0);	 
+	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,0);	 
 	 obj.info_inverse.approach_used = 'agmg';
-	 
+       elseif ( strcmp(obj.ctrl.approach,'diag') )
+	 sol=obj.inverse_matrix_diagonal*rhs;
+	 obj.info_inverse.iter=0;
        elseif( strcmp(obj.ctrl.approach, 'krylov'))
 	 if ( obj.is_symmetric )
 	   [sol,obj.info_inverse.flag,obj.info_inverse.res,obj.info_inverse.iter,obj.info_inverse.resvec]=...
@@ -113,10 +119,11 @@ classdef sparse_inverse <handle
 	   sol=obj.IL\(obj.IU\rhs);
 	   obj.info_inverse.approach_used = 'ilu';
 	 end
+	 obj.info_inverse.iter=0;
        elseif ( strcmp(obj.ctrl.approach, 'gs') || strcmp(obj.ctrl.approach, 'jacobi')  )
 	   matrix version
 	   obj.info_inverse.iter=0;
-	   sol=initial_guess;
+	   sol=initial_guess;obj.info_inverse.iter=0;
 	   res=norm(obj.matrix*sol-rhs);
 	   resv=res;
 	   omega=ctrl_solver.omega
@@ -133,17 +140,19 @@ classdef sparse_inverse <handle
        cpu=toc(apply_cpu);
        
        obj.info_inverse.rhsnorm=norm(rhs);
-       obj.info_inverse.realres=norm(obj.matrix*sol-rhs)/norm(rhs);
+       obj.info_inverse.balance=sum(rhs);
+       obj.info_inverse.res=norm(obj.matrix*sol-rhs);
+       obj.info_inverse.realres=obj.info_inverse.res/norm(rhs);
        obj.cumulative_iter=obj.cumulative_iter+obj.info_inverse.iter;
        obj.cumulative_cpu=obj.cumulative_cpu+cpu;
 
        if (obj.ctrl.verbose)
 	 obj.info_inverse.print();
        end
-       
+
        if ( obj.info_inverse.flag ~= 0 )
 	 obj.info_inverse();
-	 error('INNER ERROR FOR LINEAR SOLVER');
+	 %error('INNER ERROR FOR LINEAR SOLVER');
        end
      end
      % destructor
