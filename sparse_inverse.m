@@ -31,7 +31,7 @@ classdef sparse_inverse <handle
        obj.cumulative_iter=0;
        obj.cumulative_cpu=0;
 
-       if ( strcmp(ctrl.approach,'\'))
+       if ( strcmp(ctrl.approach,'direct'))
        elseif ( strcmp(ctrl.approach,'agmg') )
 	  if (obj.is_symmetric)
 	    icg=1;
@@ -78,9 +78,9 @@ classdef sparse_inverse <handle
        end
       
        apply_cpu=tic;	 
-       if ( strcmp(obj.ctrl.approach ,'\'))
+       if ( strcmp(obj.ctrl.approach ,'direct'))
 	 sol=obj.matrix\rhs;
-	 obj.info_inverse.approach_used = '\';
+	 obj.info_inverse.approach_used = 'direct';
 	 obj.info_inverse.iter=0;
 	 obj.info_inverse.flag=0;
        elseif ( strcmp(obj.ctrl.approach ,'agmg'))

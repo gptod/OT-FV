@@ -34,14 +34,20 @@ if (~exist('approach_string','var') )
   return
 end
 
-filename=strcat('runs/',str_test,approach_string);
+%if (~exist('controls_string','var') )
+%  fprintf('Set varible: ( controls_string ) with linear solver approach resume\n')
+%  return
+%end
+
+filename=strcat('runs/',str_test,approach_string);%,controls_string);
+disp(filename)
 log_filename=strcat(filename,'.log')
 logID = fopen(log_filename,'w');
 fprintf(logID,'mesh type       = %d\n',mesh_type);
 fprintf(logID,'solver approach = %d\n',solver_approach);
-ctrl_inner11.info(logID)
-ctrl_inner22.info(logID)
-ctrl_outer.info(logID)
+ctrl_inner11.info(logID);
+ctrl_inner22.info(logID);
+ctrl_outer.info(logID);
 
 
 csv_filename=strcat(filename,'.csv')
@@ -49,7 +55,7 @@ csvID = fopen(csv_filename,'w');
 fprintf(csvID,'    np,  nrho,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,      mu,   theta, cpulinsys, cpuassemb\n');
 
 % Boundary conditions:
-[rho_in,rho_f,mass] = bc_density(cc2h,area2h);
+[rho_in,rho_f,mass] = bc_density(test_case,cc2h,area2h);
 
 % Barrier method's parameters:
 eps_0 = 1e-6; % tolerance for the final solution

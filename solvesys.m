@@ -94,9 +94,7 @@ elseif sol==2
     %[dp,flag,res,iter] = agmg(S,fp,0,1e-6,100,0,[],0);
     %sol_stat = struct('flag',flag,'relres',res,'iter',iter);
 
-    inner_iter=0
-    inner_cpu=0
-    
+    inner_iter=0;
     dp = [0; dp];
     dr = invC*(-f2-B2*dp);
     ds = JF.ss\(-F.s-JF.sr*dr);
@@ -340,7 +338,6 @@ elseif sol==7
   flag=invS.info_inverse.flag;
   relres=invS.info_inverse.res;
   inner_iter=invS.info_inverse.iter;
-  inner_cpu=invS.cumulative_cpu;
   outer_iter=0;
   outer_cpu=0.0;
   invS.kill();
@@ -454,48 +451,67 @@ elseif sol==9
 
 
  % init A^{-1}=block[A_1^{-1}, A_^{-1}]
-  disp('INIT block A^{-1}')
-  relax_A=1e-5;
-  diag_block_invA(1:Nt,1)=sparse_inverse;
-  for i=1:Nt
-    diag_block_invA(i).init(diag_block_A{i}+relax_A*speye(nAi),ctrl_inner11);
+  relax_A=1e-3;
+  use_block_invA=1;
+  if ( use_block_invA ) 
+    diag_block_invA(Nt,1)=sparse_inverse;
+    for i=1:Nt
+      diag_block_invA(i).init(diag_block_A{i}+relax_A*speye(nAi),ctrl_inner11);
+      label=strcat('A_',num2str(i));
+      diag_block_invA(i).info_inverse.label=label;
+    end
+  else
+    invA=sparse_inverse;
+    invA.init(A+relax_A*speye(Np),ctrl_inner11);
   end
-
+  
   % init C^{-1}
   fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
   invC = sparse(1:Nr,1:Nr,(1.0./spdiags(C))',Nr,Nr);
 
-  % assembly schur AC S=A+B1
-  % reduced to system only in phi
-  S = A+B1T*(invC*B2);
-  fp = rhs(1:Np)+B1T*(invC*rhs(1+Np:Np+Nr));
   
-  % grounding the solution
-  %S(indc,:) = sparse(1,Np);
-  %S(:,indc) = sparse(Np,1);
-  %S(indc,indc) = 1;
-
-  inv_S=sparse_inverse;
-  inv_S.init(S,ctrl_inner11);
-
-  % solve with fgmres
-  stationary=1
-  info_S=info_solver;
+  % solve 
+  stationary=1;
+  info_J=info_solver;
+  tic;
   if ( stationary)
-    [d,info_S.flag,info_S.res,info_S.iter,info_S.resvec] = gmres(jacobian,rhs,20,...
-				 ctrl_outer.tolerance,...
-				 ctrl_outer.itermax,...
-				 @(x) upper_triang_prec(x, ...
-							@(y) inv_S.apply(y),...
-							B1T,...
-							@(z) invC*(-z)));
-    	%@(y) apply_block_diag_inverse(diag_block_invA,y) ,...% A^{-1}
-    
-    info_S.print();
-    flag=info_S.flag
-    relres=info_S.res
+    if (use_block_invA)
+      [d,info_J.flag,info_J.res,...
+       info_J.iter,info_J.resvec] = ...
+      bicgstab(jacobian,rhs,...
+	       ctrl_outer.tolerance,...
+	       ctrl_outer.itermax,...
+	       @(x) upper_triang_prec(x, ...
+				      @(y) apply_block_diag_inverse(diag_block_invA,y) ,...% A^{-1}
+				      B1T,...
+				      @(z) -invC*z ));
+				% set info solver quantities
+      inner_iter=0;
+      for i=1:Nt
+	inner_iter=inner_iter+diag_block_invA(i).cumulative_iter;
+      end
+      inner_nequ=nAi;
+      outer_iter = info_J.iter;
+    else
+      [d,info_J.flag,info_J.res,...
+       info_J.iter,info_J.resvec] = ...
+      bicgstab(jacobian,rhs,...
+	       ctrl_outer.tolerance,...
+	       ctrl_outer.itermax,...
+	       @(x) upper_triang_prec(x, ...
+				      @(y) invA.apply(y),...% A^{-1}
+				      B1T,...
+				      @(z) -invC*z ));
+
+      inner_iter=invA.cumulative_iter;
+      inner_nequ=Np;
+      outer_iter = info_J.iter;
+    end
+
+    flag=info_J.flag;
+    relres=info_J.res;
   else
-    [d,info_S.flag,info_S.iter,info_S.res,info_S.resvec] = fgmres(jacobian,b,ctrl_outer.tolerance,...
+    [d,info_J.flag,iters,info_J.res,info_J.resvec] = fgmres(jacobian,rhs,ctrl_outer.tolerance,...
 		      'max_iters',ctrl_outer.itermax,...
                       'restart',20,...
 		      'verb',0,...
@@ -503,19 +519,21 @@ elseif sol==9
 					       @(y) apply_block_diag_inverse(diag_block_invA,y) ,...% A^{-1}
 					       B1T,...
 					       @(z) invC*(-z)));
-    info_S.print();
+    info_J.iter=iters(1);
+    info_J.print();
     flag = 0;
     relres = 0;
 
   end
-  
+  outer_cpu=toc;
+
+  % compute real residuum
   A = sparse(JF.pp); B1T = sparse(JF.pr); B2 = sparse(JF.rp);
   C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
   jacobian2 = [A B1T; B2 -C];
-  res=norm(jacobian2*d-rhs)/norm(rhs)
+  relres=norm(jacobian2*d-rhs)/norm(rhs);
 
-  inner_iter=inv_S.cumulative_iter;
-  inner_cpu=inv_S.cumulative_cpu;
+  % 
   
   
   dp = d(1:Np); dr = d(Np+1:end);
@@ -532,8 +550,8 @@ elseif sol==10
   verbose=0;
   % Krylov method for full system
   % + 
-  % use P=( SAC BT ) as preconditoner 
-  %       ( 0   -C )
+  % use P=( SAC B1T ) as preconditoner 
+  %       ( 0    -C )
 
   % cpu time preprocessing main solver
   tic;
@@ -559,7 +577,7 @@ elseif sol==10
   % assembly schur AC S=A+B1
   % reduced to system only in phi
   S = A+B1T*(invC*B2);
-  fp = f1+B1T*(invC*f2);
+  fp = rhs(1:Np)+B1T*(invC*rhs(Np+1:Np+Nr));
 
   if ( compute_eigen)
     eigvalues=eig(full(S));
@@ -577,9 +595,8 @@ elseif sol==10
   %S(:,indc) = sparse(Np,1);
   %S(indc,indc) = 1;
   preprocess_cpu=toc;
-
-  approach='full';  
-  relax4prec=1e-5;
+  approach=controls.extra_info;  
+  relax4prec=1e-8;
   debug=0;
   if ( verbose >= 2)
     fprintf('APPROACH %s \n',appraoch)
@@ -652,9 +669,9 @@ elseif sol==10
     end
     inner_nequ=nAi;
   elseif(strcmp(approach,'block_diag'))
-    %
-    % partion diagonal and upper diagonal blocks
-    %
+			  %
+			  % partion diagonal and upper diagonal blocks
+			  %
     if ( verbose >= 2)
       fprintf('PARTION diag S\n')
     end
@@ -685,24 +702,6 @@ elseif sol==10
     inverse_block11  = @(x) apply_block_diag_inverse(diag_block_invS,x);
     inverse_block11  = @(x) explicit_diag_block_S\x;
     inner_nequ=nAi;
-    
-  elseif (strcmp(approach,'fullA'))
-    % init inverse of full S
-    if ( verbose >= 2)
-      fprintf('INIT inverse S\n')
-    end
-    inv_A=sparse_inverse;
-    inv_A.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
-    inv_A.cumulative_iter=0;
-    inv_A.cumulative_cpu=0;
-				%inv_S.info();
-    inverse_cpu=inv_A.init_cpu;
-    if ( verbose >= 2)
-      fprintf('DONE inverse S\n') 
-    end
-
-    inverse_block11 = @(x) inv_A.apply(x);
-    inner_nequ=Np;
   end
 
   %
@@ -721,45 +720,31 @@ elseif sol==10
 					 B1T,...
 					 @(z) invC*(-z));
   end
-				% solve with fgmres or bicgstab if prec is linear
+
+		     % solve with fgmres or bicgstab if prec is linear
   outer_timing=tic;
-  info_J=info_solver;
-  if ( strcmp(ctrl_inner11.approach,'\') | (ctrl_inner11.tolerance < 1e-12) )
-				%    'USING BICGSTAB'
-    [d,info_J.flag,info_J.res,info_J.iter,info_J.resvec] = bicgstab(jacobian,rhs,...
-				 ctrl_outer.tolerance,...
-				 ctrl_outer.itermax,...
-				 @(x) prec(x));    
-  else
-    [d,i,info_J.resvec,info_J.iter] = fgmres(jacobian,rhs,ctrl_outer.tolerance,...
-		      'max_iters',ctrl_outer.itermax,...
-                      'restart',20,...
-		      'verb',0,...
-		      'P',@(x,tol) prec(x));
-  end
+  [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec );
+  outer_cpu=toc(outer_timing);
 
   if(strcmp(approach,'full'))
     inner_iter=inv_S.cumulative_iter;
-    inner_cpu=inv_S.cumulative_cpu;
   elseif(strcmp(approach,'block_diag'))
     inner_iter=0;
     for i=1:Nt
       inner_iter = inner_iter + diag_block_invS(i).cumulative_iter;
     end
-    inner_cpu=0.0;
   elseif(strcmp(approach,'block_triang'))
     inner_iter=0;
     for i=1:Nt
       inner_iter = inner_iter + diag_block_invS(i).cumulative_iter;
     end
-    inner_cpu=0.0;
   end
 
   
-  outer_iter=uint8(info_J.iter);
-  outer_cpu=toc(outer_timing);
+  outer_iter=uint64(info_J.iter);
   
-  info_J.resvec=info_J.resvec(1:outer_iter);
+  
+  %info_J.resvec=info_J.resvec(1:outer_iter);
   info_J.res=norm(jacobian*d-rhs)/norm(rhs);
   info_J.flag=1;
   if (info_J.res <= ctrl_outer.tolerance)
@@ -787,8 +772,14 @@ elseif sol==11
   verbose=controls.verbose;
   % Krylov method for full system
   % + 
-  % use P=( ~diag(A)  BT ) as preconditoner 
-  %       ( B         -C )
+  % use P=( ~A  B1T ) as preconditoner 
+  %       ( B2          -C )
+  %
+  % 
+  % based on
+  % ~A=diag(A)
+  % ~A=approximate inverse of A given by inner_solver
+  % S=-C-B2*(diag(A))^{-1} B1T 
 
   % cpu time preprocessing main solver
   tic;
@@ -805,7 +796,7 @@ elseif sol==11
 
   
  % init C^{-1}
-  if ( verbose >= 1)
+  if ( verbose >= 2)
     fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
     fprintf('(%9.4e <= A <= %18.12e) \n',min(spdiags(A,0)),max(spdiags(A,0)))
   end
@@ -853,73 +844,28 @@ elseif sol==11
   %inverseA_approach='full';
   %inverseA_approach='block';
   relax4prec=1e-10;
-  if ( strcmp(inverseA_approach,'diag'))
-    invA = @(x) invDiagA*x;
-  elseif( strcmp(inverseA_approach,'full'))
-    inv_A=sparse_inverse;
-    inv_A.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
-    inv_A.cumulative_iter=0;
-    inv_A.cumulative_cpu=0;
-
-    invA = @(x) inv_A.apply(x);
-  elseif( strcmp(inverseA_approach,'block'))
-    diag_block_A = cell(Nt, 1);
-    nAi=ncellphi;
-    for i=1:Nt
-      diag_block_A{i}      =A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-      if (debug) 
-	explicit_diag_block_S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)=...
-	S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-      end
-    end
-    diag_block_invA(Nt,1)=sparse_inverse;
-    for i=1:Nt
-      diag_block_invA(i).init(diag_block_A{i}+relax4prec*speye(nAi,nAi),ctrl_inner11);
-      diag_block_invA(i).info_inverse.label=strcat('A_',num2str(i));
-    end
-    invA  = @(x) apply_block_diag_inverse(diag_block_invA,x);
-  end
-  % Define action of preconditoner
-  prec = @(x,tol) SchurCA_based_preconditioner(x, invA,inverse_block22,B1T,B2);
-
-  % solve with fgmres or bicgstab if prec is linear
-  outer_timing=tic;
-  info_J=info_solver;
-  if ( 1 )% strcmp(ctrl_inner11.approach,'\') | (ctrl_inner.tolerance < 1e-12) )
-	 %disp( 'USING BICGSTAB')
-    if (0) 
-      [d,info_J.flag,info_J.res,iters,info_J.resvec] = gmres(jacobian,rhs,...
-							     20, ctrl_outer.tolerance,...
-							     ctrl_outer.itermax,...
- 							     @(x) prec(x));
-    else
-      [d,info_J.flag,info_J.res,iters,info_J.resvec] = bicgstab(jacobian,rhs,...
-				 ctrl_outer.tolerance,...
-				 ctrl_outer.itermax,...
- 				 @(x) prec(x));
-
-    end
-    info_J.iter=iters(1);
-  else
-    [d,i,info_J.resvec,info_J.iter] = fgmres(jacobian,rhs,ctrl_outer.tolerance,...
-		      'max_iters',ctrl_outer.itermax,...
-                      'restart',20,...
-		      'verb',0);%,...
-		      %'P',@(x,tol) prec(x));
-  end
-
-  inner_iter=inv_SCA.cumulative_iter;
-  inner_cpu=inv_SCA.cumulative_cpu;
- 
-  outer_iter=uint64(info_J.iter);
-  outer_cpu=toc(outer_timing);
   
-  info_J.resvec=info_J.resvec(1:outer_iter);
-  info_J.res=norm(jacobian*d-rhs)/norm(rhs);
-  info_J.flag=1;
-  if (info_J.res <= ctrl_outer.tolerance)
-    info_J.flag=0;
-  end
+  inv_A=sparse_inverse;
+  inv_A.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
+  inv_A.cumulative_iter=0;
+  inv_A.cumulative_cpu=0;
+  
+  invA = @(x) inv_A.apply(x);
+
+  
+  % Define action of preconditoner
+  prec = @(x) SchurCA_based_preconditioner(x, invA,inverse_block22,B1T,B2);
+
+  % solve 
+  outer_timing=tic;
+  [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec );
+  outer_cpu=toc(outer_timing);
+
+  % get info
+  inner_iter=inv_SCA.cumulative_iter;
+  outer_iter=uint32(info_J.iter);
+  
+  
  
   flag=info_J.flag;
   relres=info_J.res;
@@ -1050,10 +996,8 @@ elseif sol==12
 					     'P',@(x,tol) prec(x));
   end
   
-  inner_iter=0;%inv_SCA.cumulative_iter;
-  inner_cpu=0;%,inv_SCA.cumulative_cpu;
- 
-  outer_iter=uint64(info_J.iter);
+  inner_iter=0;%inv_SCA.cumulative_iter; 
+  outer_iter=info_J.iter;
   outer_cpu=toc(outer_timing);
   
   info_J.resvec=info_J.resvec(1:outer_iter);
@@ -1103,6 +1047,5 @@ sol_stat = struct('flag',flag,...
 		  'rhsnorm',norm([F.p;F.r;F.s]),...
 		  'inner_nequ', inner_nequ,...
 		  'inner_iter', inner_iter,...
-		  'inner_cpu',  inner_cpu,...
 		  'outer_iter', outer_iter,...
 		  'outer_cpu',  outer_cpu );

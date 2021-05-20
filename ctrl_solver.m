@@ -6,22 +6,28 @@ classdef ctrl_solver <handle
      nrestart=20;
      omega=1.0;
      verbose=0;
+     label='';
    end
    methods
-     function obj = init(obj,approach,tolerance,itermax,omega,verbose)
+     function obj = init(obj,approach,tolerance,itermax,omega,verbose,label)
        obj.approach=approach;
        obj.tolerance=tolerance;
        obj.itermax=itermax;
        
        if (~exist('omega','var') )
-	 obj.omega=1
+	 obj.omega=1;
        else
-	 obj.omega=omega
+	 obj.omega=omega;
        end
        if (~exist('verbose','var') )
 	 obj.verbose=0;
        else
 	 obj.verbose=verbose;
+       end
+       if (~exist('label','var') )
+	 obj.label='';
+       else
+	 obj.label=label;
        end
      end
      function obj = info(obj,fid)
