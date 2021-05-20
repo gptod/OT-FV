@@ -399,31 +399,33 @@ elseif sol==8
   x0=zeros(Np,1);
   info_S=info_solver;
 
-  approach="stationary_block_diag"
-  %approach="stationary_block_triangular"
-  if ( strcmp(approach, "stationary_block_diag")) 
-    [dp,info_S.iter,info_S.res,info_S.resvec] = ...
-    stationary_iterative_methods(S,...
-				 fp,x0,ctrl_outer.tolerance,ctrl_outer.itermax,...
-  				 @(x) apply_block_triangular_inverse(...
-								      diag_block_invS,below_diag_block_S,'L',x));
-    info_S.print();
-  elseif ( strcmp(approach, "stationary_block_triangular") )
-    [dp,info_S.iter,info_S.res,info_S.resvec] = ...
-    stationary_iterative_methods(S,fp,x0,ctrl_outer.tolerance,ctrl_outer.itermax,...
-   				 @(x) apply_block_diag_inverse(diag_block_invS,x));
-    info_S.print();
-    
-  end 
- 
+  approach=controls.extra_info;
+			       %approach="stationary_block_triangular"
+  if ( strcmp(approach, 'block_diag')) 
+    prec = @(x) apply_block_triangular_inverse(diag_block_invS,below_diag_block_S,'L',x);
+  elseif ( strcmp(approach, 'block_triangular') )
+    prec = @(x) apply_block_diag_inverse(diag_block_invS,x);
+  end
+
+  % solve 
+  tic;
+  [dp,info_S] = apply_iterative_solver(@(y) S*y, fp, ctrl_outer, prec,x0);
+  outer_cpu = toc;
+  
+  
   % get solution of system JF d  = F  
-  dr = invC*(B2*dp-f2);
-
-  %J=[A, B1T;  B2, -C];
-  %norm(J*[dp;dr]-[f1;f2])
-
+  dr = invC*(B2*dp-rhs(Np+1:Np+Nr));
   ds = JF.ss\(h-JF.sr*dr);
   d = [dp; dr; ds];
+
+  % store info
+  inner_nequ=diag_block_invS(1).nequ;
+  inner_iter=0;
+  for i  = 1:Nt
+    inner_iter=inner_iter+diag_block_invS(i).cumulative_iter;
+  end
+  outer_iter=info_S.iter
+
     
   normd = norm(d);
 
@@ -840,9 +842,6 @@ elseif sol==11
   inner_nequ=Nr;
 
   % inverse A action
-  inverseA_approach='diag';
-  %inverseA_approach='full';
-  %inverseA_approach='block';
   relax4prec=1e-10;
   
   inv_A=sparse_inverse;

@@ -1,4 +1,11 @@
-function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec)
+function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,solini)
+
+  if (exist('solini','var') )
+    x0=solini;
+  else
+    x0=zeros(size(rhs,1),1);
+  end
+
   info=info_solver;
   
   if (strcmp(ctrl.approach,'bicgstab'))
@@ -28,6 +35,12 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec)
 			    ctrl.itermax,...
  			    @(x) prec(x));
     info.iter=iters(1);
+    info.res=norm(matrix_operator(sol)-rhs)/norm(rhs);
+    info.flag = (info.res >= ctrl.tolerance);
+
+  elseif (strcmp(ctrl.approach,'stationary_iterative_methods'))
+    [sol,info.iter,info.res] = stationary_iterative_methods(@(y) matrix_operator(y),rhs,x0,ctrl.tolerance,ctrl.itermax,@(z) prec(z));
+    
     info.res=norm(matrix_operator(sol)-rhs)/norm(rhs);
     info.flag = (info.res >= ctrl.tolerance);
   else

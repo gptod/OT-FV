@@ -38,7 +38,7 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 1:2%:4
+  for h_i = 1:4
 	       % INCRESING TIME STEP
 	       % set here 1:5
     for i=1:4
@@ -70,8 +70,36 @@ for mesh_type = 2
 	ctrl_inner22=ctrl_solver;
 	ctrl_outer=ctrl_solver;
 
+	if (sol==8)
+	  ctrl_outer.init('stationary_iterative_methods',1e-5,1000);
 
-	if (sol==9)
+	  solvers={'agmg'  ,'direct' ,'krylov'  ,'incomplete'};
+	  iters  ={10      ,1        ,10        ,  1          };
+	  labels  ={'agmg10','direct','krylov10','incomplete'};
+
+	  % set here from solvers
+	  for i=1:length(solvers)
+	    ctrl_inner11.init(solvers{i},1e-12,iters{i},1.0,0,labels{i});
+
+	    
+	    extras={'block_diag','block_triangular'}
+	    for i=1:2
+	      controls = struct('indc',grounded_node,...
+				'sol',solver_approach,...
+				'ctrl_inner11',ctrl_inner11,...
+				'ctrl_inner22',ctrl_inner22,...
+				'ctrl_outer',ctrl_outer,...
+				'compute_eigen',compute_eigen,...
+				'verbose',verbose,...
+				'extra_info',extras{i});
+	      approach_string=def_approach_string(controls);
+	      geod
+	    end
+	  end
+	    
+	
+
+	elseif (sol==9)
 	    % set here bicgstab,gmres,fgmres (for non stationary prec)
 	  ctrl_outer.init('fgmres',1e-5,1000);
 
@@ -104,7 +132,7 @@ for mesh_type = 2
 	  label  ={'direct','agmg100','agmg10','incomplete','krylov10','krylov10'};
 
 	  % set here from solvers
-	  for i=[3];%length(solvers)
+	  for i=[1,3];%length(solvers)
 	    ctrl_inner11.init(solvers{i},1e-13,iters{i},1.0,0,label{i});
 	    
 
