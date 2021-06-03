@@ -52,7 +52,7 @@ ctrl_outer.info(logID);
 
 csv_filename=strcat(filename,'.csv')
 csvID = fopen(csv_filename,'w');
-fprintf(csvID,'    np,  nrho,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,      mu,   theta, cpulinsys, cpuassemb\n');
+fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,      mu,   theta, cpulinsys, cpuassemb\n');
 
 % Boundary conditions:
 [rho_in,rho_f,mass] = bc_density(test_case,cc2h,area2h);
@@ -84,6 +84,7 @@ Ms = spdiags(ds,0,nei,nei);
 div = Div2D(ncell,nei,ind,edges); % divergence matrix
 grad = -Ms\div'; % gradient matrix
 
+
 % global matrices
 Dt = assembleDt(N,ncell);
 divt = assembleDivt(N,ncell,nei,div);
@@ -94,13 +95,17 @@ Mst = assembleMst(N,nei,Ms);
 RHt = assembleRHt(N,ncell);
 It = assembleIt(N,ncell,ncell2h,I);
 
+
 itk1 = 0;
 tit = 0; % counter of the total number of Newton iterations
 theta = theta0;
 mu = mu0/theta;
 delta_0 = 2*eps_0;
 
-
+masses=zeros(N,1);
+masses_increment=zeros(N,1);
+imbalance_res_phi=zeros(Nt,1);
+imbalance_increment_phi=zeros(Nt,1);
 
 while true
   assembly=tic;
@@ -140,6 +145,36 @@ while true
         OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
         delta_mu = norm([OC.p;OC.r;OC.s]);
 
+
+
+	for i = 1:N
+	  masses(i)=uk(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
+	end
+	state_message=sprintf('%1.4e<=masses rho[:]<= %1.4e',min(masses),max( masses));
+	%fprintf('%s \n',state_message);
+	fprintf(logID,'%s \n',state_message);
+	
+
+	current_res_phi = OC.p;
+	for i = 1:Nt
+	  imbalance_res_phi(i)=sum(current_res_phi((i-1)*ncell+1:i*ncell));
+	end
+	state_message=sprintf('%1.4e<=imbalance_F_phi[:]<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
+	fprintf('%s \n',state_message);
+	fprintf(logID,'%s \n',state_message);
+
+	for i = 1:Nt
+	  imbalance_res_phi(i)=norm(current_res_phi((i-1)*ncell+1:i*ncell));
+	  %state_message=sprintf('norm_F_phi( %d )= %1.4e',i,imbalance_res_phi(i));
+	  %fprintf('%s \n',state_message);
+	  %fprintf(logID,'%s \n',state_message);
+	end
+	state_message=sprintf('%1.4e<=norm_F_phi[:]<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
+	fprintf('%s \n',state_message);
+	fprintf(logID,'%s \n',state_message);
+
+	
+
         if verb>1
             fprintf('%11s %3i %7s %1.4e \n','Inner step:',itk2,' Error:',delta_mu)
         end
@@ -176,6 +211,12 @@ while true
 	
 				% Solve the linear system
 	timelinsys=tic;
+
+
+	
+	
+
+	
         [omegak, info_solver] = solvesys(JOC,OC,controls,logID);
 	sum_linsys=sum_linsys+toc(timelinsys);
 	sum_total=sum_total+toc(total);
@@ -185,9 +226,20 @@ while true
 	print_info_solver(info_solver)
 	print_info_solver(info_solver,logID)
 
+	for i = 1:N
+	  masses_increment(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
+	end
+
+	state_message=sprintf('%1.4e<=masses increment rho[:]<= %1.4e',min(masses_increment),max( masses_increment));
+	%fprintf('%s \n',state_message);
+	fprintf(logID,'%s \n',state_message);
+
 
 	OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
         delta_mu = norm([OC.p;OC.r;OC.s]);
+
+
+	
 	
         % Linesearch just to ensure that rho and s stay positive
         alfak = 1;
