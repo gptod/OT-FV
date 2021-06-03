@@ -231,7 +231,7 @@ while true
 	end
 
 	state_message=sprintf('%1.4e<=masses increment rho[:]<= %1.4e',min(masses_increment),max( masses_increment));
-	%fprintf('%s \n',state_message);
+	fprintf('%s \n',state_message);
 	fprintf(logID,'%s \n',state_message);
 
 
