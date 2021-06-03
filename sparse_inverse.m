@@ -1,6 +1,7 @@
 classdef sparse_inverse <handle
   properties
-    name;
+    dimblock=0;
+    name='empty';
     matrix;
     inverse_matrix_diagonal;
      nequ;
@@ -40,7 +41,7 @@ classdef sparse_inverse <handle
 	 end
 	     %obj.mgsolver=agmg(matrix,[],icg,[],ctrl.itermax,0,[],1);
        elseif ( strcmp(ctrl.approach,'diag') )
-	 obj.inverse_matrix_diagonal= sparse(1:obj.nequ,1:obj.nequ,(1.0./spdiags(matrix,0))',obj.nequ,obj.nequ);
+	 obj.inverse_matrix_diagonal= 1.0./spdiags(matrix,0);
        elseif ( strcmp(ctrl.approach,'krylov'))
 	 if ( obj.is_symmetric)
 	   obj.IL = ichol(matrix, struct('type','ict','droptol',1e-3));
@@ -67,6 +68,9 @@ classdef sparse_inverse <handle
 	 obj.D=spdiags(diag(obj.matrix),0,obj.nequ,obj.nequ);
 	 obj.M=obj.D;
 	 obj.N=obj.M-obj.matrix;
+       else
+	 fprintf('In sparse_inverse.init: approch %s not supported. Execation will be stopped',obj.ctrl.approach)
+	 return
        end
        obj.init_cpu=toc(init_cpu);
        
@@ -76,7 +80,12 @@ classdef sparse_inverse <handle
        if (~exist('initial_guess','var'))
 	 initial_guess=zeros(obj.nequ,1);
        end
-      
+
+       result = sum(isnan(rhs(:)));
+       if (result>0)
+	 disp('Nan in RHS')
+       end
+       
        apply_cpu=tic;	 
        if ( strcmp(obj.ctrl.approach ,'direct'))
 	 sol=obj.matrix\rhs;
@@ -93,8 +102,9 @@ classdef sparse_inverse <handle
 	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,0);	 
 	 obj.info_inverse.approach_used = 'agmg';
        elseif ( strcmp(obj.ctrl.approach,'diag') )
-	 sol=obj.inverse_matrix_diagonal*rhs;
+	 sol=obj.inverse_matrix_diagonal.*rhs;
 	 obj.info_inverse.iter=0;
+	 obj.info_inverse.flag= 0; 
        elseif( strcmp(obj.ctrl.approach, 'krylov'))
 	 if ( obj.is_symmetric )
 	   [sol,obj.info_inverse.flag,obj.info_inverse.res,obj.info_inverse.iter,obj.info_inverse.resvec]=...
@@ -146,10 +156,12 @@ classdef sparse_inverse <handle
        obj.cumulative_iter=obj.cumulative_iter+obj.info_inverse.iter;
        obj.cumulative_cpu=obj.cumulative_cpu+cpu;
 
+       obj.info_inverse.label=obj.ctrl.label;
        if (obj.ctrl.verbose)
 	 obj.info_inverse.print();
        end
-
+       
+       
        if ( obj.info_inverse.flag ~= 0 )
 	 obj.info_inverse();
 	 %error('INNER ERROR FOR LINEAR SOLVER');
