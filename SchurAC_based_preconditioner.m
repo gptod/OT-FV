@@ -4,7 +4,7 @@ function [out] = SchurAC_based_preconditioner(in, invSAC,invC,B1T,B2,prec_type,d
   % in  = (f;g)
 
 
-  verbose=1;
+  verbose=0;
   if (exist('prec_type','var') )
     type=prec_type;
   else

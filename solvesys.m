@@ -57,6 +57,8 @@ jacobian = [A B1T; B2 -C];
 % assembly rhs
 rhs=[f1;f2];
 
+kernel=ones(ncellphi,1);
+kernel=kernel/norm(kernel);
 
 if sol==1
     
@@ -921,18 +923,25 @@ elseif sol==11
 
   
   % Define action of preconditoner
-  prec = @(x) SchurCA_based_preconditioner(x, inv_A,inverse_block22,B1T,B2,controls.outer_prec,ncellphi);
-
+  prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
+					   inverse_block22,...
+					   @(y) B1T*y,...
+					   B2,controls.outer_prec,ncellphi);
+  %prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
+%					   inverse_block22, @(y) projector(B1T*y,kernel),...
+%					   B2,controls.outer_prec,ncellphi);
+%
+  
   % solve
   jacobian = [A B1T; B2 -C];
 
-  
   
   outer_timing=tic;
   [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(A,B1T,B2,C,ncellphi,x), ...
 				    rhs, ctrl_outer, prec,[],controls.left_right );
   outer_cpu=toc(outer_timing);
 
+  
   % get info
   inner_iter=inv_SCA.cumulative_iter;
   outer_iter=uint32(info_J.iter);

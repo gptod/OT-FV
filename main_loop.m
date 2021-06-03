@@ -16,7 +16,6 @@ rec = 1;
 verb = 1; % verbosity level: {0,1,2}
 
 
-grounded_node=1;
 
 plot=0
 
@@ -38,10 +37,10 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 3
+  for h_i = 1:4
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=3
+    for i=1:5
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -128,7 +127,7 @@ for mesh_type = 2
 	  end
 	elseif (sol==10)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('fgmres',1e-9,1000);
+	  ctrl_outer.init('fgmres',1e-6,1000);
 
 	  % preconditioner approach
 	  outer_prec='full'
@@ -161,7 +160,7 @@ for mesh_type = 2
 
    	    % set here from solvers
 	    for i=[3];%length(solvers)
-	      ctrl_inner11.init(solvers{i},1e-13,iters{i},1.0,0,label{i});
+	      ctrl_inner11.init(solvers{i},1e-3,iters{i},1.0,0,label{i});
 	      
 	      
 	      % store all controls
@@ -219,12 +218,12 @@ for mesh_type = 2
 	    outer_prec=outer_precs{iprec};
 	  
 	  % set here other approximate inverse of block11
-	  ctrl_inner11.init('direct',... %approach
+	  ctrl_inner11.init('diag',... %approach
 			    1e-12,... %tolerance
 			    10,...% itermax
 			    0.0,... %omega
 			    0,... %verbose
-			    'direct'); %label
+			    'diag'); %label
 	  %extra_info='full';
 	  extra_info='block';
 	  relax4_inv11=1e-09;
@@ -238,7 +237,7 @@ for mesh_type = 2
 	  label  ={'agmg1','agmg10','agmg100','direct','krylov1','krylov10','incomplete'};
 	  relax4_inv22=0;
 	  
-	  for i=[2];%1:length(solvers)
+	  for i=[1];%1:length(solvers)
 	    ctrl_inner22.init(solvers{i},1e-13,iters{i},1.0,0,label{i});
 	    controls = struct('indc',grounded_node,...
 			      'sol',solver_approach,...

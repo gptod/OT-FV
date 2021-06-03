@@ -151,25 +151,26 @@ while true
 	  masses(i)=uk(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
 	end
 	state_message=sprintf('%1.4e<=masses rho[:]<= %1.4e',min(masses),max( masses));
-	%fprintf('%s \n',state_message);
+	fprintf('%s \n',state_message);
 	fprintf(logID,'%s \n',state_message);
+
+	
 	
 
 	current_res_phi = OC.p;
 	for i = 1:Nt
-	  imbalance_res_phi(i)=sum(current_res_phi((i-1)*ncell+1:i*ncell));
+	  imbalance_res_phi(i)=sum(current_res_phi((i-1)*ncell+1:i*ncell))/norm(current_res_phi((i-1)*ncell+1:i*ncell));
 	end
-	state_message=sprintf('%1.4e<=imbalance_F_phi[:]<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
+	state_message=sprintf('%1.4e<=sum(F_phi[:])/norm(F_phi[:])<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
 	fprintf('%s \n',state_message);
 	fprintf(logID,'%s \n',state_message);
 
-	for i = 1:Nt
-	  imbalance_res_phi(i)=norm(current_res_phi((i-1)*ncell+1:i*ncell));
-	  %state_message=sprintf('norm_F_phi( %d )= %1.4e',i,imbalance_res_phi(i));
-	  %fprintf('%s \n',state_message);
-	  %fprintf(logID,'%s \n',state_message);
+
+	current_res_phi = OC.r;
+	for i = 1:N
+	  imbalance_res_phi(i)=current_res_phi((i-1)*ncell2h+1:i*ncell2h)'*area2h;
 	end
-	state_message=sprintf('%1.4e<=norm_F_phi[:]<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
+	state_message=sprintf('%1.4e<=integral_F_rho[:]<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
 	fprintf('%s \n',state_message);
 	fprintf(logID,'%s \n',state_message);
 

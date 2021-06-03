@@ -17,8 +17,10 @@ function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,prec_type,d
     dimblock=0;
   end
 
-  n=size(B1T,1);
-  m=size(B1T,2);
+  n=size(B2,2);
+  m=size(B2,1);
+
+  %fprintf('norm v in P^{-1} v - %1.4e \n', norm(in))
 
 
   
@@ -46,7 +48,7 @@ function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,prec_type,d
     out(n+1:n+m)=invSCA(w);
 
     % w= B1T*y
-    w      = B1T * out(1+n:n+m);
+    w      = B1T ( out(1+n:n+m) );
     % x = t - A^{-1} w
     if (verbose)
       disp('second')
@@ -84,10 +86,11 @@ function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,prec_type,d
     
     
     % v= f - B1T*y
-    v=in(1:n) - B1T*out(n+1:n+m);
-    if (verbose)
-      print_imbalance(v,dimblock)
-    end
+    %print_imbalance(in(1:n),dimblock)
+    v=in(1:n) - B1T ( out(n+1:n+m));
+    %if (verbose)
+    %print_imbalance(v,dimblock)
+    %end
     
     % x = A^{-1} v
     out(1:n) = invA(v);
