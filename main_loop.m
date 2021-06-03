@@ -38,10 +38,10 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 2:4
+  for h_i = 3
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=1
+    for i=3
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -200,7 +200,7 @@ for mesh_type = 2
 
 	  
 	  % external prec appraoch
-	  outer_precs={'full' ,'lower_triang'  ,'upper_triang'};
+	  outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
 	  nouter_precs=length(outer_precs);
 
 	  % pcg works only with full
@@ -215,19 +215,19 @@ for mesh_type = 2
 	  left_right='right';
 
 	  
-	  for iprec=[3]%1:nouter_precs
+	  for iprec=[1]%1:nouter_precs
 	    outer_prec=outer_precs{iprec};
 	  
 	  % set here other approximate inverse of block11
-	  ctrl_inner11.init('agmg',... %approach
+	  ctrl_inner11.init('direct',... %approach
 			    1e-12,... %tolerance
 			    10,...% itermax
 			    0.0,... %omega
 			    0,... %verbose
-			    'agmg'); %label
+			    'direct'); %label
 	  %extra_info='full';
 	  extra_info='block';
-	  relax4_inv11=1e-10;
+	  relax4_inv11=1e-09;
 	  
 	  % set grounded_node>0 to gorund the potential in grounded node
 	  grounded_node=0;
@@ -239,7 +239,7 @@ for mesh_type = 2
 	  relax4_inv22=0;
 	  
 	  for i=[2];%1:length(solvers)
-	    ctrl_inner22.init(solvers{i},1e-12,iters{i},1.0,0,label{i});
+	    ctrl_inner22.init(solvers{i},1e-13,iters{i},1.0,0,label{i});
 	    controls = struct('indc',grounded_node,...
 			      'sol',solver_approach,...
 			      'outer_prec',outer_prec,...
