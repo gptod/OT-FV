@@ -91,7 +91,9 @@ function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,prec_type,d
     
     % x = A^{-1} v
     out(1:n) = invA(v);
-   
+
+  elseif(strcmp(type,'identity'))
+    out=in;
   end 
 
 end
