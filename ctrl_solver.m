@@ -25,7 +25,7 @@ classdef ctrl_solver <handle
 	 obj.verbose=verbose;
        end
        if (~exist('label','var') )
-	 obj.label='';
+	 obj.label=approach;
        else
 	 obj.label=label;
        end
@@ -34,7 +34,7 @@ classdef ctrl_solver <handle
         if (~exist('fid','var') )
 	  fid=1;
        end
-       fprintf(fid,'approch=%s tolerance=%9.3e itermax=%d \n',...
+       fprintf(fid,'approach=%s tolerance=%9.3e itermax=%d \n',...
 	       obj.approach,obj.tolerance,obj.itermax);
      end
    end
