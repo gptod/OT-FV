@@ -925,9 +925,12 @@ elseif sol==11
 
   % solve
   jacobian = [A B1T; B2 -C];
+
+  
   
   outer_timing=tic;
-  [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec,[],controls.left_right );
+  [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(A,B1T,B2,C,ncellphi,x), ...
+				    rhs, ctrl_outer, prec,[],controls.left_right );
   outer_cpu=toc(outer_timing);
 
   % get info
