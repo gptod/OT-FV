@@ -51,7 +51,7 @@ JOCpr = Mxt*Nt*Dt*It*I_all+divt*spdiags(gradphi,0,te,te)*drhos;
 JOCps = sparse(tnp,tnr2h);
 
 % derivatives of the optimality conditions in rho
-JOCrp = (Nt*Mxt*Dt*It*I_all)'-drhos'*Mst*(spdiags(gradphi,0,te,te)*gradt);
+%JOCrp = (Nt*Mxt*Dt*It*I_all)'-drhos'*Mst*(spdiags(gradphi,0,te,te)*gradt);
 JOCrr = -0.5*ddrhosa;
 JOCrs = -Mxt2h(1:tnr2h,1:tnr2h);
 
@@ -63,7 +63,7 @@ JOCss = -spdiags(rho,0,tnr2h,tnr2h);
 
 
 JOC.pp = JOCpp; JOC.pr = JOCpr; JOC.ps = JOCps;
-JOC.rp = JOCrp; JOC.rr = JOCrr; JOC.rs = JOCrs;
+JOC.rp = JOCpr'; JOC.rr = JOCrr; JOC.rs = JOCrs;
 JOC.sp = JOCsp; JOC.sr = JOCsr; JOC.ss = JOCss;
 
 JOC.ntimestep=N;
