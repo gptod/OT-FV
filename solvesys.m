@@ -566,7 +566,7 @@ elseif sol==10
     A(indc,:)   = sparse(1,Np);
     A(indc,indc)= 1;
     B1T(indc,:) = sparse(1,Nr);
-    B2(:,indc)  = sparse(Nr,1);
+    %B2(:,indc)  = sparse(Nr,1);
   end
 
 
@@ -731,7 +731,7 @@ elseif sol==10
       diag_block_invS(i).init(diag_block_S{i}+relax4prec*speye(nAi,nAi),ctrl_loc);
       diag_block_invS(i).name=sprintf('inverse_SAC%d%d',ctrl_inner11.label,i,i);
     end
-    if (1) 
+    if (0) 
       for i=1:Nt
 	disp(diag_block_invS(i).ctrl.label);
 	Sii=S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
@@ -739,9 +739,9 @@ elseif sol==10
 		      nonzeros(Sii));
 	fprintf('diff block %1.4e\n', differe);
       end
-      inverse_block11  = @(x) apply_block_diag_inverse(diag_block_invS,x);
+      
     end
-    
+    inverse_block11  = @(x) apply_block_diag_inverse(diag_block_invS,x);
   end
 
   %
@@ -774,6 +774,8 @@ elseif sol==10
 
   
   outer_iter=uint64(info_J.iter);
+
+ 
   
   
   %info_J.resvec=info_J.resvec(1:outer_iter);
@@ -916,28 +918,57 @@ elseif sol==11
   end 
   inverse_block22 = @(x) -inv_SCA.apply(x);
 
+  fprintf(' %1.4e <=diag(S)< %1.4e\n ', min(inv_SCA.inverse_matrix_diagonal),max(inv_SCA.inverse_matrix_diagonal));
+
   %SCA = @(x) (C*x + B2*(invA(B1T*x)));
   %assembly inverse of  SAC iterative solver with no precodnitioner
   %inverse_block22 = @(y) -apply_iterative_solver( SCA, y, ctrl_inner22, @(z) z);
   inner_nequ=Nr;
 
   
-  % Define action of preconditoner
-  prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
-					   inverse_block22,...
-					   @(y) B1T*y,...
-					   B2,controls.outer_prec,ncellphi);
-  %prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
-%					   inverse_block22, @(y) projector(B1T*y,kernel),...
-%					   B2,controls.outer_prec,ncellphi);
-%
+				% Define action of preconditoner
+  proj=0;
+  if (proj==0)
+    prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
+					     inverse_block22,...
+					     @(y) B1T*y,...
+					     @(z) B2*z,...
+					     Np,Nr,...
+					     controls.outer_prec,ncellphi);
+  elseif( proj ==1)
+    prec = @(x) SchurCA_based_preconditioner(x, @(zp) inv_A(projector(zp,kernel)),...
+					     inverse_block22,...
+					     @(y) B1T*y,...
+					     @(z) B2*z,...
+					     Np,Nr,...
+					     controls.outer_prec,ncellphi);
+  elseif( proj == 2)
+    prec = @(x) SchurCA_based_preconditioner(x, inv_A,...%@(z) projector(inv_A(z),kernel),...
+					     inverse_block22,...
+					     @(y) projector(B1T*y,kernel),...
+					     @(z) B2*projector(z,kernel),...
+					     Np,Nr,...
+					     controls.outer_prec,ncellphi);
+  elseif( proj ==3) 
+    prec = @(x) SchurCA_based_preconditioner(x, ...
+					     @(zp) projector(inv_A(zp),kernel),...
+					     inverse_block22,...
+					     @(y) projector(B1T*y,kernel),...
+					     @(z) B2*projector(z,kernel),...
+					     Np,Nr,...
+					     controls.outer_prec,ncellphi);
+  end
+  
+
   
   % solve
   jacobian = [A B1T; B2 -C];
 
   
   outer_timing=tic;
-  [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(A,B1T,B2,C,ncellphi,x), ...
+
+  
+  [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(x,A,B1T,B2,C,ncellphi,kernel,rhs), ...
 				    rhs, ctrl_outer, prec,[],controls.left_right );
   outer_cpu=toc(outer_timing);
 
