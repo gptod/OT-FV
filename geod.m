@@ -107,6 +107,9 @@ masses_increment=zeros(N,1);
 imbalance_res_phi=zeros(Nt,1);
 imbalance_increment_phi=zeros(Nt,1);
 
+Np = ncell*Nt;
+Nr = ncell2h*N;
+
 while true
   assembly=tic;
   total=tic;
@@ -145,6 +148,17 @@ while true
         OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
         delta_mu = norm([OC.p;OC.r;OC.s]);
 
+	if (  itk2 > 0)
+	  state_message=sprintf(' \n')	;		
+	  fprintf('%s \n',state_message);
+	  fprintf(logID,'%s \n',state_message);
+	end	
+	
+	state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e \n' ,...
+			      itk2+1, norm(OC.p),norm(OC.r),norm(OC.s));
+	fprintf('%s \n',state_message);
+	fprintf(logID,'%s \n',state_message);
+
 
 
 	for i = 1:N
@@ -159,20 +173,20 @@ while true
 
 	current_res_phi = OC.p;
 	for i = 1:Nt
-	  imbalance_res_phi(i)=sum(current_res_phi((i-1)*ncell+1:i*ncell))/norm(current_res_phi((i-1)*ncell+1:i*ncell));
+	  imbalance_res_phi(i)=sum(current_res_phi((i-1)*ncell+1:i*ncell));%/norm(current_res_phi((i-1)*ncell+1:i*ncell));
 	end
 	state_message=sprintf('%1.4e<=sum(F_phi[:])/norm(F_phi[:])<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
 	fprintf('%s \n',state_message);
 	fprintf(logID,'%s \n',state_message);
 
 
-	current_res_phi = OC.r;
-	for i = 1:N
-	  imbalance_res_phi(i)=current_res_phi((i-1)*ncell2h+1:i*ncell2h)'*area2h;
-	end
-	state_message=sprintf('%1.4e<=integral_F_rho[:]<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
-	fprintf('%s \n',state_message);
-	fprintf(logID,'%s \n',state_message);
+	% current_res_phi = OC.r;
+	% for i = 1:N
+	%   imbalance_res_phi(i)=current_res_phi((i-1)*ncell2h+1:i*ncell2h)'*area2h;
+	% end
+	% state_message=sprintf('%1.4e<=integral_F_rho[:]<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
+	% fprintf('%s \n',state_message);
+	% fprintf(logID,'%s \n',state_message);
 
 	
 
@@ -226,6 +240,28 @@ while true
 	
 	print_info_solver(info_solver)
 	print_info_solver(info_solver,logID)
+
+
+	y=omegak(Np+1:Np+Nr);
+	B1T = sparse(JOC.pr);
+	v=B1T*y;
+	for i = 1:Nt
+	  masses_increment(i)=sum(v(1+(i-1)*ncell:i*ncell));
+	end
+
+	state_message=sprintf('%1.4e<=sum(B1T y_i)[:]<= %1.4e',min(masses_increment),max( masses_increment));
+	fprintf('%s \n',state_message);
+	fprintf(logID,'%s \n',state_message);
+
+	v=OC.p-v;
+	for i = 1:Nt
+	  masses_increment(i)=sum(v(1+(i-1)*ncell:i*ncell));
+	end
+	state_message=sprintf('%1.4e<=sum(f-B1T y_i)[:]<= %1.4e',min(masses_increment),max( masses_increment));
+	fprintf('%s \n',state_message);
+	fprintf(logID,'%s \n',state_message);
+
+	
 
 	for i = 1:N
 	  masses_increment(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
