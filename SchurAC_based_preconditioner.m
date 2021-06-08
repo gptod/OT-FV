@@ -10,7 +10,7 @@ function [out] = SchurAC_based_preconditioner(in, invSAC,invC,B1T,B2,prec_type,d
   else
     type='full';
   end
-
+ 
   if (exist('prec_type','var') )
     dimblock=dimblock;
   else
