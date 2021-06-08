@@ -37,10 +37,10 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 1:4
+  for h_i = 1:3
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=1:5
+    for i=3
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -61,7 +61,7 @@ for mesh_type = 2
       % ~SCA=C+B2 diag(A)^{-1} B1T
       
       %set here [9,10,11]
-      for sol=[11];
+      for sol=[10];
 	% Mesh structure:
 	% nodes -> array of nodes coordinates [x y]
 	% cells -> array of cells nodes [#nodes node1 node2 node3 ...]
@@ -127,7 +127,7 @@ for mesh_type = 2
 	  end
 	elseif (sol==10)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('fgmres',1e-6,1000);
+	  ctrl_outer.init('fgmres',1e-5,1000);
 
 	  % preconditioner approach
 	  outer_prec='full'
@@ -154,13 +154,13 @@ for mesh_type = 2
 	  for j=[1]%length(invS_approach)
 
 	    % set solver for block 11 (schurAC)
-	    solvers={'direct','agmg' ,'agmg'  ,'incomplete','krylov' ,'krylov'  };
-	    iters  ={1       ,100      ,10       ,1           ,100        ,  1          };
-	    label  ={'direct','agmg100','agmg10','incomplete','krylov10','krylov10'};
+	    solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov'  };
+	    iters  ={1       ,100      ,10      ,1      ,1           ,100       ,1         };
+	    label  ={'direct','agmg100','agmg10','agmg1','incomplete','krylov10','krylov10'};
 
    	    % set here from solvers
-	    for i=[3];%length(solvers)
-	      ctrl_inner11.init(solvers{i},1e-3,iters{i},1.0,0,label{i});
+	    for i=[4];%length(solvers)
+	      ctrl_inner11.init(solvers{i},1e-3,iters{i},1.0,1,label{i});
 	      
 	      
 	      % store all controls
@@ -195,7 +195,7 @@ for mesh_type = 2
 
 	  % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 	  for isolver=[3]%1:length(outer_solvers)
-	  ctrl_outer.init(outer_solvers{isolver},1e-5,1000);
+	  ctrl_outer.init(outer_solvers{isolver},1e-10,3000,0.0,0); % verbose=[1,2] works only for fgmres
 
 	  
 	  % external prec appraoch
@@ -226,19 +226,19 @@ for mesh_type = 2
 			    'diag'); %label
 	  %extra_info='full';
 	  extra_info='block';
-	  relax4_inv11=1e-09;
+	  relax4_inv11=1e-12;
 	  
 	  % set grounded_node>0 to gorund the potential in grounded node
 	  grounded_node=0;
 
 	  % set here list of solvers for block 22 
-	  solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete'};
-	  iters  ={1      ,10      ,100,1       ,1        ,10        ,  1          };
-	  label  ={'agmg1','agmg10','agmg100','direct','krylov1','krylov10','incomplete'};
+	  solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete','diag'};
+	  iters  ={1      ,10      ,100,1       ,1        ,10        ,  1          ,0};
+	  label  ={'agmg1','agmg10','agmg100','direct','krylov1','krylov10','incomplete','diag'};
 	  relax4_inv22=0;
 	  
-	  for i=[1];%1:length(solvers)
-	    ctrl_inner22.init(solvers{i},1e-13,iters{i},1.0,0,label{i});
+	  for i=[8];%1:length(solvers)
+	    ctrl_inner22.init(solvers{i},1e-13,iters{i},1.0,1,label{i});
 	    controls = struct('indc',grounded_node,...
 			      'sol',solver_approach,...
 			      'outer_prec',outer_prec,...
@@ -254,7 +254,7 @@ for mesh_type = 2
 
 	    approach_string=strcat('schurCAwithdiagA_',...
 				   ctrl_outer.approach,'_',...
-				   left_right,'_',outer_prec,'_',...
+				   left_right,'_',outer_prec,'_prec_',...
 				   'invA',ctrl_inner11.label,'_',...
 				   'invSCA',ctrl_inner22.label);
 				   %...'_fullprecSCA_invA',label{i},'_invSCA',ctrl_inner22.label);
