@@ -272,8 +272,8 @@ while true
 	fprintf(logID,'%s \n',state_message);
 
 
-	OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
-        delta_mu = norm([OC.p;OC.r;OC.s]);
+	%OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
+        %delta_mu = norm([OC.p;OC.r;OC.s]);
 
 
 	
