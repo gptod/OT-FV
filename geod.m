@@ -44,10 +44,17 @@ disp(filename)
 log_filename=strcat(filename,'.log')
 logID = fopen(log_filename,'w');
 fprintf(logID,'mesh type       = %d\n',mesh_type);
+fprintf(logID,'rec type       = %d\n',rec);
+fprintf(logID,'ncellphi= %d ncellrho=%d n time step=%d \n',ncell,ncell2h,N);
 fprintf(logID,'solver approach = %d\n',solver_approach);
-ctrl_inner11.info(logID);
-ctrl_inner22.info(logID);
+fprintf(logID,'string approach = %s\n',approach_string);
+fprintf(logID,'outer solver :\n');
 ctrl_outer.info(logID);
+fprintf(logID,'solver block 11:\n');
+ctrl_inner11.info(logID);
+fprintf(logID,'solver block 22: \n');
+ctrl_inner22.info(logID);
+
 
 
 csv_filename=strcat(filename,'.csv')
@@ -74,7 +81,16 @@ rho0 = (mass/sum(area))*ones(tnr2h,1);
 s0 = mu0./rho0;
 uk = [phi0;rho0;s0]; % initial condition of the barrier method
 
+save_data=controls.save_data;
+if (save_data)
+  filename_save=strcat('runs/','PhiRhoSMuTheta',str_test,approach_string,'.dat');%,controls_string);
+  IDsave = fopen(filename_save,'w');
+  IDsave = write2td_sequence( IDsave, [uk;mu0;theta0], 0.0,'head');
 
+  %filename_save=([strcat('runs/','PhiRhoSMuTheta',str_test,approach_string,'.dat')]);%,controls_string);
+  %matvar = matfile(filename_save,'Writable',true);
+  %save(filename_save,'matvar.[uk;mu0;theta0]','-append'); 
+end
 % Assemble matrices
 
 Mx = spdiags(area,0,ncell,ncell);
@@ -148,16 +164,16 @@ while true
         OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
         delta_mu = norm([OC.p;OC.r;OC.s]);
 
-	if (  itk2 > 0)
-	  state_message=sprintf(' \n')	;		
-	  fprintf('%s \n',state_message);
-	  fprintf(logID,'%s \n',state_message);
-	end	
-	
 	state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e \n' ,...
-			      itk2+1, norm(OC.p),norm(OC.r),norm(OC.s));
-	fprintf('%s \n',state_message);
+				itk2+1, norm(OC.p),norm(OC.r),norm(OC.s));
 	fprintf(logID,'%s \n',state_message);
+	if verb>1
+	  if (  itk2 == 0)
+	    state_message=sprintf(' \n')	;		
+	    fprintf('%s \n',state_message);
+	  end	
+	  fprintf('%s \n',state_message);
+	end
 
 
 
@@ -381,13 +397,13 @@ while true
 
 	
 
-	for i = 1:N
-	  masses_increment(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
-	end
+	% for i = 1:N
+	%   masses_increment(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
+	% end
 
-	state_message=sprintf('%1.4e<=masses increment rho[:]<= %1.4e',min(masses_increment),max( masses_increment));
-	fprintf('%s \n',state_message);
-	fprintf(logID,'%s \n',state_message);
+	% state_message=sprintf('%1.4e<=masses increment rho[:]<= %1.4e',min(masses_increment),max( masses_increment));
+	% fprintf('%s \n',state_message);
+	% fprintf(logID,'%s \n',state_message);
 
 
 	%OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
@@ -417,6 +433,12 @@ while true
     phimu = uk(1:tnp);
     rhomu = uk(tnp+1:tnp+tnr2h);
     smu = uk(tnp+tnr2h+1:end);
+
+    if (save_data)
+      IDsave=write2td_sequence( IDsave, [uk;mu;theta], itk1,'body');
+      %s = size(m, 'my_variables');
+      %matvar.my_variables(s+1, :) = [uk;mu;theta];
+    end
     
     % error bound on optimality
     delta_0 = (N/Nt)*sum(area)*mu;
@@ -448,6 +470,12 @@ while true
 	   sum_linsys,sum_assembly);
 
 end
+
+if (save_data)
+  IDsave=write2td_sequence( IDsave, [uk;mu;theta], itk2,'tail');
+%  fclose(IDsave);
+end
+
 
 fprintf('%17s %4i %7s %1.4e \n','Total Newton its:',tit,'Error: ',delta_0)
 

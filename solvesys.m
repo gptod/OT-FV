@@ -584,6 +584,40 @@ elseif sol==10
   % assembly schur AC S=A+B1
   % reduced to system only in phi
   S = A+B1T*(invdiagC*B2);
+
+  % test=zeros(Np,1);
+  % support=zeros(Nt,1);
+  % for i=1:N
+  %   test(:)=0.0;
+  %   test(1+(i-1)*ncellphi:i*ncellphi)  =1.0;
+  %   test(1+(i)*ncellphi:(i+1)*ncellphi)=1.0;
+    
+
+  %   support(:)=0.0;
+  %   for j=1:Nt
+  %     support(j)=norm(test(1+(j-1)*ncellphi:j*ncellphi));
+  %   end
+  %   %disp(support')
+
+  %   v=S*test;
+  %   support(:)=0.0;
+  %   for j=1:Nt
+  %     support(j)=norm(v(1+(j-1)*ncellphi:j*ncellphi));
+  %   end
+  %   disp(support')
+
+  %   v=A*test;
+  %   support(:)=0.0;
+  %   for j=1:Nt
+  %     support(j)=norm(v(1+(j-1)*ncellphi:j*ncellphi));
+  %   end
+  %   %disp(support')
+
+  %   disp(' ' )
+  % end
+
+  
+    
   %fp = rhs(1:Np)+B1T*(invC*rhs(Np+1:Np+Nr));
 
   if ( compute_eigen)
