@@ -161,23 +161,23 @@ while true
 
 
 
-	for i = 1:N
-	  masses(i)=uk(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
-	end
-	state_message=sprintf('%1.4e<=masses rho[:]<= %1.4e',min(masses),max( masses));
-	fprintf('%s \n',state_message);
-	fprintf(logID,'%s \n',state_message);
+	% for i = 1:N
+	%   masses(i)=uk(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
+	% end
+	% state_message=sprintf('%1.4e<=masses rho[:]<= %1.4e',min(masses),max( masses));
+	% fprintf('%s \n',state_message);
+	% fprintf(logID,'%s \n',state_message);
 
 	
 	
 
-	current_res_phi = OC.p;
-	for i = 1:Nt
-	  imbalance_res_phi(i)=sum(current_res_phi((i-1)*ncell+1:i*ncell));%/norm(current_res_phi((i-1)*ncell+1:i*ncell));
-	end
-	state_message=sprintf('%1.4e<=sum(F_phi[:])/norm(F_phi[:])<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
-	fprintf('%s \n',state_message);
-	fprintf(logID,'%s \n',state_message);
+	% current_res_phi = OC.p;
+	% for i = 1:Nt
+	%   imbalance_res_phi(i)=sum(current_res_phi((i-1)*ncell+1:i*ncell));%/norm(current_res_phi((i-1)*ncell+1:i*ncell));
+	% end
+	% state_message=sprintf('%1.4e<=sum(F_phi[:])/norm(F_phi[:])<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
+	% fprintf('%s \n',state_message);
+	% fprintf(logID,'%s \n',state_message);
 
 
 	% current_res_phi = OC.r;
@@ -220,46 +220,164 @@ while true
         end
 
         % Compute the jacobian of the system of equations
-        JOC = JFkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk);
+        JOC = JFkgeod(ind,edges,cc,mid,N,...
+		      (rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),...
+		      Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk);
 	sum_assembly=sum_assembly+toc(assembly);
 
 	
-				% Solve the linear system
+	% Solve the linear system
 	timelinsys=tic;
+        [omegak, info_solver_newton] = solvesys(JOC,OC, controls,logID);
+	sum_linsys= sum_linsys+toc(timelinsys);
+        sum_total = sum_total+toc(total);
+	print_info_solver(info_solver_newton)
+	print_info_solver(info_solver_newton,logID)
+
+	if (restart)
+	  solver_approach=11;
+
+	  ctrl_inner11=ctrl_solver;
+	  ctrl_inner22=ctrl_solver;
+	  ctrl_outer=ctrl_solver;
+	  
+          % krylov based solvers for M [x;y] = [f;g]
+ 	  % pcg works only with full
+	  outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
+
+      % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
+	  for isolver=[3]%1:length(outer_solvers)
+	    ctrl_outer.init(outer_solvers{isolver},controls.ctrl_outer.tolerance,3000,0.0,0); % verbose=[1,2] works only for fgmres
+	    %ctrl_outer.init(outer_solvers{isolver},1e-10,3000,0.0,0); % verbose=[1,2] works only for fgmres
+	    
+	    
+				% external prec appraoch
+	    outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
+	    nouter_precs=length(outer_precs);
+	    
+				% pcg works only with full
+	    if (strcmp(outer_solvers,'pcg'))
+	      nouter_precs=1
+	    end
+	    
+				% fgmres works only with right prec
+				%if (strcmp(outer_solvers,'fgmres'))
+				%  nouter_precs=1
+				%end
+	    left_right='right';
+	    
+	    
+	    for iprec=[3]%1:nouter_precs
+	      outer_prec=outer_precs{iprec};
+	      
+		       % set here other approximate inverse of block11
+	      ctrl_inner11.init('agmg',... %approach
+				1e-12,... %tolerance
+				10,...% itermax
+				0.0,... %omega
+				0,... %verbose
+				'agmg10'); %label
+					 %extra_info='full';
+	      extra_info='block';
+	      relax4_inv11=1e-12;
+	      
+	% set grounded_node>0 to gorund the potential in grounded node
+	      indc=0;
+	      indeces=set_grounding_node(JF.pp,ncellphi);
+
+	      % ground other potential
+	      grounded_values=omegak(indeces);
+	      		      % set here list of solvers for block 22 
+	      solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete','diag'};
+	      iters  ={1      ,10      ,100,1       ,1        ,10        ,  1          ,0};
+	      label  ={'agmg1','agmg10','agmg100','direct','krylov1','krylov10','incomplete','diag'};
+	      relax4_inv22=0;
+	      
+	      for i=[2];%1:length(solvers)
+		ctrl_inner22.init(solvers{i},1e-13,iters{i},1.0,0,label{i});
+		restart_controls = struct('indc',grounded_node,...
+				  'grounded_values',grounded_values,...
+				  'sol',solver_approach,...
+				  'outer_prec',outer_prec,...
+				  'left_right',left_right,...
+				  'ctrl_inner11',ctrl_inner11,...
+				  'ctrl_inner22',ctrl_inner22,...
+				  'ctrl_outer',ctrl_outer,...
+				  'compute_eigen',compute_eigen,...
+				  'verbose',verbose,...
+				  'extra_info',extra_info,...
+				  'relax4inv11',relax4_inv11,...
+				  'relax4inv22',relax4_inv22);
 
 
-	
-	
+	      end
+	    end
+	  end
+	  timelinsys=tic;
+	  omegak_old=omegak;
+          [omegak, info_solver_newton] = solvesys(JOC,OC, restart_controls,logID);
+	  sum_linsys=sum_linsys+toc(timelinsys);
+	   print_info_solver(info_solver_newton);
+	   print_info_solver(info_solver_newton,logID);
+	  
+	  if( 0 )
+	  for i=1:Nt
+	    grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
+	   fprintf('diff dir %1.4e diff phi%1.4e\n', ...
+		    abs(restart_controls.grounded_values(i)-omegak(grounded_node+(i-1)*ncell)),...
+		    norm(omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell))...
+		   )
+	  end
+	  for i=1:N
+	    grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
+	    fprintf('diff rho %1.4e\n', ...
+		    norm(omegak(Np+1+(i-1)*ncell2h:Np+i*ncell2h)-omegak_old(Np+1+(i-1)*ncell2h:Np+i*ncell2h))...
+		   )
+	  end
+	  end
+	  
+	  %i=1;
+	  %X=linspace(0,1,ncell)';
+	  %diff=-omegak(controls.indc)+omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell);
+	  %plot(X,diff)
 
-	
-        [omegak, info_solver] = solvesys(JOC,OC,controls,logID);
-	sum_linsys=sum_linsys+toc(timelinsys);
-	sum_total=sum_total+toc(total);
-	sum_iter_outer_linear= sum_iter_outer_linear+info_solver.outer_iter;
-	sum_iter_inner_linear= sum_iter_inner_linear+info_solver.inner_iter;
-	
-	print_info_solver(info_solver)
-	print_info_solver(info_solver,logID)
+	  
+	  fprintf('diff  sol = %1.4e \n', norm(omegak-omegak_old));
+	  fprintf(logID,'diff  sol = %1.4e \n', norm(omegak-omegak_old));
 
-
-	y=omegak(Np+1:Np+Nr);
-	B1T = sparse(JOC.pr);
-	v=B1T*y;
-	for i = 1:Nt
-	  masses_increment(i)=sum(v(1+(i-1)*ncell:i*ncell));
+	  
+	 
+	  
 	end
 
-	state_message=sprintf('%1.4e<=sum(B1T y_i)[:]<= %1.4e',min(masses_increment),max( masses_increment));
-	fprintf('%s \n',state_message);
-	fprintf(logID,'%s \n',state_message);
 
-	v=OC.p-v;
-	for i = 1:Nt
-	  masses_increment(i)=sum(v(1+(i-1)*ncell:i*ncell));
-	end
-	state_message=sprintf('%1.4e<=sum(f-B1T y_i)[:]<= %1.4e',min(masses_increment),max( masses_increment));
-	fprintf('%s \n',state_message);
-	fprintf(logID,'%s \n',state_message);
+
+	
+
+	
+	sum_iter_outer_linear= sum_iter_outer_linear+info_solver_newton.outer_iter;
+	sum_iter_inner_linear= sum_iter_inner_linear+info_solver_newton.inner_iter;
+	
+
+
+	% y=omegak(Np+1:Np+Nr);
+	% B1T = sparse(JOC.pr);
+	% v=B1T*y;
+	% for i = 1:Nt
+	%   masses_increment(i)=sum(v(1+(i-1)*ncell:i*ncell));
+	% end
+
+	% state_message=sprintf('%1.4e<=sum(B1T y_i)[:]<= %1.4e',min(masses_increment),max( masses_increment));
+	% fprintf('%s \n',state_message);
+	% fprintf(logID,'%s \n',state_message);
+
+	% v=OC.p-v;
+	% for i = 1:Nt
+	%   masses_increment(i)=sum(v(1+(i-1)*ncell:i*ncell));
+	% end
+	% state_message=sprintf('%1.4e<=sum(f-B1T y_i)[:]<= %1.4e',min(masses_increment),max( masses_increment));
+	% fprintf('%s \n',state_message);
+	% fprintf(logID,'%s \n',state_message);
 
 	
 
@@ -326,7 +444,7 @@ while true
     fprintf(csvID,'%6d,%6d,%6d,%5d,%8.3e,%6d,%7d,%8d,%11d,%1.2e,%1.2e,%1.2e,%1.4e,%1.4e \n',...
 	    ncell2h,ncell,N,...
 	    itk1,delta_0,itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
-	   info_solver.inner_nequ,min(uk(tnp+1:tnp+tnr2h)),mu,theta,...
+	   info_solver_newton.inner_nequ,min(uk(tnp+1:tnp+tnr2h)),mu,theta,...
 	   sum_linsys,sum_assembly);
 
 end
@@ -341,7 +459,7 @@ rho_all = [rho_in;rho;rho_f];
 W2 = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
 
 % plot
-if (plot)
+if (plot_figures)
 figure
 fig=patch('Faces',cells2h(:,2:end),'Vertices',nodes2h,'edgecolor','none','FaceVertexCData',rho_in,'FaceColor','flat');
 colorbar
