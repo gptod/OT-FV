@@ -74,6 +74,7 @@ alfamin = 0.1; % minimal step length accepted
 
 tnp = (N+1)*ncell; % total number of dofs for the potential
 tnr2h = N*ncell2h; % total number of dofs for the density
+tne = (N+1)*nei; % total number of internal edges
 
 mu0 = 1;
 phi0 = zeros(tnp,1);
@@ -111,6 +112,16 @@ Mst = assembleMst(N,nei,Ms);
 RHt = assembleRHt(N,ncell);
 It = assembleIt(N,ncell,ncell2h,I);
 
+if rec==1
+    Rs=Ktos2D(ind,edges,cc,mid);
+    Rst = sparse(tne,tnp);
+    for k=1:N+1
+        Rst((k-1)*nei+1:k*nei,(k-1)*ncell+1:k*ncell) = Rs;
+    end
+    clear Rs
+else
+    Rst = [];
+end
 
 itk1 = 0;
 tit = 0; % counter of the total number of Newton iterations
@@ -160,10 +171,10 @@ while true
         total=tic;
         assembly=tic;
 	
-        
-        OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
+        [rhosk,drhosk,~]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+        OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu);
         delta_mu = norm([OC.p;OC.r;OC.s]);
-
+        
 	state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e \n' ,...
 				itk2+1, norm(OC.p),norm(OC.r),norm(OC.s));
 	fprintf(logID,'%s \n',state_message);
@@ -236,12 +247,12 @@ while true
         end
 
         % Compute the jacobian of the system of equations
-        JOC = JFkgeod(ind,edges,cc,mid,N,...
-		      (rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),...
-		      Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk);
+        [~,~,ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
+        JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk);
+        
 	sum_assembly=sum_assembly+toc(assembly);
 
-	
+    
 	% Solve the linear system
 	timelinsys=tic;
         [omegak, info_solver_newton] = solvesys(JOC,OC, controls,logID);
