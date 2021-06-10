@@ -21,7 +21,7 @@ plot_figures=0
 
 restart=0;
 
-save_data=1;
+save_data=0;
 
 
 compute_eigen=0;
