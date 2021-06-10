@@ -562,11 +562,12 @@ elseif sol==10
   
   % grounding
   if (indc>0)
-    rhs(indc)=0;  
-    A(indc,:)   = sparse(1,Np);
-    A(indc,indc)= 1;
-    B1T(indc,:) = sparse(1,Nr);
-    %B2(:,indc)  = sparse(Nr,1);
+    % find nodes at time time step diag(A^i) is max
+    indeces=set_grounding_node(A,ncellphi);
+    
+    inode=indeces(1);
+
+    [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
   end
 
 
@@ -817,13 +818,22 @@ elseif sol==11
   tic;
 
   % grounding
-  if ( indc >0) 
-    rhs(indc)=0;
-    A(indc,:)   = sparse(1,Np);
-    %A(:,indc)   = sparse(Np,1);
-    A(indc,indc)= 1;
-    B1T(indc,:) = sparse(1,Nr);
-    %B2(:,indc) = sparse(Nr,1);
+  if ( indc >0)
+    % find nodes at time time step diag(A_ii) is max
+    indeces=set_grounding_node(A,ncellphi)
+
+    % ground node of A_11
+    inode=indeces(1);
+    [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
+
+    % ground other phi increment (when available)
+    if ( isfield(controls,'grounded_values') )
+      %disp('extra grounding')
+      for i=2:Nt
+	inode=indeces(i);
+	[A,B1T,rhs]=grounding(A,B1T,rhs,inode,grounded_values(i));
+      end	 
+    end
   end
   
 
@@ -918,7 +928,8 @@ elseif sol==11
   end 
   inverse_block22 = @(x) -inv_SCA.apply(x);
 
-  fprintf(' %1.4e <=diag(S)< %1.4e\n ', min(inv_SCA.inverse_matrix_diagonal),max(inv_SCA.inverse_matrix_diagonal));
+  
+  %fprintf(' %1.4e <=diag(S)< %1.4e\n ', min(inv_SCA.inverse_matrix_diagonal),max(inv_SCA.inverse_matrix_diagonal));
 
   %SCA = @(x) (C*x + B2*(invA(B1T*x)));
   %assembly inverse of  SAC iterative solver with no precodnitioner
@@ -967,6 +978,18 @@ elseif sol==11
   
   outer_timing=tic;
 
+  x0=zeros(Np+Nr,1);
+  if ( indc >0)
+    indeces=set_grounding_node(A,ncellphi);
+    x0(indeces(1))=0;
+  			 % ground other phi increment (when available)
+    if ( isfield(controls,'grounded_values') )
+      for i=2:Nt
+  	inode=indeces(i);
+  	x0(inode)=controls.grounded_values(i);
+      end
+    end
+  end
   
   [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(x,A,B1T,B2,C,ncellphi,kernel,rhs), ...
 				    rhs, ctrl_outer, prec,[],controls.left_right );
