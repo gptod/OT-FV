@@ -15,7 +15,7 @@ rho = uk(tnp+1:tnp+tnr2h);
 s = uk(tnp+tnr2h+1:tnp+2*tnr2h);
 
 rho_all = [rho_in;rho;rho_f];
-I_all = [zeros(ncell2h,tnr2h);speye(tnr2h,tnr2h);zeros(ncell2h,tnr2h)];
+I_all = [sparse(ncell2h,tnr2h);speye(tnr2h,tnr2h);sparse(ncell2h,tnr2h)];
 gradphi = gradt*phi;
 
 % compute the reconstructed density on the diamond cells, rhos
