@@ -13,6 +13,8 @@ test_case='sin'
 	% 2 -> weighted harmonic mean
 rec = 1;
 
+eps_0 = 1e-6; % tolerance 
+
 verb = 1; % verbosity level: {0,1,2}
 
 

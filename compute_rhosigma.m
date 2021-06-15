@@ -1,6 +1,9 @@
-function [rhos,drhos,ddrhosa]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,str)
+function [out]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,str)
 
-% Compute jacobian of the system of first-order optimality conditions
+% str='rhos'    -> compute reconstructed density
+% str='drhos'   -> compute derivative of the reconstructed density
+% str='ddrhosa' -> compute second derivative of the reconstructed density
+%                  applied to the vector a
 
 ncell2h = size(rho_in,1);
 ncell = size(cc,1);
@@ -19,36 +22,34 @@ gradphi = gradt*phi;
 % compute the reconstructed density on the diamond cells, rhos
 if rec==1
     if strcmp(str,'rhos')
-        rhos = Rst*RHt*It*rho_all;
-        drhos = Rst*RHt*It*I_all;
-        ddrhosa = [];
+        out = Rst*RHt*It*rho_all;
+    elseif strcmp(str,'drhos')
+        out = Rst*RHt*It*I_all;
     elseif strcmp(str,'ddrhosa')
-        rhos = [];
-        drhos = [];
-        ddrhosa = sparse(tnr2h,tnr2h);
+        out = sparse(tnr2h,tnr2h);
     end
 else
     rhoa = RHt*It*rho_all;
     if strcmp(str,'rhos')
-        rhos = zeros(te,1);
-        drhos = sparse(te,tnr);
-        ddrhosa = [];
+        out = zeros(te,1);
         for k=1:N+1
-            rhos((k-1)*nei+1:k*nei) = rho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));
-            drhos((k-1)*nei+1:k*nei,(k-1)*ncell+1:k*ncell) = ...
+            out((k-1)*nei+1:k*nei) = rho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));
+        end
+    elseif strcmp(str,'drhos')
+        out = sparse(te,tnr);
+        for k=1:N+1
+            out((k-1)*nei+1:k*nei,(k-1)*ncell+1:k*ncell) = ...
                 drho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));
         end
-        drhos = drhos*RHt*It*I_all;
-    elseif strcmp(str,'ddrhosa')
-        rhos = [];
-        drhos = [];  
-        ddrhosa = sparse(tnr,tnr);
+        out = out*RHt*It*I_all;
+    elseif strcmp(str,'ddrhosa') 
+        out = sparse(tnr,tnr);
         a = Mst*gradphi.^2;
         for k=1:N+1
-            ddrhosa((k-1)*ncell+1:k*ncell,(k-1)*ncell+1:k*ncell) = ...
+            out((k-1)*ncell+1:k*ncell,(k-1)*ncell+1:k*ncell) = ...
                 ddrho_siga(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell),a((k-1)*nei+1:k*nei));
         end
-        ddrhosa = I_all'*It'*RHt'*ddrhosa*RHt*It*I_all;
+        out = I_all'*It'*RHt'*out*RHt*It*I_all;
     end
 end
 

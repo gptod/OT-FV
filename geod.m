@@ -65,7 +65,7 @@ fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  in
 [rho_in,rho_f,mass] = bc_density(test_case,cc2h,area2h);
 
 % Barrier method's parameters:
-eps_0 = 1e-6; % tolerance for the final solution
+%eps_0 = 1e-6; % tolerance for the final solution
 k2max = 30; % maximum number of inner (Newton) iterations
 k1max = 20; % maximum number of outer iterations
 theta0 = 0.2; % decay ratio for the perturbation parameter mu
@@ -171,7 +171,8 @@ while true
         total=tic;
         assembly=tic;
 	
-        [rhosk,drhosk,~]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+        [rhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+        [drhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
         OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu);
         delta_mu = norm([OC.p;OC.r;OC.s]);
         
@@ -247,7 +248,7 @@ while true
         end
 
         % Compute the jacobian of the system of equations
-        [~,~,ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
+        [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
         JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk);
         
 	sum_assembly=sum_assembly+toc(assembly);
@@ -495,7 +496,7 @@ rho = uk(tnp+1:tnp+tnr2h);
 
 % Compute Wasserstein distance
 rho_all = [rho_in;rho;rho_f];
-W2 = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
+W2th = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
 
 % plot
 if (plot_figures)
