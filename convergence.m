@@ -37,13 +37,13 @@ if strcmp(test_case,'sin')
     midpoint = @(x,y) (((x-0.5).^2+(y-0.5).^2-0.3^2)<=0).*(1+cos(supp*(sqrt((x-0.5).^2+(y-0.5).^2))));
     potential=@(x,y,t) 0.4*x+0.4*y-(0.4^2)*t-0.4;
     geodesic =@(x,y,t) (((x-0.3-t*0.4).^2+(y-0.3-t*0.4).^2-0.3^2)<=0).*(1+cos(supp*(sqrt((x-0.3-t*0.4).^2+(y-0.3-t*0.4).^2))));
-    W2cost = sqrt(2)*0.4;
+    W2 = sqrt(2)*0.4;
 elseif strcmp(test_case,'compression')
     sc = 0.3;
     midpoint =@(x,y) ((((x-0.5)/(0.5*sc+0.5)).^2-0.5^2)<=0).*(1+cos(2*pi*((x-0.5)/(0.5*sc+0.5))))/(0.5*sc+0.5);
     potential =@(x,y,t)((sc-1)/((sc-1)*t+1))*0.5*(x-0.5).^2;
     geodesic =@(x,y,t) ((abs(x-0.5)-0.5*(t*(sc-1)+1))<=0).*(1+cos(2*pi*((x-0.5)/(t*(sc-1)+1))))/(t*(sc-1)+1);
-    W2cost = sqrt(((pi^2-6)*(sc-1)^2)/(12*pi^2));
+    W2 = sqrt(((pi^2-6)*(sc-1)^2)/(12*pi^2));
 else
     disp('error: wrong test case')
 end
