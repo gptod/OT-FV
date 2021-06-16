@@ -2,6 +2,7 @@ classdef sparse_inverse <handle
   properties
     dimblock=0;
     name='empty';
+    preprocesses_agmg=0;
     matrix;
     inverse_matrix_diagonal;
      nequ;
@@ -19,6 +20,7 @@ classdef sparse_inverse <handle
      cumulative_iter=0;
      init_cpu=0;
      cumulative_cpu=0;
+     
    end
    methods
      function obj = init(obj,matrix,ctrl)
@@ -39,7 +41,10 @@ classdef sparse_inverse <handle
 	 else
 	   icg=obj.ctrl.nrestart;
 	  end
-	   obj.mgsolver=agmg(matrix,[],icg,[],ctrl.itermax,0,[],1);
+	  if (  obj.preprocesses_agmg ) 
+	    obj.mgsolver=agmg(obj.matrix,[],icg,[],ctrl.itermax,0,[],1);
+	  end
+	  
        elseif ( strcmp(ctrl.approach,'diag') )
 	 obj.inverse_matrix_diagonal= 1.0./spdiags(matrix,0);
        elseif ( strcmp(ctrl.approach,'krylov'))
@@ -69,7 +74,7 @@ classdef sparse_inverse <handle
 	 obj.M=obj.D;
 	 obj.N=obj.M-obj.matrix;
        else
-	 fprintf('In sparse_inverse.init: approch %s not supported. Execation will be stopped',obj.ctrl.approach)
+	 fprintf('In sparse_inverse.init: approach %s not supported. Execation will be stopped',obj.ctrl.approach)
 	 return
        end
        obj.init_cpu=toc(init_cpu);
@@ -98,8 +103,13 @@ classdef sparse_inverse <handle
 	 else
 	   icg=obj.ctrl.nrestart;
 	 end
+	 if (obj.preprocesses_agmg )
+	   jobagmg=2;
+	 else
+	   jobagmg=0;
+	 end
 	 [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
-	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,2);	 
+	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,jobagmg);	 
 	 obj.info_inverse.approach_used = 'agmg';
        elseif ( strcmp(obj.ctrl.approach,'diag') )
 	 sol=obj.inverse_matrix_diagonal.*rhs;
@@ -170,7 +180,9 @@ classdef sparse_inverse <handle
      % destructor
      function obj = kill(obj)
        if ( strcmp(obj.ctrl.approach ,'agmg'))
-	 z=agmg(obj.matrix,[],1,[],1000,0,[],-1);
+	 if( obj.preprocesses_agmg )
+	   z=agmg(obj.matrix,[],1,[],1000,0,[],-1);
+	 end
        end
        clear obj.matrix;
        clear obj.is_symmetric;
