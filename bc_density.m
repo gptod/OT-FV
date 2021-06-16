@@ -12,10 +12,11 @@ if (strcmp(test_case,'gauss'))
   rho_f = final(cc(:,1),cc(:,2));
   rho_f = rho_f*mass/sum(rho_f.*area);
 elseif (strcmp(test_case,'sin'))
-    % convergence test 1
-  supp = pi/0.3;
-  initial =@(x,y) (sqrt((x-0.3).^2+(y-0.3).^2)-0.3<=0).*(1+cos(supp*((x-0.3).^2+(y-0.3).^2)));
-  final =@(x,y) (sqrt((x-0.7).^2+(y-0.7).^2)-0.3<=0).*(1+cos(supp*((x-0.7).^2+(y-0.7).^2)));
+  % convergence test 1
+  supp = pi/(0.3^2);
+  initial =@(x,y) ((sqrt((x-0.3).^2+(y-0.3).^2)-0.3)<=0).*(1+cos(supp*((x-0.3).^2+(y-0.3).^2)));
+  final =@(x,y) ((sqrt((x-0.7).^2+(y-0.7).^2)-0.3)<=0).*(1+cos(supp*((x-0.7).^2+(y-0.7).^2)));
+  %supp = pi/0.3;
   %initial =@(x,y) (((x-0.3).^2+(y-0.3).^2-0.3^2)<=0).*(1+cos(supp*(sqrt((x-0.3).^2+(y-0.3).^2))));
   %final =@(x,y) (((x-0.7).^2+(y-0.7).^2-0.3^2)<=0).*(1+cos(supp*(sqrt((x-0.7).^2+(y-0.7).^2))));
   rho_in = initial(cc(:,1),cc(:,2));

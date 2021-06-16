@@ -33,10 +33,10 @@ verbose=0;
 
 
 if strcmp(test_case,'sin')
-    supp = pi/0.3;
-    midpoint = @(x,y) (((x-0.5).^2+(y-0.5).^2-0.3^2)<=0).*(1+cos(supp*(sqrt((x-0.5).^2+(y-0.5).^2))));
+    supp = pi/(0.3^2);
+    midpoint = @(x,y) ((sqrt((x-0.5).^2+(y-0.5).^2)-0.3)<=0).*(1+cos(supp*((x-0.5).^2+(y-0.5).^2)));
     potential=@(x,y,t) 0.4*x+0.4*y-(0.4^2)*t-0.4;
-    geodesic =@(x,y,t) (((x-0.3-t*0.4).^2+(y-0.3-t*0.4).^2-0.3^2)<=0).*(1+cos(supp*(sqrt((x-0.3-t*0.4).^2+(y-0.3-t*0.4).^2))));
+    geodesic =@(x,y,t) ((sqrt((x-0.3-t*0.4).^2+(y-0.3-t*0.4).^2)-0.3)<=0).*(1+cos(supp*((x-0.3-t*0.4).^2+(y-0.3-t*0.4).^2)));
     W2 = sqrt(2)*0.4;
 elseif strcmp(test_case,'compression')
     sc = 0.3;
