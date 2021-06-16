@@ -75,21 +75,38 @@ alfamin = 0.1; % minimal step length accepted
 tnp = (N+1)*ncell; % total number of dofs for the potential
 tnr2h = N*ncell2h; % total number of dofs for the density
 
-mu0 = 1;
-phi0 = zeros(tnp,1);
-rho0 = (mass/sum(area))*ones(tnr2h,1);
-s0 = mu0./rho0;
-uk = [phi0;rho0;s0]; % initial condition of the barrier method
 
+% set initial data
+if ( read_from_file>0)
+  data_name=sprintf('/DS%d',read_from_file);
+  data = h5read(h5_file2read,data_name)
+  phi0 = data(1:tnp);
+  rho0 = data(1+tnp,tnp+tn2rh);
+  s0   = data(1+tnp+tn2rh,tnp+2*tn2rh);
+  mu0  = data(tnp+2*tn2rh+1);
+  theta0 = data(tnp+2*tn2rh+2);
+else
+  mu0 = 1;
+  phi0 = zeros(tnp,1);
+  rho0 = (mass/sum(area))*ones(tnr2h,1);
+  s0 = mu0./rho0;
+  uk = [phi0;rho0;s0]; % initial condition of the barrier method
+end
+
+Np = ncell*Nt;
+Nr = ncell2h*N;
 save_data=controls.save_data;
 if (save_data)
-  filename_save=strcat('runs/','PhiRhoSMuTheta',str_test,approach_string,'.dat');%,controls_string);
-  IDsave = fopen(filename_save,'w');
-  IDsave = write2td_sequence( IDsave, [uk;mu0;theta0], 0.0,'head');
+  %filename_save=strcat('runs/','PhiRhoSMuTheta',str_test,approach_string,'.dat');%,controls_string);
+  %IDsave = fopen(filename_save,'w');
+  %IDsave = write2td_sequence( IDsave, [uk;mu0;theta0], 0.0,'head');
 
-  %filename_save=([strcat('runs/','PhiRhoSMuTheta',str_test,approach_string,'.dat')]);%,controls_string);
-  %matvar = matfile(filename_save,'Writable',true);
-  %save(filename_save,'matvar.[uk;mu0;theta0]','-append'); 
+  filename_h5=([strcat('runs/','PhiRhoSMuTheta',str_test,approach_string,'.h5')]);
+  if exist(filename_h5, 'file')==2
+    delete(filename_h5);
+  end
+  h5create(filename_h5,'/DS1',[Np+2*Nr+2])
+  h5write(filename_h5,'/DS1',[uk;mu0;theta0]')
 end
 % Assemble matrices
 
@@ -160,18 +177,23 @@ while true
         total=tic;
         assembly=tic;
 	
-        
-        OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
-        delta_mu = norm([OC.p;OC.r;OC.s]);
-
-	state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e \n' ,...
-				itk2+1, norm(OC.p),norm(OC.r),norm(OC.s));
-	fprintf(logID,'%s \n',state_message);
+        message="BEGIN ASSEMBLY FOC";
 	if verb>1
 	  if (  itk2 == 0)
 	    state_message=sprintf(' \n')	;		
 	    fprintf('%s \n',state_message);
 	  end	
+	  fprintf('%s \n',message);
+	end
+	ctime=tic;
+        OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
+	FOCtime=toc(ctime);
+        delta_mu = norm([OC.p;OC.r;OC.s]);
+
+	state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e - CPU %1.4e \n' ,...
+				itk2+1, norm(OC.p),norm(OC.r),norm(OC.s),FOCtime);
+	fprintf(logID,'%s \n',state_message);
+	if verb>1
 	  fprintf('%s \n',state_message);
 	end
 
@@ -206,9 +228,9 @@ while true
 
 	
 
-        if verb>1
-            fprintf('%11s %3i %7s %1.4e \n','Inner step:',itk2,' Error:',delta_mu)
-        end
+        %if verb>1
+        %    fprintf('%11s %3i %7s %1.4e \n','Inner step:',itk2,' Error:',delta_mu)
+        %end
 
         if delta_mu < eps_mu  
             if itk2<4
@@ -235,11 +257,21 @@ while true
             continue
         end
 
-        % Compute the jacobian of the system of equations
+	% Compute the jacobian of the system of equations
+	message="BEGIN ASSEMBLY JFOC";
+	if verb>1
+          fprintf('%s \n',message)
+        end
+	ctime=tic;
         JOC = JFkgeod(ind,edges,cc,mid,N,...
 		      (rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),...
 		      Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk);
-	sum_assembly=sum_assembly+toc(assembly);
+	JFOCtime=toc(ctime);
+	
+	sum_assembly=sum_assembly+toc(assembly);	
+	if verb>1
+          fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
+        end
 
 	
 	% Solve the linear system
@@ -336,22 +368,22 @@ while true
 	   print_info_solver(info_solver_newton);
 	   print_info_solver(info_solver_newton,logID);
 	  
-	  if( 0 )
-	  for i=1:Nt
-	    grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
-	   fprintf('diff dir %1.4e diff phi%1.4e\n', ...
-		    abs(restart_controls.grounded_values(i)-omegak(grounded_node+(i-1)*ncell)),...
-		    norm(omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell))...
-		   )
-	  end
-	  for i=1:N
-	    grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
-	    fprintf('diff rho %1.4e\n', ...
-		    norm(omegak(Np+1+(i-1)*ncell2h:Np+i*ncell2h)-omegak_old(Np+1+(i-1)*ncell2h:Np+i*ncell2h))...
-		   )
-	  end
-	  end
-	  
+	   if( 0 )
+	     for i=1:Nt
+	       grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
+	       fprintf('diff dir %1.4e diff phi%1.4e\n', ...
+		       abs(restart_controls.grounded_values(i)-omegak(grounded_node+(i-1)*ncell)),...
+		       norm(omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell))...
+		      )
+	     end
+	     for i=1:N
+	       grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
+	       fprintf('diff rho %1.4e\n', ...
+		       norm(omegak(Np+1+(i-1)*ncell2h:Np+i*ncell2h)-omegak_old(Np+1+(i-1)*ncell2h:Np+i*ncell2h))...
+		      )
+	     end
+	   end
+	   
 	  %i=1;
 	  %X=linspace(0,1,ncell)';
 	  %diff=-omegak(controls.indc)+omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell);
@@ -435,9 +467,11 @@ while true
     smu = uk(tnp+tnr2h+1:end);
 
     if (save_data)
-      IDsave=write2td_sequence( IDsave, [uk;mu;theta], itk1,'body');
-      %s = size(m, 'my_variables');
-      %matvar.my_variables(s+1, :) = [uk;mu;theta];
+      disp('start saving')
+      data_name=sprintf('/DS%d',itk1+1);
+      h5create(filename_h5,data_name,[Np+2*Nr+2])
+      h5write(filename_h5,data_name,[uk;mu;theta]')
+      disp('finished saving')
     end
     
     % error bound on optimality
@@ -472,7 +506,7 @@ while true
 end
 
 if (save_data)
-  IDsave=write2td_sequence( IDsave, [uk;mu;theta], itk2,'tail');
+  %IDsave=write2td_sequence( IDsave, [uk;mu;theta], itk2,'tail');
 %  fclose(IDsave);
 end
 
@@ -527,5 +561,5 @@ end
 
 fclose(logID);
 fclose(csvID);
-
+%h5disp(filename_h5)
 
