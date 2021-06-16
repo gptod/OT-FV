@@ -65,7 +65,7 @@ fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  in
 [rho_in,rho_f,mass] = bc_density(test_case,cc2h,area2h);
 
 % Barrier method's parameters:
-eps_0 = 1e-6; % tolerance for the final solution
+%eps_0 = 1e-6; % tolerance for the final solution
 k2max = 30; % maximum number of inner (Newton) iterations
 k1max = 20; % maximum number of outer iterations
 theta0 = 0.2; % decay ratio for the perturbation parameter mu
@@ -74,6 +74,7 @@ alfamin = 0.1; % minimal step length accepted
 
 tnp = (N+1)*ncell; % total number of dofs for the potential
 tnr2h = N*ncell2h; % total number of dofs for the density
+tne = (N+1)*nei; % total number of internal edges
 
 
 % set initial data
@@ -128,6 +129,16 @@ Mst = assembleMst(N,nei,Ms);
 RHt = assembleRHt(N,ncell);
 It = assembleIt(N,ncell,ncell2h,I);
 
+if rec==1
+    Rs=Ktos2D(ind,edges,cc,mid);
+    Rst = sparse(tne,tnp);
+    for k=1:N+1
+        Rst((k-1)*nei+1:k*nei,(k-1)*ncell+1:k*ncell) = Rs;
+    end
+    clear Rs
+else
+    Rst = [];
+end
 
 itk1 = 0;
 tit = 0; % counter of the total number of Newton iterations
@@ -174,28 +185,29 @@ while true
     sum_iter_outer_linear=0;
     sum_iter_inner_linear=0;
     while true
-        total=tic;
-        assembly=tic;
-	
-        message="BEGIN ASSEMBLY FOC";
-	if verb>1
-	  if (  itk2 == 0)
-	    state_message=sprintf(' \n')	;		
-	    fprintf('%s \n',state_message);
-	  end	
-	  fprintf('%s \n',message);
-	end
-	ctime=tic;
-        OC = Fkgeod(ind,edges,cc,mid,N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk,mu);
-	FOCtime=toc(ctime);
-        delta_mu = norm([OC.p;OC.r;OC.s]);
+      total=tic;
+      assembly=tic;
+      
+      message="BEGIN ASSEMBLY FOC";
+      if verb>1
+	if (  itk2 == 0)
+	  state_message=sprintf(' \n')	;		
+	end	
+	fprintf('%s \n',message);
+      end
+      [rhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+      [drhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
+      ctime=tic;
+      OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu);
+      FOCtime=toc(ctime);
+      delta_mu = norm([OC.p;OC.r;OC.s]);
 
-	state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e - CPU %1.4e \n' ,...
-				itk2+1, norm(OC.p),norm(OC.r),norm(OC.s),FOCtime);
-	fprintf(logID,'%s \n',state_message);
-	if verb>1
-	  fprintf('%s \n',state_message);
-	end
+      state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e - CPU %1.4e \n' ,...
+			    itk2+1, norm(OC.p),norm(OC.r),norm(OC.s),FOCtime);
+      fprintf(logID,'%s \n',state_message);
+      if verb>1
+	fprintf('%s \n',state_message);
+      end
 
 
 
@@ -257,15 +269,18 @@ while true
             continue
         end
 
+
 	% Compute the jacobian of the system of equations
 	message="BEGIN ASSEMBLY JFOC";
 	if verb>1
           fprintf('%s \n',message)
         end
 	ctime=tic;
-        JOC = JFkgeod(ind,edges,cc,mid,N,...
-		      (rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),...
-		      Dt,divt,Mxt,Mxt2h,Mst,gradt,RHt,It,rec,uk);
+       % Compute the jacobian of the system of equations
+        [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
+        JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk);
+        
+	sum_assembly=sum_assembly+toc(assembly);
 	JFOCtime=toc(ctime);
 	
 	sum_assembly=sum_assembly+toc(assembly);	
@@ -273,7 +288,7 @@ while true
           fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
         end
 
-	
+    
 	% Solve the linear system
 	timelinsys=tic;
         [omegak, info_solver_newton] = solvesys(JOC,OC, controls,logID);
@@ -518,7 +533,7 @@ rho = uk(tnp+1:tnp+tnr2h);
 
 % Compute Wasserstein distance
 rho_all = [rho_in;rho;rho_f];
-W2 = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
+W2th = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
 
 % plot
 if (plot_figures)

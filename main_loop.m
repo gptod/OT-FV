@@ -13,6 +13,8 @@ test_case='sin'
 	% 2 -> weighted harmonic mean
 rec = 1;
 
+eps_0 = 1e-6; % tolerance 
+
 verb = 1; % verbosity level: {0,1,2}
 
 
@@ -43,7 +45,7 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 3
+  for h_i = 4
 	       % INCRESING TIME STEP
 	       % set here 1:5
     for i=4
@@ -74,7 +76,7 @@ for mesh_type = 2
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[12];
+      for sol=[10];
 	% Mesh structure:
 	% nodes -> array of nodes coordinates [x y]
 	% cells -> array of cells nodes [#nodes node1 node2 node3 ...]

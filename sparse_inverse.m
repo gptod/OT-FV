@@ -2,7 +2,7 @@ classdef sparse_inverse <handle
   properties
     dimblock=0;
     name='empty';
-    preprocesses_agmg=0;
+    preprocesses_agmg=1;
     matrix;
     inverse_matrix_diagonal;
      nequ;
