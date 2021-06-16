@@ -253,7 +253,7 @@ elseif sol==6
   flag=invS.info.flag;
   relres=invS.info.res;
   iter=invS.info.iter;
-  invS.kill();
+  %invS.kill();
 
   %res;norm(S*dp-fp)
 
@@ -342,7 +342,7 @@ elseif sol==7
   inner_iter=invS.info_inverse.iter;
   outer_iter=0;
   outer_cpu=0.0;
-  invS.kill();
+  %invS.kill();
   
   % get solution of system JF d  = F  
   dr = invdiagC*(B2*dp-rhs(1+Np:Np+Nr));
@@ -559,15 +559,31 @@ elseif sol==10
 
   % cpu time preprocessing main solver
   tic;
+
+  % set rows 
+  [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
+  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  if (swap_sign)
+    vectors_x=-vectors_x;
+    vectors_y=-vectors_y;
+    alphas=-alphas;
+  end
+  if (1)
+    [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
+  end
   
-  % grounding
+ % grounding
   if (indc>0)
     % find nodes at time time step diag(A^i) is max
+    disp('GROUNDING')
     indeces=set_grounding_node(A,ncellphi);
-    
     inode=indeces(1);
-
     [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
+  else
+    irow=indeces_global(1);
+    A(irow,1:ncellphi) = vectors_x(:,1)';
+    B1T(irow,:)=sparse(1,Nr);
+    rhs(irow,:)=0.0;
   end
 
 
@@ -577,49 +593,16 @@ elseif sol==10
   invC.init(C,ctrl_inner22);
   invdiagC = sparse(1:Nr,1:Nr,(invC.inverse_matrix_diagonal)',Nr,Nr);
   if ( verbose >= 1)
-    fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
+    fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C,0)),max(spdiags(C,0)))
   end
 
   
   % assembly schur AC S=A+B1
   % reduced to system only in phi
-  S = A+B1T*(invdiagC*B2);
-
-  % test=zeros(Np,1);
-  % support=zeros(Nt,1);
-  % for i=1:N
-  %   test(:)=0.0;
-  %   test(1+(i-1)*ncellphi:i*ncellphi)  =1.0;
-  %   test(1+(i)*ncellphi:(i+1)*ncellphi)=1.0;
-    
-
-  %   support(:)=0.0;
-  %   for j=1:Nt
-  %     support(j)=norm(test(1+(j-1)*ncellphi:j*ncellphi));
-  %   end
-  %   %disp(support')
-
-  %   v=S*test;
-  %   support(:)=0.0;
-  %   for j=1:Nt
-  %     support(j)=norm(v(1+(j-1)*ncellphi:j*ncellphi));
-  %   end
-  %   disp(support')
-
-  %   v=A*test;
-  %   support(:)=0.0;
-  %   for j=1:Nt
-  %     support(j)=norm(v(1+(j-1)*ncellphi:j*ncellphi));
-  %   end
-  %   %disp(support')
-
-  %   disp(' ' )
-  % end
+  S = A+B1T*(invdiagC*B2);  
+  fp = rhs(1:Np)+B1T*(invC.apply(rhs(Np+1:Np+Nr)));
 
   
-    
-  %fp = rhs(1:Np)+B1T*(invC*rhs(Np+1:Np+Nr));
-
   if ( compute_eigen)
     eigvalues=eig(full(S));
     fprintf('eig(S) min %8.4e max %8.4e  \n', min(eigvalues), max(eigvalues))
@@ -638,7 +621,7 @@ elseif sol==10
   relax4prec=0.0;
   debug=0;
   if ( verbose >= 2)
-    fprintf('APPROACH %s \n',appraoch)
+    fprintf('APPROACH %s \n',approach)
   end
   if (strcmp(approach,'full'))
     % init inverse of full S
@@ -779,6 +762,20 @@ elseif sol==10
     inverse_block11  = @(x) apply_block_diag_inverse(diag_block_invS,x);
   end
 
+  if( 0 )
+    sol_phi=inverse_block11(fp);
+    sol_rho=invC.apply(B2*sol_phi-rhs(Np+1:Np+Nr));
+    fprintf(' res |S x -f_r|/f_r = %1.4e \n',norm(S*sol_phi-fp)/norm(fp));
+    
+    
+    jacobian=[A B1T;B2 -C];
+    d=[sol_phi;sol_rho];
+    
+    
+    fprintf(' res modified = %1.4e \n',norm(jacobian*d-rhs)/norm(rhs))
+  end
+  
+  
   %
   % Define action of preconditoner
   % 
@@ -790,7 +787,15 @@ elseif sol==10
   % solve with fgmres or bicgstab if prec is linear
   outer_timing=tic;
   jacobian = [A B1T; B2 -C];
+  if ( verbose >= 2)
+    fprintf('START SOLVER \n')
+  end
   [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec );
+  if ( verbose >= 2)
+    fprintf('END SOLVER \n')
+  end
+
+  outer_iter=uint64(info_J.iter);
   outer_cpu=toc(outer_timing);
 
   if(strcmp(approach,'full'))
@@ -806,11 +811,85 @@ elseif sol==10
       inner_iter = inner_iter + diag_block_invS(i).cumulative_iter;
     end
   end
+  %fprintf(' res |S x -f_r|/f_r = %1.4e \n',norm(S*d(1:Np)-fp)/norm(fp))
+
+  %info_J.print();
+
+
+  % free memory (mandatory for agmg)
+  inv_S.kill();
+
+
+  if (0)
+
+    A = sparse(JF.pp); B1T = sparse(JF.pr); B2 = sparse(JF.rp);
+    C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
+    f1 = f;
+    f2 = g-JF.rs*(JF.ss\h);
+
+	      % swap C sign for having standard saddle point notation 
+    C = -C;
+    if (swap_sign)
+      A=-A;
+      B1T=-B1T;
+      B2=-B2;
+      C=-C;
+      f1=-f1;
+      f2=-f2;
+    end
+
+				% assembly full system
+    jacobian = [A B1T; B2 -C];
+
+				% assembly rhs
+    rhs=[f1;f2];
+
+				% grounding
+    if (indc>0)
+		       % find nodes at time time step diag(A^i) is max
+      disp('GROUNDING')
+      indeces=set_grounding_node(A,ncellphi);
+      inode=indeces(1);
+      [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
+    else
+      irow=indeces_global(1)
+      A(irow,1:ncellphi) = vectors_x(:,1)';
+      B1T(irow,:)=sparse(1,Nr);
+      rhs(irow,:)=0.0;
+    end
+
+    [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
+
+    S = A+B1T*(invdiagC*B2);  
+    fp = rhs(1:Np)+B1T*(invC.apply(rhs(Np+1:Np+Nr)));
+    
+    fprintf(' res |S x -f_r|/f_r = %1.4e \n',norm(S*d(1:Np)-fp)/norm(fp))
+
+    jacobian=[A B1T;B2 -C];
+
+
+    
+    fprintf(' res modified = %1.4e \n',norm(jacobian*d-rhs)/norm(rhs))
+  end
 
   
-  outer_iter=uint64(info_J.iter);
+  
+  
 
- 
+  if (0)
+    for i=1:N
+      v1=vectors_x(:,1+(i-1)*2);
+      v2=vectors_x(:,2+(i-1)*2);
+      vy=vectors_y(:,i);
+      res=abs(...
+	       v1'*d(1+(i-1)*ncellphi:    i*ncellphi)+...
+	       v2'*d(1+i    *ncellphi:(i+1)*ncellphi)+...
+	       vy'*d(Np+1:Np+Nr)-...
+	       alphas(i) );
+      fprintf(' %d alpha=%1.4e res=%1.4e\n', i, alphas(i),res)
+    end
+  end
+
   
   
   %info_J.resvec=info_J.resvec(1:outer_iter);
@@ -819,7 +898,7 @@ elseif sol==10
   if (info_J.res <= ctrl_outer.tolerance)
     info_J.flag=0;
   end
- 
+
 				%disp('END')
   flag=info_J.flag;
   relres=info_J.res;
@@ -852,9 +931,10 @@ elseif sol==11
   tic;
 
   % grounding
+  indeces=set_grounding_node(A,ncellphi);
   if ( indc >0)
     % find nodes at time time step diag(A_ii) is max
-    indeces=set_grounding_node(A,ncellphi)
+    indeces=set_grounding_node(A,ncellphi);
 
     % ground node of A_11
     inode=indeces(1);
@@ -862,7 +942,7 @@ elseif sol==11
 
     % ground other phi increment (when available)
     if ( isfield(controls,'grounded_values') )
-      %disp('extra grounding')
+      disp('extra grounding')
       for i=2:Nt
 	inode=indeces(i);
 	[A,B1T,rhs]=grounding(A,B1T,rhs,inode,grounded_values(i));
@@ -899,35 +979,39 @@ elseif sol==11
     % define function
     inv_A = @(x) invA.apply(x);
   elseif( strcmp(inverseA_approach,'block'))
-    % partion matrix 
-    diag_block_A = cell(Nt, 1);
-    nAi=ncellphi;
-    for i=1:Nt
-      diag_block_A{i}      =A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-    end
-    % use block inverse
-    diag_block_invA(Nt,1)=sparse_inverse;
+    % % partion matrix 
+    % nAi=ncellphi;
+   
+    % % use block inverse
+    % diag_block_invA(Nt,1)=sparse_inverse;
+    % ctrl_loc=ctrl_solver;
 
-    ctrl_loc=ctrl_solver;
-    for i=1:Nt
-      ctrl_loc=ctrl_solver;
-      ctrl_loc.init(ctrl_inner11.approach,...
-		    ctrl_inner11.tolerance,...
-		    ctrl_inner11.itermax,...
-		    ctrl_inner11.omega,...
-		    ctrl_inner11.verbose,...
-		    sprintf('%sA%d',ctrl_inner11.label,i));
-      diag_block_invA(i).name=sprintf('inverse A%d',i);
-      diag_block_invA(i).init(diag_block_A{i}+relax4prec*speye(nAi,nAi),ctrl_loc);     
-    end
 
-    % define function
-    inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+    % [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
+   
+    % for i=1:Nt
+    %   ctrl_loc=ctrl_solver;
+    %   ctrl_loc.init(ctrl_inner11.approach,...
+    % 		    ctrl_inner11.tolerance,...
+    % 		    ctrl_inner11.itermax,...
+    % 		    ctrl_inner11.omega,...
+    % 		    ctrl_inner11.verbose,...
+    % 		    sprintf('%sA%d',ctrl_inner11.label,i));
+    %   diag_block_invA(i).name=sprintf('inverse A%d',i);
+    %   matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi) + relax4prec*speye(nAi,nAi) ;
+    %   inode=indeces_local(i)
+    %   matrixAi(inode,:)=sparse(ncellphi,1);
+    %   diag_block_invA(i).init(matrixAi,ctrl_loc);     
+    % end
+
+    % % define function
+    % inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
   end
 
   % define explicitely inverse of diag(A)
   invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
 
+  inv_A  = @(x) invDiagA*x;
   
   % assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
   % reduced to system only in rho
@@ -1080,46 +1164,52 @@ elseif sol==12
 
   % cpu time preprocessing main solver
   tic;
-  
-				% grounding
-  if (indc>0) 
-    rhs(indc)=0;
-    A(indc,:)   = sparse(1,Np);
-    %A(:,indc)   = sparse(Np,1);
-    A(indc,indc)= 1;
-    B1T(indc,:) = sparse(1,Nr);
-    %B2(:,indc) = sparse(Nr,1);
+
+   % set rows 
+  [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
+  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  if (swap_sign)
+    vectors_x=-vectors_x;
+    vectors_y=-vectors_y;
+    alphas=-alphas;
+  end
+  if (1)
+    [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
   end
   
-
-  if ( verbose >= 2)
-    fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
-    fprintf('(%9.4e <= A <= %18.12e) \n',min(spdiags(A,0)),max(spdiags(A,0)))
+ % grounding
+  if (indc>0)
+    % find nodes at time time step diag(A^i) is max
+    disp('GROUNDING')
+    indeces=set_grounding_node(A,ncellphi);
+    inode=indeces(1);
+    [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
+  else
+    irow=indeces_global(1);
+    A(irow,1:ncellphi) = vectors_x(:,1)';
+    B1T(irow,:)=sparse(1,Nr);
+    rhs(irow,:)=0.0;
   end
 
   % define inverse of (~A)^{-1}
-  relax4prec=1e-8
+  relax4prec=controls.relax4inv11;
   
-  % inverse A action  
-  if ( strcmp(ctrl.extra_info,'full'))
-    % set inverse
-    invA=sparse_inverse;
-    invA.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
-    invA.cumulative_iter=0;
-    invA.cumulative_cpu=0;
+  % inverse A action
+  approach_inverse_A=controls.extra_info;
+  if (strcmp(approach_inverse_A,'full'))
+    inverseA=sparse_inverse;
+    inverseA.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
+    inverseA.info_inverse.label='A';
+    inverseA.cumulative_iter=0;
+    inverseA.cumulative_cpu=0;
 
-    % define function
-    inv_A = @(x) invA.apply(x);
-  elseif( strcmp(inverseA_approach,'block'))
-    % partion matrix 
-    diag_block_A = cell(Nt, 1);
-    nAi=ncellphi;
-    for i=1:Nt
-      diag_block_A{i}      =A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-    end
-    % use block inverse
+    inv_A  = @(x) inverseA.apply(x);
+    
+  elseif(strcmp(approach_inverse_A,'block'))
+    % define array of sparse inverse
     diag_block_invA(Nt,1)=sparse_inverse;
 
+    % create blocks
     ctrl_loc=ctrl_solver;
     for i=1:Nt
       ctrl_loc=ctrl_solver;
@@ -1130,43 +1220,59 @@ elseif sol==12
 		    ctrl_inner11.verbose,...
 		    sprintf('%s A%d',ctrl_inner11.label,i));
       diag_block_invA(i).name=sprintf('inverse A%d',i);
-
       
-      diag_block_invA(i).init(diag_block_A{i}+relax4prec*speye(nAi,nAi),ctrl_loc);     
-    end
+				% get block add relaxation
+      matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)+relax4prec*speye(nAi,nAi);
+      
+				% define inverse
+      diag_block_invA(i).init( matrixAi,ctrl_loc);     
 
-    % define function
-    inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+    end
+% define function A shifter( inverse A grounded ( rhs set to zero in some nodes )
+    inv_A  = @(x) shift_solution( apply_block_diag_inverse(diag_block_invA,...
+							   set_rhs(x,indeces_globals)),...
+				  vectors,alphas);
+
   end
-  
- 
+
   
   % preprocess of precondtioner defienition
   preprocess_cpu=toc;
 
   % 
-  approach='full';  
-  relax4prec=0e-5;
-  debug=0;
-  if ( verbose >= 2)
-    fprintf('APPROACH %s \n',appraoch)
-  end
-  
-  
-  % init inverse of full S
-  if ( verbose >= 2)
-    fprintf('INIT inverse S\n')
-  end
-  
+  approach_schur='diagA';  
+  if (strcmp(approach_schur,'diagA'))
+    % define explicitely inverse of diag(A)
+    invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
 
-  SCA = @(x) (C*x + B2*(invA(B1T*x)));
-  %assembly inverse of  SAC iterative solver with no precodnitioner
-  inverse_block22 = @(y) -apply_iterative_solver( SCA, y, ctrl_inner22, @(z) z);
-  inner_nequ=Nr;
+    % assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
+    approx_SCA = (C+B2*invDiagA*B1T);
 
+    % assembly approximate inverse
+    inv_SCA=sparse_inverse;
+    inv_SCA.init(approx_SCA+controls.relax4inv22*speye(Nr,Nr),ctrl_inner22);
+    inv_SCA.info_inverse.label='schur_ca';
+    inv_SCA.cumulative_iter=0;
+    inv_SCA.cumulative_cpu=0;
+    
+    inverse_cpu=inv_SCA.init_cpu;
+    inverse_block22 = @(x) -inv_SCA.apply(x);
+
+  elseif(strcmp(approach_schur,'pure_iterative'))
+    % define matrix-vector operator
+    SCA = @(x) (C*x + B2*(invA(B1T*x)));
+    % assembly inverse of  SAC iterative solver with no precodnitioner
+    inverse_block22 = @(y) -apply_iterative_solver( SCA, y, ctrl_inner22, @(z) z);
+    inner_nequ=Nr;
+  end
   
   % Define action of preconditoner
-  prec = @(x) SchurCA_based_preconditioner(x, invA,inverse_block22,B1T,B2);
+  prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
+					   inverse_block22,...
+					   @(y) B1T*y,...
+					   @(z) B2*z,...
+					   Np,Nr,...
+					   controls.outer_prec,ncellphi);
 
   % solve
   jacobian = [A B1T; B2 -C];
@@ -1358,3 +1464,6 @@ sol_stat = struct('flag',flag,...
 		  'inner_iter', inner_iter,...
 		  'outer_iter', outer_iter,...
 		  'outer_cpu',  outer_cpu );
+
+%print_info_solver(sol_stat)
+%return
