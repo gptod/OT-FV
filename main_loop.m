@@ -21,7 +21,9 @@ plot_figures=0
 
 restart=0;
 
-save_data=0;
+save_data=1;
+read_from_file=0;
+h5_file2read='';
 
 
 compute_eigen=0;
@@ -41,10 +43,10 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 4
+  for h_i = 3
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=1:4
+    for i=4
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -63,9 +65,16 @@ for mesh_type = 2
       %        (B2  -~SCA )
       % ~A=diag(A)
       % ~SCA=C+B2 diag(A)^{-1} B1T
+
+
+      % 12 :  P=(~A   B1T)
+      %        (B2  -~SCA )
+      %  ~A^{-1} = inverse of A
+      %  ~SCA=C+B2 diag(A)^{-1} B1T
+      %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[10];
+      for sol=[12];
 	% Mesh structure:
 	% nodes -> array of nodes coordinates [x y]
 	% cells -> array of cells nodes [#nodes node1 node2 node3 ...]
@@ -77,7 +86,7 @@ for mesh_type = 2
 	ctrl_outer=ctrl_solver;
 
 	if (sol==8)
-	  ctrl_outer.init('stationary_iterative_methods',1e-5,1000);
+	  ctrl_outer.init('stationary_iterative_methods',1e-9,1000);
 
 	  solvers={'agmg'  ,'direct' ,'krylov'  ,'incomplete'};
 	  iters  ={10      ,1        ,10        ,  1          };
@@ -133,7 +142,7 @@ for mesh_type = 2
 	  end
 	elseif (sol==10)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('fgmres',1e-5,200);
+	  ctrl_outer.init('fgmres',1e-5,200,0.0,0);
 
 	  % preconditioner approach
 	  outer_prec='full'
@@ -152,7 +161,7 @@ for mesh_type = 2
 	  % block_triang :~S=upper block triangular of S
 	  % block_diag   :~S=block diagonal of S
 	  invS_approach={'full','block_triang', 'block_diag'};
-	  grounded_node=0;
+	  grounded_node=1;
 	  relax4inv11=0;
 
 	  
@@ -184,7 +193,7 @@ for mesh_type = 2
 				'relax4inv22',relax4inv22);
 	      
 
-	      approach_string=strcat('grounded_schurACwithdiagC_',...
+	      approach_string=strcat('testprepostprocess_g_schurACwithdiagC_',...
 				   ctrl_outer.approach,'_',...
 				   outer_prec,'_',...
 				   'invSAC',invS_approach{j},ctrl_inner11.label,'_',...
@@ -239,7 +248,7 @@ for mesh_type = 2
 			    'diag'); %label
 	  %extra_info='full';
 	  extra_info='block';
-	  relax4_inv11=1e-12;
+	  relax4_inv11=0e-12;
 	  
 	  % set grounded_node>0 to gorund the potential in grounded node
 	  grounded_node=0;
@@ -281,34 +290,53 @@ for mesh_type = 2
 	  end
 	elseif (sol==12)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('bicgstab',1e-5,1000);
+	  ctrl_outer.init('fgmres',1e-5,200,0.0,2);
 
-	  % set here other approximate inverse of block11
-	  ctrl_inner11.init('incomplete',1e-12,1,1.0,1,'incomplete');
+
+	  outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
+
+	  grounded_node=1;
+	  left_right='right';
+	  relax4_inv11=0;
+	  relax4_inv22=0;
 
 	  
-	  solvers={'bicgstab' ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-	  iters  ={100      ,10      ,1       ,1        ,10        ,  1          };
-	  label  ={'bicgstab100','agmg10','direct','krylov1','krylov10','incomplete'};
+	  for j=[3]
+	    outer_prec=outer_precs{j};
+	    
+	  
+
+	  % set here other approximate inverse of block11
+	  ctrl_inner11.init('agmg',1e-12,20,1.0,1,'agmgA');
+
+	  
+	  solvers={'bicgstab'   ,'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
+	  iters  ={100          ,10      ,1       ,1       ,1        ,100        ,  1         };
+	  label  ={'bicgstab100','agmg10','agmg1' ,'direct','krylov1','krylov100','incomplete'};
 
 	  % set here from solvers
-	  for i=[1];%1:length(solvers)
-	    ctrl_inner22.init(solvers{i},1e-12,iters{i},1.0,1,label{i});
-	    extra_info='';
+	  for i=[2];%1:length(solvers)
+	    ctrl_inner22.init(solvers{i},1e-2,iters{i},1.0,1,strcat(label{i},'_S'));
+	    extra_info='full';
 	    controls = struct('save_data',save_data,...
 			      'indc',grounded_node,...
 			      'sol',solver_approach,...
+			      'outer_prec',outer_prec,...
+			      'left_right',left_right,...
 			      'ctrl_inner11',ctrl_inner11,...
 			      'ctrl_inner22',ctrl_inner22,...
 			      'ctrl_outer',ctrl_outer,...
 			      'compute_eigen',compute_eigen,...
 			      'verbose',verbose,...
-			      'extra_info',extra_info);
+			      'extra_info',extra_info,...
+			      'relax4inv11',relax4_inv11,...
+			      'relax4inv22',relax4_inv22);
 
 	    approach_string=strcat(ctrl_outer.approach,...
-				   '_fullprecSCA_invA',label{i},'_invSCA',ctrl_inner22.label);
+				   'invA_precSCA',label{i},'_invSCAdiagA',ctrl_inner22.label);
 
 	    geod;
+	  end
 	  end
 	elseif (sol==13)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
