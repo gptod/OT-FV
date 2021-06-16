@@ -38,8 +38,8 @@ classdef sparse_inverse <handle
 	    icg=1;
 	 else
 	   icg=obj.ctrl.nrestart;
-	 end
-	     %obj.mgsolver=agmg(matrix,[],icg,[],ctrl.itermax,0,[],1);
+	  end
+	   obj.mgsolver=agmg(matrix,[],icg,[],ctrl.itermax,0,[],1);
        elseif ( strcmp(ctrl.approach,'diag') )
 	 obj.inverse_matrix_diagonal= 1.0./spdiags(matrix,0);
        elseif ( strcmp(ctrl.approach,'krylov'))
@@ -99,7 +99,7 @@ classdef sparse_inverse <handle
 	   icg=obj.ctrl.nrestart;
 	 end
 	 [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
-	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,0);	 
+	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,2);	 
 	 obj.info_inverse.approach_used = 'agmg';
        elseif ( strcmp(obj.ctrl.approach,'diag') )
 	 sol=obj.inverse_matrix_diagonal.*rhs;
@@ -170,7 +170,7 @@ classdef sparse_inverse <handle
      % destructor
      function obj = kill(obj)
        if ( strcmp(obj.ctrl.approach ,'agmg'))
-	 %obj.mgsolver=agmg(obj.matrix,[],1,[],1000,0,[],-1);
+	 z=agmg(obj.matrix,[],1,[],1000,0,[],-1);
        end
        clear obj.matrix;
        clear obj.is_symmetric;
