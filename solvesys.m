@@ -5,12 +5,13 @@ function [d, sol_stat, normd] = solvesys(JF,F,controls,logID)
 % constant of the potential dp
 
 
-indc=controls.indc;
 sol=controls.sol;
-ctrl_inner11=controls.ctrl_inner11;
-ctrl_inner22=controls.ctrl_inner22;
-ctrl_outer=controls.ctrl_outer;
-compute_eigen=controls.compute_eigen;
+indc=controls.indc;
+
+%ctrl_inner11=controls.ctrl_inner11;
+%ctrl_inner22=controls.ctrl_inner22;
+%ctrl_outer=controls.ctrl_outer;
+%compute_eigen=controls.compute_eigen;
   
 Np = length(F.p);
 Nr = length(F.r);
@@ -551,6 +552,15 @@ elseif sol==9
   sol_stat = struct('flag',flag,'relres',relres,'iter',iter);
 
 elseif sol==10
+  % copy controls
+  indc=controls.indc;
+  sol=controls.sol;
+  ctrl_inner11=controls.ctrl_inner11;
+  ctrl_inner22=controls.ctrl_inner22;
+  ctrl_outer=controls.ctrl_outer;
+  compute_eigen=controls.compute_eigen;
+
+
   verbose=0;
   % Krylov method for full system
   % + 
@@ -581,7 +591,7 @@ elseif sol==10
     [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
   else
     irow=indeces_global(1);
-    A(irow,1:ncellphi) = vectors_x(:,1)';
+    A(irow,1:ncellphi) = -vectors_x(:,1)';
     B1T(irow,:)=sparse(1,Nr);
     rhs(irow,:)=0.0;
   end
@@ -846,6 +856,14 @@ elseif sol==10
   normd = norm(d);
 
 elseif sol==11
+  % copy controls
+  indc=controls.indc;
+  sol=controls.sol;
+  ctrl_inner11=controls.ctrl_inner11;
+  ctrl_inner22=controls.ctrl_inner22;
+  ctrl_outer=controls.ctrl_outer;
+  compute_eigen=controls.compute_eigen;
+
   verbose=controls.verbose;
   % Krylov method for full system
   % + 
@@ -861,25 +879,53 @@ elseif sol==11
   % cpu time preprocessing main solver
   tic;
 
-  % grounding
-  indeces=set_grounding_node(A,ncellphi);
+
+  % set rows 
+  [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
+  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  if (~swap_sign)
+    vectors_x=-vectors_x;
+    vectors_y=-vectors_y;
+    alphas=-alphas;
+  end
+
   if ( indc >0)
     % find nodes at time time step diag(A_ii) is max
     indeces=set_grounding_node(A,ncellphi);
 
     % ground node of A_11
-    inode=indeces(1);
+    inode=indeces_globals(1);
     [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
-
-    % ground other phi increment (when available)
-    if ( isfield(controls,'grounded_values') )
-      disp('extra grounding')
-      for i=2:Nt
-	inode=indeces(i);
-	[A,B1T,rhs]=grounding(A,B1T,rhs,inode,grounded_values(i));
-      end	 
-    end
   end
+  if (1)
+    disp('MAKING A invertible')
+    [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
+  end
+
+
+  if (controls.diagonal_scaling)
+    diagA_scaling = sparse(1:Np,1:Np,(1.0./sqrt(spdiags(A,0)))',Np,Np);
+    diagC_scaling=sparse(1:Nr,1:Nr,(1.0./sqrt(spdiags(C,0)))',Nr,Nr);
+
+    
+    %fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C,0)),max(spdiags(C,0)))
+    %fprintf('(%9.4e <= A <= %18.12e) \n',min(spdiags(A,0)),max(spdiags(A,0)))
+
+   
+
+    
+    A=  diagA_scaling*A*  diagA_scaling;
+    B1T=diagA_scaling*B1T*diagC_scaling;
+    B2= diagC_scaling*B2* diagA_scaling;
+    C=  diagC_scaling*C*  diagC_scaling;
+
+    %fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C,0)),max(spdiags(C,0)))
+    %fprintf('(%9.4e <= A <= %18.12e) \n',min(spdiags(A,0)),max(spdiags(A,0)))
+
+    rhs(1:Np)      =diagA_scaling*rhs(1:Np);
+    rhs(1+Np:Np+Nr)=diagC_scaling*rhs(1+Np:Np+Nr);   
+  end
+  
   
 
   if ( verbose >= 2)
@@ -987,61 +1033,25 @@ elseif sol==11
 
   
 				% Define action of preconditoner
-  proj=0;
-  if (proj==0)
-    prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
-					     inverse_block22,...
-					     @(y) B1T*y,...
-					     @(z) B2*z,...
-					     Np,Nr,...
-					     controls.outer_prec,ncellphi);
-  elseif( proj ==1)
-    prec = @(x) SchurCA_based_preconditioner(x, @(zp) inv_A(projector(zp,kernel)),...
-					     inverse_block22,...
-					     @(y) B1T*y,...
-					     @(z) B2*z,...
-					     Np,Nr,...
-					     controls.outer_prec,ncellphi);
-  elseif( proj == 2)
-    prec = @(x) SchurCA_based_preconditioner(x, inv_A,...%@(z) projector(inv_A(z),kernel),...
-					     inverse_block22,...
-					     @(y) projector(B1T*y,kernel),...
-					     @(z) B2*projector(z,kernel),...
-					     Np,Nr,...
-					     controls.outer_prec,ncellphi);
-  elseif( proj ==3) 
-    prec = @(x) SchurCA_based_preconditioner(x, ...
-					     @(zp) projector(inv_A(zp),kernel),...
-					     inverse_block22,...
-					     @(y) projector(B1T*y,kernel),...
-					     @(z) B2*projector(z,kernel),...
-					     Np,Nr,...
-					     controls.outer_prec,ncellphi);
-  end
   
-
+  prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
+					   inverse_block22,...
+					   @(y) B1T*y,...
+					   @(z) B2*z,...
+					   Np,Nr,...
+					   controls.outer_prec,ncellphi);
   
   % solve
   jacobian = [A B1T; B2 -C];
 
   
   outer_timing=tic;
-
-  x0=zeros(Np+Nr,1);
-  if ( indc >0)
-    indeces=set_grounding_node(A,ncellphi);
-    x0(indeces(1))=0;
-  			 % ground other phi increment (when available)
-    if ( isfield(controls,'grounded_values') )
-      for i=2:Nt
-  	inode=indeces(i);
-  	x0(inode)=controls.grounded_values(i);
-      end
-    end
-  end
-  
   [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(x,A,B1T,B2,C,ncellphi,kernel,rhs), ...
 				    rhs, ctrl_outer, prec,[],controls.left_right );
+  if (controls.diagonal_scaling)
+    d(1:Np)      =diagA_scaling*d(1:Np);
+    d(1+Np:Np+Nr)=diagC_scaling*d(1+Np:Np+Nr);  
+  end
   outer_cpu=toc(outer_timing);
 
   
@@ -1081,6 +1091,14 @@ elseif sol==11
   normd = norm(d);
 
 elseif sol==12
+  % copy controls
+  indc=controls.indc;
+  sol=controls.sol;
+  ctrl_inner11=controls.ctrl_inner11;
+  ctrl_inner22=controls.ctrl_inner22;
+  ctrl_outer=controls.ctrl_outer;
+  compute_eigen=controls.compute_eigen;
+  
   verbose=controls.verbose;
   % Krylov method for full system
   % + 
@@ -1096,7 +1114,7 @@ elseif sol==12
   % cpu time preprocessing main solver
   tic;
 
-   % set rows 
+  % set rows 
   [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
   [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
   if (swap_sign)
@@ -1104,29 +1122,59 @@ elseif sol==12
     vectors_y=-vectors_y;
     alphas=-alphas;
   end
+  for i=1:N
+    fprintf('(%9.4e <= p1 <= %18.12e) \n',min(vectors_x(:,1+(i-1)*2)),max(vectors_x(:,1+(i-1)*2)))
+    fprintf('(%9.4e <= p2 <= %18.12e) \n',min(vectors_x(:,2+(i-1)*2)),max(vectors_x(:,2+(i-1)*2)))
+
+  end
+  
   if (1)
     [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
   end
-  
- % grounding
+  				% grounding
   if (indc>0)
     % find nodes at time time step diag(A^i) is max
     disp('GROUNDING')
-    indeces=set_grounding_node(A,ncellphi);
-    inode=indeces(1);
+    inode=indeces_global(1);
     [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
-  else
+  elseif(indc<0)
     irow=indeces_global(1);
-    A(irow,1:ncellphi) = vectors_x(:,1)';
+    A(irow,1:ncellphi) = -vectors_x(:,1)';
     B1T(irow,:)=sparse(1,Nr);
     rhs(irow,:)=0.0;
   end
+
+
+  if (controls.diagonal_scaling)
+    diagA_scaling = sparse(1:Np,1:Np,(1.0./sqrt(spdiags(A,0)))',Np,Np);
+    diagC_scaling=sparse(1:Nr,1:Nr,(1.0./sqrt(spdiags(C,0)))',Nr,Nr);
+
+    
+    %fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
+    %fprintf('(%9.4e <= A <= %18.12e) \n',min(spdiags(A,0)),max(spdiags(A,0)))
+
+   
+
+    
+    A=  diagA_scaling*A*  diagA_scaling;
+    B1T=diagA_scaling*B1T*diagC_scaling;
+    B2= diagC_scaling*B2* diagA_scaling;
+    C=  diagC_scaling*C*  diagC_scaling;
+
+    %fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
+    %fprintf('(%9.4e <= A <= %18.12e) \n',min(spdiags(A,0)),max(spdiags(A,0)))
+
+    rhs(1:Np)      =diagA_scaling*rhs(1:Np);
+    rhs(1+Np:Np+Nr)=diagC_scaling*rhs(1+Np:Np+Nr);   
+  end
+
+  
 
   % define inverse of (~A)^{-1}
   relax4prec=controls.relax4inv11;
   
   % inverse A action
-  approach_inverse_A=controls.extra_info;
+  approach_inverse_A=controls.approach_inverse_A;
   if (strcmp(approach_inverse_A,'full'))
     inverseA=sparse_inverse;
     inverseA.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
@@ -1140,7 +1188,8 @@ elseif sol==12
     % define array of sparse inverse
     diag_block_invA(Nt,1)=sparse_inverse;
 
-    % create blocks
+				% create blocks
+    nAi=ncellphi;
     ctrl_loc=ctrl_solver;
     for i=1:Nt
       ctrl_loc=ctrl_solver;
@@ -1152,7 +1201,7 @@ elseif sol==12
 		    sprintf('%s A%d',ctrl_inner11.label,i));
       diag_block_invA(i).name=sprintf('inverse A%d',i);
       
-				% get block add relaxation
+      % get block add relaxation
       matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)+relax4prec*speye(nAi,nAi);
       
 				% define inverse
@@ -1160,9 +1209,7 @@ elseif sol==12
 
     end
 % define function A shifter( inverse A grounded ( rhs set to zero in some nodes )
-    inv_A  = @(x) shift_solution( apply_block_diag_inverse(diag_block_invA,...
-							   set_rhs(x,indeces_globals)),...
-				  vectors,alphas);
+    inv_A  = @(x) apply_inverseAtilde(diag_block_invA,vectors_x,indeces_local,x);
 
   end
 
@@ -1170,9 +1217,54 @@ elseif sol==12
   % preprocess of precondtioner defienition
   preprocess_cpu=toc;
 
+  % compute eigenvalue of schur complement
+  if (controls.compute_eigen)
+    
+    ctrl_loc=ctrl_solver;
+    ctrl_loc.init('direct',1e-14,0,0.0,0,'accurate A inverse');
+    real_inverseA=sparse_inverse;
+    real_inverseA.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
+    dense_S=form_minus_SchurCA(@(x) real_inverseA.apply(x),B1T,B2,C);
+    
+    fprintf('\n')
+    eigenvalues=eig(dense_S);
+    real_part=real(eigenvalues);
+    imag_part=imag(eigenvalues);
+    abs_eig=abs(eigenvalues);
+    fprintf('max/min=%1.4e | %1.4e<=real(eig(S))<=%1.4e %1.4e<=img(eig(S))<=%1.4e %1.4e<=abs(eig(S))<=%1.4e\n',max(abs_eig)/min(abs_eig),...
+	    min(real_part),max(real_part),...
+	    min(imag_part),max(imag_part),...
+	    min(abs_eig),max(abs_eig))
+    
+    figure
+    plot(eigenvalues,'o')
+  
+      
+    if (strcmp(approach_inverse_A,'full'))
+      inverseA.cumulative_application=0;
+    elseif (strcmp(approach_inverse_A,'full'))
+      diag_block_invA(1,1).cumulative_application=0;
+    end
+
+    %dS=diag(dense_S);
+    %fprintf('(%9.4e <= diag(S) <= %18.12e) \n',min(dS),max(dS))
+
+    %sqrt_dS=sparse(1:Nr,1:Nr,(1.0./sqrt(dS))',Nr,Nr);
+
+    %new_dense=sqrt_dS*dense_S*sqrt_dS;
+    %new_dense=dense_S;
+    %new_dense(abs(new_dense)<1e-10)  = 0;
+    
+    
+    %figure
+    %spy(new_dense)
+    %imagesc(new_dense)
+  end
+    
+
   % 
-  approach_schur='diagA';  
-  if (strcmp(approach_schur,'diagA'))
+  approach_schurCA=controls.approach_schurCA;
+  if (strcmp(approach_schurCA,'diagA'))
     % define explicitely inverse of diag(A)
     invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
 
@@ -1189,13 +1281,54 @@ elseif sol==12
     inverse_cpu=inv_SCA.init_cpu;
     inverse_block22 = @(x) -inv_SCA.apply(x);
 
-  elseif(strcmp(approach_schur,'pure_iterative'))
-    % define matrix-vector operator
-    SCA = @(x) (C*x + B2*(invA(B1T*x)));
+  elseif(strcmp(approach_schurCA,'iterative'))
+				% define matrix-vector operator
+    SCA = @(x) (C*x + B2*(inv_A(B1T*x)));
     % assembly inverse of  SAC iterative solver with no precodnitioner
     inverse_block22 = @(y) -apply_iterative_solver( SCA, y, ctrl_inner22, @(z) z);
     inner_nequ=Nr;
+
+  elseif(strcmp(approach_schurCA,'full'))
+    tildeS=form_minus_SchurCA(inv_A,B1T,B2,C);
+
+    inv_SCA=sparse_inverse;
+    inv_SCA.init(tildeS,ctrl_inner22);
+    inv_SCA.info_inverse.label='schur_ca';
+    inv_SCA.cumulative_iter=0;
+    inv_SCA.cumulative_cpu=0;
+    
+    inverse_cpu=inv_SCA.init_cpu;
+    inverse_block22 = @(x) -inv_SCA.apply(x);
   end
+
+  if (0)%controls.compute_eigen)
+
+				% create (~S)^{-1} S
+    fprintf('building (~S)^{-1} S')
+    fprintf('aaaaaa')
+    precS=zeros(Nr,Nr);
+    for i=1:Nr
+      if (mod(i,100))
+	fprintf('\b\b\b\b\b\b%4.2f ',i/Nr*100)
+      end
+      precS(:,i)=-inverse_block22(dense_S(:,i));
+    end
+
+    eigenvalues=eig(precS);
+    real_part=real(eigenvalues);
+    imag_part=imag(eigenvalues);
+    abs_eig=abs(eigenvalues);
+    fprintf('real part eigen (~S)^{-1} S : min=%1.4e max=%1.4e\n', min(real_part),max(real_part))
+    fprintf('imag part eigen (~S)^{-1} S : min=%1.4e max=%1.4e\n', min(imag_part),max(imag_part))
+    fprintf('abs       eigen (~S)^{-1} S : min=%1.4e max=%1.4e\n', min(abs_eig),max(abs_eig))
+
+    figure
+    plot(eigenvalues,'o')
+  end
+
+  
+
+  
   
   % Define action of preconditoner
   prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
@@ -1209,8 +1342,22 @@ elseif sol==12
   jacobian = [A B1T; B2 -C];
   outer_timing=tic;
   [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec );
+  if (controls.diagonal_scaling)
+    d(1:Np)      =diagA_scaling*d(1:Np);
+    d(1+Np:Np+Nr)=diagC_scaling*d(1+Np:Np+Nr);  
+  end
+  
   outer_cpu=toc(outer_timing);
 
+  if(strcmp(approach_schurCA,'iterative'))
+    if (strcmp(approach_inverse_A,'full'))
+      total_Ainversion=inverseA.cumulative_application;
+    elseif (strcmp(approach_inverse_A,'block'))
+      total_Ainversion=diag_block_invA(1).cumulative_application;
+    end
+    fprintf('total number of A^{-1} application=%d\n',total_Ainversion)
+  end
+   
   % get info
   inner_iter=0;%inv_SCA.cumulative_iter;
   outer_iter=uint32(info_J.iter);
@@ -1221,149 +1368,194 @@ elseif sol==12
   relres=info_J.res;
   iter=info_J.iter;
 
-  A = sparse(JF.pp); B1T = sparse(JF.pr); B2 = sparse(JF.rp);
-  C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
-  f1 = f;
-  f2 = g-JF.rs*(JF.ss\h);
-  % swap C sign for having standard saddle point notation 
-  C = -C;
+  if (0)
+    A = sparse(JF.pp); B1T = sparse(JF.pr); B2 = sparse(JF.rp);
+    C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
+    f1 = f;
+    f2 = g-JF.rs*(JF.ss\h);
+	      % swap C sign for having standard saddle point notation 
+    C = -C;
 
 
-  % assembly full system
-  jacobian = [A B1T; B2 -C];
+				% assembly full system
+    jacobian = [A B1T; B2 -C];
 
-  % assembly rhs
-  rhs=[f1;f2];
+				% assembly rhs
+    rhs=[f1;f2];
 
-  
+    
 
-  relres=norm(jacobian*d-rhs)/norm(rhs);
- 
+    relres=norm(jacobian*d-rhs)/norm(rhs);
+
+  end
   
   dp = d(1:Np); dr = d(Np+1:end);
   ds = JF.ss\(-F.s-JF.sr*dr);
   d = [dp; dr; ds];
   
   normd = norm(d);
+
+  if (strcmp(approach_inverse_A,'full'))
+    inverseA.kill();
+  elseif (strcmp(approach_inverse_A,'full'))
+    for i=1:Nt
+      diag_block_invA(i).kill();
+    end
+  end
   
 elseif sol==13
-  verbose=0;
+  verbose=controls.verbose;
+  % approach from : "A PRECONDITIONER FOR GENERALIZED SADDLE POINT PROBLEMS"
+  % solve M=(A B1T) = H + S
+  %         (-B2 C) 
+  % where
+  % H=(A  ) S=(     B1T)
+  %   (  C)   (-B2     )
   % Krylov method for full system
   % + 
-  % use P=SchurCA approximation as preconditoner 
-  %       
-
+  % use P = 1/(2a)*(H+aI)(S+aI)  
+  % 
+  
   % cpu time preprocessing main solver
   tic;
-  
-  % grounding
-  rhs(indc)=0;
-  A(indc,:)   = sparse(1,Np);
-  A(indc,indc)= 1;
-  B1T(indc,:) = sparse(1,Nr);
 
-  jacobian = [A B1T; B2 -C];
-
-  % init inverse A
-  relax4prec=0e-6;
-  inverseA_approach='full';
-  %inverseA_approach='block';
-  %inverseA_approach='diag';
-  if ( strcmp(inverseA_approach,'diag'))
-    invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
-    inv_A = @(x) invDiagA*x;
-  elseif ( strcmp(inverseA_approach,'full'))
-    % set inverse
-    invA=sparse_inverse;
-    invA.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
-    invA.cumulative_iter=0;
-    invA.cumulative_cpu=0;
-
-    % define function
-    inv_A = @(x) invA.apply(x);
-  elseif( strcmp(inverseA_approach,'block'))
-    % partion matrix 
-    diag_block_A = cell(Nt, 1);
-    nAi=ncellphi;
-    for i=1:Nt
-      diag_block_A{i}      =A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-    end
-    % use block inverse
-    diag_block_invA(Nt,1)=sparse_inverse;
-
-    ctrl_loc=ctrl_solver;
-    disp(' ')
-    for i=1:Nt
-      ctrl_loc=ctrl_solver;
-      ctrl_loc.init(ctrl_inner11.approach,...
-		    ctrl_inner11.tolerance,...
-		    ctrl_inner11.itermax,...
-		    ctrl_inner11.omega,...
-		    ctrl_inner11.verbose,...
-		    sprintf('%s A%d',ctrl_inner11.label,i));
-      diag_block_invA(i).name=sprintf('inverse A%d',i);
-
-      
-      %disp(i)
-      %disp(diag_block_invA(i).name)
-      diag_block_invA(i).init(diag_block_A{i}+relax4prec*speye(nAi,nAi),ctrl_loc);
-      % if (i>1)
-      % 	disp(strcat(num2str(i),diag_block_invA(i).ctrl.label,...
-      % 		    'before',diag_block_invA(i-1).name,diag_block_invA(i-1).ctrl.label))
-      % end
-      
-    end
-
-    % for i=1:Nt
-    %   fprintf( '%d %s %s\n', i,diag_block_invA(i).name,diag_block_invA(i).ctrl.label)	    
-    % end
-
-
-    % define function
-    inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+  % set rows with maximal entries on A diagonal 
+  [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
+  % get vectors p and q and alpha such that p^T x + q^y = alpha
+  % we build N vectors
+  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  if (swap_sign)
+    vectors_x=-vectors_x;
+    vectors_y=-vectors_y;
+    alphas=-alphas;
+  end
+  % manipulate A,B1T and rhs with p,q,alpha
+  if (controls.manipulate)
+    [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
   end
 
-  %f_rhs=rhs(1:Np);
-  %test=inv_A(f_rhs);
-  %resf=norm(A*test-f_rhs)/norm(f_rhs)
+ 
+  				% grounding
+  if (indc>0)
+    disp('GROUNDING')
+    inode=indeces_global(1);
+    [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
+  elseif(indc<0)
+    irow=indeces_global(1);
+    A(irow,1:ncellphi) = -vectors_x(:,1)';
+    B1T(irow,:)=sparse(1,Nr);
+    rhs(irow,:)=0.0;
+  end
 
-  % schur CA
-  
-  % %assembly, implicetely, SAC=-(C+B2 * (A)^{-1} B1T)
-  % SCA = @(x) (C*x + B2*(inv_A(B1T*x)));
-  % %assembly inverse of  SAC iterative solver with no precodnitioner
-  % invS = @(y) -apply_iterative_solver( SCA, y, ctrl_inner22, @(z) z);
+  if (controls.diagonal_scaling)
+    diagA_scaling = sparse(1:Np,1:Np,(1.0./sqrt(spdiags(A,0)))',Np,Np);
+    diagC_scaling=sparse(1:Nr,1:Nr,(1.0./sqrt(spdiags(C,0)))',Nr,Nr);
+    size(diagA_scaling);
+    A=diagA_scaling*A*diagA_scaling;
+    B1T=diagA_scaling*B1T*diagC_scaling;
+    B2=diagC_scaling*B2*diagA_scaling;
+    C=diagC_scaling*C*diagC_scaling;
 
-  
-  invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
-  SCA = (C+B2*invDiagA*B1T);
-
-  relax4prec=0.0
-  inv_SCA=sparse_inverse;
-  inv_SCA.init(SCA+relax4prec*speye(Nr,Nr),ctrl_inner22);
-  inv_SCA.info_inverse.label='schur_ca';
-  inv_SCA.cumulative_iter=0;
-  inv_SCA.cumulative_cpu=0;
-  
-  inverse_cpu=inv_SCA.init_cpu;
-  if ( verbose >= 2)
-    fprintf('DONE inverse S\n') 
-  end 
-  inverse_block22 = @(x) -inv_SCA.apply(x);
-  inner_nequ=Nr;
+    rhs(1:Np)      =diagA_scaling*rhs(1:Np);
+    rhs(1+Np:Np+Nr)=diagC_scaling*rhs(1+Np:Np+Nr);   
+  end
 
   
+  % change sign of second row
+  matrixM = [A B1T; -B2 C];
+  rhs(Np+1:Np+Nr)=-rhs(Np+1:Np+Nr);
 
-  % Define action of preconditoner
-  prec = @(x,tol) SchurCA_based_preconditioner(x, inv_A,inverse_block22,B1T,B2);
+  %get relazation paramter
+  alpha=controls.alpha;
+ 
+  % define inverse of H+alphaI
+  %inverse of A
+  approach_inverse_A=controls.approach_inverse_A;
+  if ( strcmp(approach_inverse_A,'full'))
+    invAalpha=sparse_inverse;
+    invAalpha.init(A+alpha*speye(Np,Np),controls.ctrl_innerA);
+    invAalpha.cumulative_iter=0;
+    invAalpha.cumulative_cpu=0;
+			
+    inv_Aalpha = @(x) invAalpha.apply(x);
+  elseif( strcmp(approach_inverse_A,'block'))
+    % define array of sparse inverse
+    diag_block_invA(Nt,1)=sparse_inverse;
 
+    % create blocks
+    nAi=ncellphi;
+    ctrl_loc=ctrl_solver;
+    for i=1:Nt
+      ctrl_loc=ctrl_solver;
+      ctrl_loc.init(controls.ctrl_innerA.approach,...
+		    controls.ctrl_innerA.tolerance,...
+		    controls.ctrl_innerA.itermax,...
+		    controls.ctrl_innerA.omega,...
+		    controls.ctrl_innerA.verbose,...
+		    sprintf('%s A%d',controls.ctrl_innerA.label,i));
+      diag_block_invA(i).name=sprintf('inverse A%d',i);
+      
+      % get block add relaxation
+      matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)+alpha*speye(nAi,nAi);
+      
+      % define inverse
+      diag_block_invA(i).init( matrixAi,ctrl_loc);     
+
+    end
+    % define function
+    inv_Aalpha  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+  end
+
+  % inverse of C+alpha*I
+  inv_Calpha=sparse_inverse;
+  inv_Calpha.init(C+alpha*speye(Nr,Nr),controls.ctrl_innerC);
+
+  % concatenate
+  inv_Halpha = @(x) [inv_Aalpha(x(1:Np)); inv_Calpha.apply(x(Np+1:Np+Nr))];
+
+  % define inverse of S+alphaI
+  % We can explicitely form the matrix
+  if (strcmp(controls.approach_inverse_S,'SAC'))
+    S11=alpha*speye(Np,Np)+1/alpha*B1T*B2;
+    inv_S11=sparse_inverse;
+    inv_S11.init(S11,controls.ctrl_innerS);
+    
+    inv_Salpha = @(x) SchurAC_based_preconditioner(x, @(xin) inv_S11.apply(xin),...
+						   @(y) -y/alpha ,B1T,-B2,...
+						   'full',ncellphi);
+  elseif (strcmp(controls.approach_inverse_S,'SCA'))
+    S11=alpha*speye(Nr,Nr)+1/alpha*B2*B1T;
+    inv_S11=sparse_inverse;
+    inv_S11.init(S11,controls.ctrl_innerS);
+				% Define action of preconditoner
+    inv_Salpha = @(x) SchurCA_based_preconditioner(x, @(xin) xin/alpha,...
+						   @(yin) inv_S11.apply(yin),...
+						   @(y) B1T*y,...
+						   @(z) -B2*z,...
+						   Np,Nr,...
+						   'full',ncellphi);
+  end
+
+
+				% define preconditioner
+  if (strcmp(controls.approach_prec,'HS'))
+    prec = @(x) inv_Salpha(inv_Halpha(x))/(2*alpha);
+  elseif ( strcmp(controls.approach_prec,'SH'))
+    prec = @(x) inv_Halpha(inv_Salpha(x))/(2*alpha);
+  end
+ 
   %preprocess finished
   preprocess_cpu=toc;
 
 
   % solve 
   outer_timing=tic;
-  [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec );
+  [d,info_J]=apply_iterative_solver(@(x) matrixM*x, rhs, controls.ctrl_outer, prec,[],controls.left_right );
+  if (controls.diagonal_scaling)
+    d(1:Np)      =diagA_scaling*d(1:Np);
+    d(1+Np:Np+Nr)=diagC_scaling*d(1+Np:Np+Nr);  
+  end
+  
   outer_cpu=toc(outer_timing);
   
   flag=info_J.flag;

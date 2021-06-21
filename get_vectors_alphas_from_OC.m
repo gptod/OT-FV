@@ -69,6 +69,8 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 			 rho(1+(i-1)*m:i*m);
     % D(rho) * (B2 x + Ry - M z) =D(rho) g
     % D(m)(-D(s) y-D(rho)z)=D(m)*h
+    %sum(vectors(:,1+(i-1)*2))
+    %sum(vectors(:,2+(i-1)*2))
 
     % vy=R*rho^i + M*slack^i
     vectors_y(:,i) = JOC.rr(:,1+(i-1)*m:i*m)*rho(1+(i-1)*m:i*m);
