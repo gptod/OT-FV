@@ -482,11 +482,11 @@ while true
     smu = uk(tnp+tnr2h+1:end);
 
     if (save_data)
-      disp('start saving')
+      %disp('start saving')
       data_name=sprintf('/DS%d',itk1+1);
       h5create(filename_h5,data_name,[Np+2*Nr+2])
       h5write(filename_h5,data_name,[uk;mu;theta]')
-      disp('finished saving')
+      %disp('finished saving')
     end
     
     % error bound on optimality

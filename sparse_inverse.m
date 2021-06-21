@@ -2,25 +2,27 @@ classdef sparse_inverse <handle
   properties
     dimblock=0;
     name='empty';
-    preprocesses_agmg=1;
+    preprocesses_agmg=0;
     matrix;
     inverse_matrix_diagonal;
-     nequ;
-     is_symmetric;
-     ctrl;
-     info_inverse;
-     % agmg solver
-     mgsolver;
-     % incomplete factor in LU factorization A~IL*IU
-     IL; 
-     IU;
-     % M, N matrix for Gauss-Seidel and Jacobi
-     M; 
-     N;
-     cumulative_iter=0;
-     init_cpu=0;
-     cumulative_cpu=0;
-     
+    nequ;
+    is_symmetric;
+    ctrl;
+    info_inverse;
+    % dense factorizations
+    matrix_decomposed; 
+    % agmg solver
+    mgsolver;
+    % incomplete factor in LU factorization A~IL*IU
+    IL; 
+    IU;
+    % M, N matrix for Gauss-Seidel and Jacobi
+    M; 
+    N;
+    cumulative_iter=0;
+    cumulative_application=0;
+    init_cpu=0;
+    cumulative_cpu=0; 
    end
    methods
      function obj = init(obj,matrix,ctrl)
@@ -33,8 +35,10 @@ classdef sparse_inverse <handle
        obj.info_inverse=info_solver;
        obj.cumulative_iter=0;
        obj.cumulative_cpu=0;
+       obj.cumulative_application=0;
 
        if ( strcmp(ctrl.approach,'direct'))
+	 obj.matrix_decomposed = decomposition(obj.matrix); 
        elseif ( strcmp(ctrl.approach,'agmg') )
 	  if (obj.is_symmetric)
 	    icg=1;
@@ -93,7 +97,7 @@ classdef sparse_inverse <handle
        
        apply_cpu=tic;	 
        if ( strcmp(obj.ctrl.approach ,'direct'))
-	 sol=obj.matrix\rhs;
+	 sol= obj.matrix_decomposed\rhs;
 	 obj.info_inverse.approach_used = 'direct';
 	 obj.info_inverse.iter=0;
 	 obj.info_inverse.flag=0;
@@ -158,7 +162,9 @@ classdef sparse_inverse <handle
 	   obj.info_inverse.resvec = resvec;
        end
        cpu=toc(apply_cpu);
-       
+
+
+       obj.cumulative_application=obj.cumulative_application +1;
        obj.info_inverse.rhsnorm=norm(rhs);
        obj.info_inverse.balance=sum(rhs);
        obj.info_inverse.res=norm(obj.matrix*sol-rhs);
@@ -184,6 +190,7 @@ classdef sparse_inverse <handle
 	   z=agmg(obj.matrix,[],1,[],1000,0,[],-1);
 	 end
        end
+       clear obj.matrix_decomposed;
        clear obj.matrix;
        clear obj.is_symmetric;
        clear obj.ctrl;

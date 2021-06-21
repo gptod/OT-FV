@@ -92,3 +92,6 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,sol
   else
     disp('IN apply_iterative_solver: solver not defined')
   end
+  info.realres=info.res/norm(rhs);
+  info.rhsnorm=norm(rhs);
+  info.print();
