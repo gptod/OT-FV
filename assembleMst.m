@@ -1,10 +1,13 @@
 function Mst = assembleMst(N,nedge,Ms)
 
 
-Mst = sparse((N+1)*nedge,(N+1)*nedge);
+% Mst = sparse((N+1)*nedge,(N+1)*nedge);
+% 
+% for k=1:N+1
+%    
+%     Mst((k-1)*nedge+1:k*nedge,(k-1)*nedge+1:k*nedge) = Ms;
+%     
+% end
 
-for k=1:N+1
-   
-    Mst((k-1)*nedge+1:k*nedge,(k-1)*nedge+1:k*nedge) = Ms;
-    
-end
+Mst = repmat({Ms},1,N+1);
+Mst = blkdiag(Mst{:});
