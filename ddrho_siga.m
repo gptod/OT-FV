@@ -45,13 +45,13 @@ ds = edges(ind.internal(:),5);
 
 
 ddrhosa(indu_KK) = ddrhosa(indu_KK) + ...
-                   accumarray(indo_KK,dKdKharm_vect(rho(KK),rho(LL),dK,dL,ds).*a);
+                   accumarray(indo_KK,dKdKharm(rho(KK),rho(LL),dK,dL,ds).*a);
 ddrhosa(indu_KL) = ddrhosa(indu_KL) + ...
-                   accumarray(indo_KL,dLdKharm_vect(rho(KK),rho(LL),dK,dL,ds).*a);         
+                   accumarray(indo_KL,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);         
 ddrhosa(indu_LK) = ddrhosa(indu_LK) + ...
-                   accumarray(indo_LK,dLdKharm_vect(rho(KK),rho(LL),dK,dL,ds).*a);          
+                   accumarray(indo_LK,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);          
 ddrhosa(indu_LL) = ddrhosa(indu_LL) + ...
-                   accumarray(indo_LL,dKdKharm_vect(rho(LL),rho(KK),dL,dK,ds).*a);
+                   accumarray(indo_LL,dKdKharm(rho(LL),rho(KK),dL,dK,ds).*a);
                
 
 

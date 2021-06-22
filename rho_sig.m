@@ -28,4 +28,4 @@ dL = sqrt((mid(ind.internal(:),1)-cc(LL,1)).^2+...
     (mid(ind.internal(:),2)-cc(LL,2)).^2);
 ds = edges(ind.internal(:),5);
 
-rhos = harm_vect(rho(KK),rho(LL),dK,dL,ds);
+rhos = harm(rho(KK),rho(LL),dK,dL,ds);

@@ -35,7 +35,7 @@ dL = sqrt((mid(ind.internal(:),1)-cc(LL,1)).^2+...
     (mid(ind.internal(:),2)-cc(LL,2)).^2);
 ds = edges(ind.internal(:),5);
 
-drhos(indeK) = dKharm_vect(rho(KK),rho(LL),dK,dL,ds);
-drhos(indeL) = dKharm_vect(rho(LL),rho(KK),dL,dK,ds);
+drhos(indeK) = dKharm(rho(KK),rho(LL),dK,dL,ds);
+drhos(indeL) = dKharm(rho(LL),rho(KK),dL,dK,ds);
 
 
