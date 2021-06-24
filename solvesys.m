@@ -575,11 +575,15 @@ elseif sol==10
     vectors_y=-vectors_y;
     alphas=-alphas;
   end
-  for i=1:N
-    fprintf('(%1.4e <= p1 <= %1.4e) \n',min(vectors_x(:,1+(i-1)*2)),max(vectors_x(:,1+(i-1)*2)))
-    fprintf('(%1.4e <= p2 <= %1.4e) \n',min(vectors_x(:,2+(i-1)*2)),max(vectors_x(:,2+(i-1)*2)))
-    fprintf('A(%d,%d)=%1.4e \n', indeces_global(i),indeces_global(i),...
-   	    find(A(indeces_global(i+1),indeces_global(i+1))));
+
+  if (0)
+    for i=1:N
+      fprintf('(%1.4e <= p1 <= %1.4e) \n',min(vectors_x(:,1+(i-1)*2)),max(vectors_x(:,1+(i-1)*2)))
+      fprintf('(%1.4e <= p2 <= %1.4e) \n',min(vectors_x(:,2+(i-1)*2)),max(vectors_x(:,2+(i-1)*2)))
+      fprintf('A(%d,%d)=%1.4e \n', indeces_global(i),indeces_global(i),...
+   	      find(A(indeces_global(i+1),indeces_global(i+1))));
+    end
+
   end
   
   if (controls.manipulate > 0 )
@@ -835,7 +839,7 @@ elseif sol==10
   end
     
  
-  if (1)
+  if (0)
     sizecell=-spdiags(JF.rs(1:ncellrho,1:ncellrho),0);
       
     % call subroutine to check if the solution satisfies

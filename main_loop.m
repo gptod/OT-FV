@@ -76,7 +76,7 @@ for mesh_type = 2
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[10];
+      for sol=[13];
 	% Mesh structure:
 	% nodes -> array of nodes coordinates [x y]
 	% cells -> array of cells nodes [#nodes node1 node2 node3 ...]
@@ -144,7 +144,7 @@ for mesh_type = 2
 	  end
 	elseif (sol==10)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('fgmres',1e-13,200,0.0,0);
+	  ctrl_outer.init('fgmres',1e-5,200,0.0,0);
 
 	  % preconditioner approach
 	  outer_prec='full'
@@ -165,8 +165,8 @@ for mesh_type = 2
 	  invS_approach={'full','block_triang', 'block_diag'};
 
 	  grounded_node=1;
-	  manipulation_approach=2;
-	  manipulate=1;
+	  manipulation_approach=1;
+	  manipulate=0;
 
 	  
 	  relax4inv11=0;
@@ -427,12 +427,15 @@ for mesh_type = 2
 	  
           % handle singularity
 	  % change A,B1T,f to remove part of its kernel
-	  manipulate=0
+	  manipulate=0;
+	  manipulation_approach=1;
 	  % we need to ground the solution since A_11 is singular
 	  % grounded<0 C^T x1 =0
 	  % grounded=0 no grounding
 	  % grounded>0 solution is grounded on one node
 	  grounded_node=1;
+	  diagonal_scaling=1;
+
 
           % alpha relaxation
 	  alpha=0.1;
@@ -443,7 +446,7 @@ for mesh_type = 2
 	  ctrl_innerS=ctrl_solver;
 
 	  approach_inverse_A='block';
-	  approach_inverse_A='full';
+	  %approach_inverse_A='full';
 
 	  approach_inverse_S='SCA';
 	  %approach_inverse_S='SAC';
@@ -451,8 +454,7 @@ for mesh_type = 2
 	  approach_prec='SH';
 	  %approach_prec='HS';
 
-	  diagonal_scaling=1;
-	  
+	  	  
 	  
 	  solversA={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
 	  itersA  ={1      ,10       ,1       ,1        ,100        ,  1         };

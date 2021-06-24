@@ -49,6 +49,8 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 
   B2T=JOC.rp';
 
+  print=0;
+
 
   if (approach==1)
     
@@ -99,13 +101,17 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
     % compute imbalances given by rhs
     for i=1:Nt
       imbalances(i)=sum(f(1+(i-1)*n:i*n));
-      fprintf('%d imb=%1.4e \n',i,imbalances(i))
+      if (print)
+	fprintf('%d imb=%1.4e \n',i,imbalances(i))
+      end
     end
     betas(1)=imbalances(i)/deltat;
     for i=2:N
       betas(i)= imbalances(i)/deltat;
       betas(i) = betas(i)+betas(i-1);
-      fprintf('%d beta=%1.4e\n',i,betas(i))
+      if (print)
+	fprintf('%d beta=%1.4e\n',i,betas(i))
+      end
     end
 
 
