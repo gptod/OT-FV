@@ -52,9 +52,6 @@ if (swap_sign)
   f2=-f2;
 end
 
-% assembly full system
-jacobian = [A B1T; B2 -C];
-
 % assembly rhs
 rhs=[f1;f2];
 
@@ -572,13 +569,20 @@ elseif sol==10
 
   % set rows 
   [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
-  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls,controls.manipulation_approach);
   if (swap_sign)
     vectors_x=-vectors_x;
     vectors_y=-vectors_y;
     alphas=-alphas;
   end
-  if (0)
+  for i=1:N
+    fprintf('(%1.4e <= p1 <= %1.4e) \n',min(vectors_x(:,1+(i-1)*2)),max(vectors_x(:,1+(i-1)*2)))
+    fprintf('(%1.4e <= p2 <= %1.4e) \n',min(vectors_x(:,2+(i-1)*2)),max(vectors_x(:,2+(i-1)*2)))
+    fprintf('A(%d,%d)=%1.4e \n', indeces_global(i),indeces_global(i),...
+   	    find(A(indeces_global(i+1),indeces_global(i+1))));
+  end
+  
+  if (controls.manipulate > 0 )
     [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
   end
   
@@ -589,7 +593,7 @@ elseif sol==10
     indeces=set_grounding_node(A,ncellphi);
     inode=indeces(1);
     [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
-  else
+  elseif(indc<0)
     irow=indeces_global(1);
     A(irow,1:ncellphi) = -vectors_x(:,1)';
     B1T(irow,:)=sparse(1,Nr);
@@ -600,7 +604,17 @@ elseif sol==10
   
    % init diag(C)^{-1}
   invC = sparse_inverse;
-  invC.init(C,ctrl_inner22);
+
+  ctrl_loc=ctrl_solver;
+  index_agmg=1;
+  ctrl_loc.init(ctrl_inner22.approach,...
+		ctrl_inner22.tolerance,...
+		ctrl_inner22.itermax,...
+		ctrl_inner22.omega,...
+		ctrl_inner22.verbose,...
+		'C',index_agmg);
+ 
+  invC.init(C,ctrl_loc);
   invdiagC = sparse(1:Nr,1:Nr,(invC.inverse_matrix_diagonal)',Nr,Nr);
   if ( verbose >= 1)
     fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C,0)),max(spdiags(C,0)))
@@ -639,7 +653,16 @@ elseif sol==10
       fprintf('INIT inverse S\n')
     end
     inv_S=sparse_inverse;
-    inv_S.init(S+relax4prec*speye(Np,Np),ctrl_inner11);
+
+    ctrl_loc=ctrl_solver;
+    index_agmg=index_agmg+1;
+    ctrl_loc.init(ctrl_inner11.approach,...
+		  ctrl_inner11.tolerance,...
+		  ctrl_inner11.itermax,...
+		  ctrl_inner11.omega,...
+		  ctrl_inner11.verbose,...
+		  'SAC',index_agmg);
+    inv_S.init(S+relax4prec*speye(Np,Np),ctrl_loc);
     inv_S.cumulative_iter=0;
     inv_S.cumulative_cpu=0;
     inv_S.dimblock=ncellphi;
@@ -693,13 +716,14 @@ elseif sol==10
     end 
     diag_block_invS(Nt,1)=sparse_inverse;
     for i=1:Nt
+      index_agmg=index_agmg+1;
       ctrl_loc=ctrl_solver;
       ctrl_loc.init(ctrl_inner11.approach,...
 		    ctrl_inner11.tolerance,...
 		    ctrl_inner11.itermax,...
 		    ctrl_inner11.omega,...
 		    ctrl_inner11.verbose,...
-		    sprintf('%sA%d%d',ctrl_inner11.label,i,i));
+		    sprintf('%sA%d%d',ctrl_inner11.label,i,i),index_agmg);
       diag_block_invA(i).name=sprintf('inverse A%d%d',i,i);
       diag_block_invS(i).init(diag_block_S{i}+relax4prec*speye(nAi,nAi),ctrl_loc);
     end
@@ -719,26 +743,6 @@ elseif sol==10
     nAi=ncellphi;
     inner_nequ=nAi;
     
-    %
-    % partion diagonal and upper diagonal blocks
-    %
-    if ( verbose >= 2)
-      fprintf('PARTION diag S\n')
-    end
-    diag_block_S       = cell(Nt, 1);
-
-    
-    if (debug) 
-      explicit_diag_block_S=sparse(Np,Np);
-    end
-    for i=1:Nt
-      diag_block_S{i}      =S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-      if (debug) 
-	explicit_diag_block_S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)=...
-	S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-      end
-    end
-
     %				
     % create define inverse on diagonal block
     % relax diagonal by a factor 1/omega 0<omega<1
@@ -749,26 +753,20 @@ elseif sol==10
     diag_block_invS(Nt,1)=sparse_inverse;
     ctrl_loc=ctrl_solver;
     for i=1:Nt
+      index_agmg=index_agmg+1;
       ctrl_loc=ctrl_solver;
       ctrl_loc.init(ctrl_inner11.approach,...
 		    ctrl_inner11.tolerance,...
 		    ctrl_inner11.itermax,...
 		    ctrl_inner11.omega,...
 		    ctrl_inner11.verbose,...
-		    sprintf('%s_SAC%d%d',ctrl_inner11.label,i,i));
-      diag_block_invS(i).init(diag_block_S{i}+relax4prec*speye(nAi,nAi),ctrl_loc);
+		    sprintf('%s_SAC%d%d',ctrl_inner11.label,i,i),index_agmg);
+      diag_block_invS(i).init(S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)+...
+			      relax4prec*speye(nAi,nAi),ctrl_loc);
       diag_block_invS(i).name=sprintf('inverse_SAC%d%d',ctrl_inner11.label,i,i);
     end
-    if (0) 
-      for i=1:Nt
-	disp(diag_block_invS(i).ctrl.label);
-	Sii=S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-	differe= norm(nonzeros(diag_block_invS(i).matrix)-...
-		      nonzeros(Sii));
-	fprintf('diff block %1.4e\n', differe);
-      end
-      
-    end
+
+    
     inverse_block11  = @(x) apply_block_diag_inverse(diag_block_invS,x);
   end
 
@@ -789,7 +787,8 @@ elseif sol==10
   %
   % Define action of preconditoner
   % 
-  prec = @(x) SchurAC_based_preconditioner(x, inverse_block11, @(y) invC.apply(y) ,B1T,B2,controls.outer_prec,ncellphi);
+  prec = @(x) SchurAC_based_preconditioner(x, inverse_block11, @(y) invC.apply(y) ,...
+					   B1T,B2,controls.outer_prec,ncellphi);
 
   %prec = @(x) lower_triang_prec(x,inverse_block11,B2, @(y) invC.apply(y));
 
@@ -823,12 +822,28 @@ elseif sol==10
   end
  
   % free memory (mandatory for agmg)
-  inv_S.kill();
-
-
-  if (0)
-    % call subroutine
-    test_vectors
+  if (strcmp(approach,'full'))
+    inv_S.kill();
+  elseif(strcmp(approach,'block_diag'))
+    for i=1:Nt
+      diag_block_invS(i).kill()
+    end
+  elseif(strcmp(approach,'block_triang'))
+    for i=1:Nt
+      diag_block_invS(i).kill()
+    end
+  end
+    
+ 
+  if (1)
+    sizecell=-spdiags(JF.rs(1:ncellrho,1:ncellrho),0);
+      
+    % call subroutine to check if the solution satisfies
+    % p^t x + q^t y=alpha
+    test_vectors(d,vectors_x,vectors_y,alphas,N,Np,Nr)
+    for i=1:N
+      fprintf(' %d imbalance=%1.2e \n', i, sizecell'*d(Np+1+(i-1)*ncellrho:Np+i*ncellrho))
+    end
   end
 
   
@@ -882,7 +897,7 @@ elseif sol==11
 
   % set rows 
   [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
-  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls,controls.manipulation_approach);
   if (~swap_sign)
     vectors_x=-vectors_x;
     vectors_y=-vectors_y;
@@ -897,7 +912,8 @@ elseif sol==11
     inode=indeces_globals(1);
     [A,B1T,rhs]=grounding(A,B1T,rhs,inode,0);
   end
-  if (1)
+
+  if (controls.manipulate)
     disp('MAKING A invertible')
     [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
   end
@@ -1116,19 +1132,19 @@ elseif sol==12
 
   % set rows 
   [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
-  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls,controls.manipulation_approach);
   if (swap_sign)
     vectors_x=-vectors_x;
     vectors_y=-vectors_y;
     alphas=-alphas;
   end
-  for i=1:N
-    fprintf('(%9.4e <= p1 <= %18.12e) \n',min(vectors_x(:,1+(i-1)*2)),max(vectors_x(:,1+(i-1)*2)))
-    fprintf('(%9.4e <= p2 <= %18.12e) \n',min(vectors_x(:,2+(i-1)*2)),max(vectors_x(:,2+(i-1)*2)))
-
-  end
+  %for i=1:N
+  %  fprintf('(%1.4e <= p1 <= %1.4e) \n',min(vectors_x(:,1+(i-1)*2)),max(vectors_x(:,1+(i-1)*2)))
+  %  fprintf('(%1.4e <= p2 <= %1.4e) \n',min(vectors_x(:,2+(i-1)*2)),max(vectors_x(:,2+(i-1)*2)))
+  %  fprintf('A(irow,irow)=%1.4e \n', find(A(indeces_global,indeces_global)));
+  %end
   
-  if (1)
+  if (controls.manipulate > 0)
     [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
   end
   				% grounding
@@ -1148,13 +1164,9 @@ elseif sol==12
   if (controls.diagonal_scaling)
     diagA_scaling = sparse(1:Np,1:Np,(1.0./sqrt(spdiags(A,0)))',Np,Np);
     diagC_scaling=sparse(1:Nr,1:Nr,(1.0./sqrt(spdiags(C,0)))',Nr,Nr);
-
     
-    %fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
-    %fprintf('(%9.4e <= A <= %18.12e) \n',min(spdiags(A,0)),max(spdiags(A,0)))
-
-   
-
+    fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
+    fprintf('(%9.4e <= A <= %18.12e) \n',min(spdiags(A,0)),max(spdiags(A,0)));
     
     A=  diagA_scaling*A*  diagA_scaling;
     B1T=diagA_scaling*B1T*diagC_scaling;
@@ -1172,12 +1184,25 @@ elseif sol==12
 
   % define inverse of (~A)^{-1}
   relax4prec=controls.relax4inv11;
+
+  index_agmg=0;
   
   % inverse A action
   approach_inverse_A=controls.approach_inverse_A;
   if (strcmp(approach_inverse_A,'full'))
+    % we need a new seed for agmg, in case is used
+    index_agmg=index_agmg+1;
+    ctrl_loc=ctrl_solver;
+    ctrl_loc.init(controls.ctrl_inner11.approach,...
+		  controls.ctrl_inner11.tolerance,...
+		  controls.ctrl_inner11.itermax,...
+		  controls.ctrl_inner11.omega,...
+		  controls.ctrl_inner11.verbose,...
+		  '~A',index_agmg);
+
+    
     inverseA=sparse_inverse;
-    inverseA.init(A+relax4prec*speye(Np,Np),ctrl_inner11);
+    inverseA.init(A+relax4prec*speye(Np,Np),ctrl_loc);
     inverseA.info_inverse.label='A';
     inverseA.cumulative_iter=0;
     inverseA.cumulative_cpu=0;
@@ -1192,13 +1217,17 @@ elseif sol==12
     nAi=ncellphi;
     ctrl_loc=ctrl_solver;
     for i=1:Nt
+      % we need a new seed for agmg, in case is used
+      index_agmg=index_agmg+1;
       ctrl_loc=ctrl_solver;
-      ctrl_loc.init(ctrl_inner11.approach,...
-		    ctrl_inner11.tolerance,...
-		    ctrl_inner11.itermax,...
-		    ctrl_inner11.omega,...
-		    ctrl_inner11.verbose,...
-		    sprintf('%s A%d',ctrl_inner11.label,i));
+      % passing index_agmg we will use agmg-i 
+      ctrl_loc.init(controls.ctrl_inner11.approach,...
+		    controls.ctrl_inner11.tolerance,...
+		    controls.ctrl_inner11.itermax,...
+		    controls.ctrl_inner11.omega,...
+		    controls.ctrl_inner11.verbose,...
+		    sprintf('%s A%d',ctrl_inner11.label,i),...
+		    index_agmg);
       diag_block_invA(i).name=sprintf('inverse A%d',i);
       
       % get block add relaxation
@@ -1209,7 +1238,7 @@ elseif sol==12
 
     end
 % define function A shifter( inverse A grounded ( rhs set to zero in some nodes )
-    inv_A  = @(x) apply_inverseAtilde(diag_block_invA,vectors_x,indeces_local,x);
+    inv_A  = @(x) apply_inverseAtilde(diag_block_invA,A,indeces_global,indeces_local,x);
 
   end
 
@@ -1273,7 +1302,21 @@ elseif sol==12
 
     % assembly approximate inverse
     inv_SCA=sparse_inverse;
-    inv_SCA.init(approx_SCA+controls.relax4inv22*speye(Nr,Nr),ctrl_inner22);
+
+
+    % we need a new seed for agmg, in case is used
+    index_agmg=index_agmg+1;
+    ctrl_loc=ctrl_solver;
+    % passing index_agmg+1 we will use one copy of agmg, allowing preprocess 
+    ctrl_loc.init(ctrl_inner22.approach,...
+		  ctrl_inner22.tolerance,...
+		  ctrl_inner22.itermax,...
+		  ctrl_inner22.omega,...
+		  ctrl_inner22.verbose,...
+		  'C+B1diag(A)^{-1}B2',...
+		  index_agmg);
+    
+    inv_SCA.init(approx_SCA+controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
     inv_SCA.info_inverse.label='schur_ca';
     inv_SCA.cumulative_iter=0;
     inv_SCA.cumulative_cpu=0;
@@ -1292,8 +1335,22 @@ elseif sol==12
     tildeS=form_minus_SchurCA(inv_A,B1T,B2,C);
 
     inv_SCA=sparse_inverse;
-    inv_SCA.init(tildeS,ctrl_inner22);
-    inv_SCA.info_inverse.label='schur_ca';
+
+    % we need a new seed for agmg, in case is used
+    index_agmg=index_agmg+1;
+    ctrl_loc=ctrl_sovler;
+    
+    ctrl_loc=ctrl_solver;
+    % passing index_agmg+1 we will use one copy of agmg, allowing preprocess 
+    ctrl_loc.init(ctrl_inner22.approach,...
+		  ctrl_inner22.tolerance,...
+		  ctrl_inner22.itermax,...
+		  ctrl_inner22.omega,...
+		  ctrl_inner22.verbose,...
+		  'schur_ca',...
+		  index_agmg);
+    
+    inv_SCA.init(tildeS,ctrl_loc);
     inv_SCA.cumulative_iter=0;
     inv_SCA.cumulative_cpu=0;
     
@@ -1397,11 +1454,13 @@ elseif sol==12
 
   if (strcmp(approach_inverse_A,'full'))
     inverseA.kill();
-  elseif (strcmp(approach_inverse_A,'full'))
+  elseif (strcmp(approach_inverse_A,'block'))
     for i=1:Nt
       diag_block_invA(i).kill();
     end
   end
+
+  inv_SCA.kill();
   
 elseif sol==13
   verbose=controls.verbose;
@@ -1423,14 +1482,14 @@ elseif sol==13
   [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
   % get vectors p and q and alpha such that p^T x + q^y = alpha
   % we build N vectors
-  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls,controls.manipulation_approach);
   if (swap_sign)
     vectors_x=-vectors_x;
     vectors_y=-vectors_y;
     alphas=-alphas;
   end
   % manipulate A,B1T and rhs with p,q,alpha
-  if (controls.manipulate)
+  if (controls.manipulate>0)
     [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas);
   end
 
