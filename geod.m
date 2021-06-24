@@ -1,3 +1,6 @@
+%include agmg folder
+addpath(genpath('./agmg/'));
+
 %% Code starts
 if mesh_type == 1
     mesh_name = strcat('meshes/tri2_mesh',num2str(h_i));
@@ -292,11 +295,14 @@ while true
 	% Solve the linear system
 	timelinsys=tic;
         [omegak, info_solver_newton] = solvesys(JOC,OC, controls,logID);
+	
 	sum_linsys= sum_linsys+toc(timelinsys);
         sum_total = sum_total+toc(total);
 	print_info_solver(info_solver_newton)
 	print_info_solver(info_solver_newton,logID)
 
+	
+	
 	if (restart)
 	  solver_approach=11;
 
@@ -415,6 +421,7 @@ while true
 
 
 
+
 	
 
 	
@@ -477,6 +484,7 @@ while true
 
     end
 
+    
     phimu = uk(1:tnp);
     rhomu = uk(tnp+1:tnp+tnr2h);
     smu = uk(tnp+tnr2h+1:end);
