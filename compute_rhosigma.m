@@ -33,22 +33,22 @@ else
     if strcmp(str,'rhos')
         out = zeros(te,1);
         for k=1:N+1
-            out((k-1)*nei+1:k*nei) = rho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));
+            out((k-1)*nei+1:k*nei) = rho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));            
         end
     elseif strcmp(str,'drhos')
-        out = sparse(te,tnr);
+        out = cell(N+1,1);
         for k=1:N+1
-            out((k-1)*nei+1:k*nei,(k-1)*ncell+1:k*ncell) = ...
-                drho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));
+            out{k} = drho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));
         end
+        out = blkdiag(out{:});
         out = out*RHt*It*I_all;
-    elseif strcmp(str,'ddrhosa') 
-        out = sparse(tnr,tnr);
+    elseif strcmp(str,'ddrhosa')
+        out = cell(N+1,1);
         a = Mst*gradphi.^2;
         for k=1:N+1
-            out((k-1)*ncell+1:k*ncell,(k-1)*ncell+1:k*ncell) = ...
-                ddrho_siga(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell),a((k-1)*nei+1:k*nei));
+            out{k} = ddrho_siga(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell),a((k-1)*nei+1:k*nei));
         end
+        out = blkdiag(out{:});
         out = I_all'*It'*RHt'*out*RHt*It*I_all;
     end
 end

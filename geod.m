@@ -112,17 +112,21 @@ if (save_data)
   h5create(filename_h5,'/DS1',[Np+2*Nr+2])
   h5write(filename_h5,'/DS1',[uk;mu0;theta0]')
 end
-% Assemble matrices
 
+
+% Assemble matrices
+local_ass = tic;
 Mx = spdiags(area,0,ncell,ncell);
 Mx2h = spdiags(area2h,0,ncell2h,ncell2h);
 ds = edges(ind.internal,5).*edges(ind.internal,6);
 Ms = spdiags(ds,0,nei,nei);
 div = Div2D(ncell,nei,ind,edges); % divergence matrix
 grad = -Ms\div'; % gradient matrix
-
+disp('local matrices assembled in')
+disp(toc(local_ass))
 
 % global matrices
+global_ass = tic;
 Dt = assembleDt(N,ncell);
 divt = assembleDivt(N,ncell,nei,div);
 gradt = assembleGradt(N,ncell,nei,grad);
@@ -131,17 +135,16 @@ Mxt2h = assembleMxt(N,ncell2h,Mx2h);
 Mst = assembleMst(N,nei,Ms);
 RHt = assembleRHt(N,ncell);
 It = assembleIt(N,ncell,ncell2h,I);
-
 if rec==1
     Rs=Ktos2D(ind,edges,cc,mid);
-    Rst = sparse(tne,tnp);
-    for k=1:N+1
-        Rst((k-1)*nei+1:k*nei,(k-1)*ncell+1:k*ncell) = Rs;
-    end
-    clear Rs
+    Rst = repmat({Rs},1,N+1);
+    Rst = blkdiag(Rst{:});
+    %clear Rs
 else
     Rst = [];
 end
+disp('global matrices assembled in ')
+disp(toc(global_ass))
 
 itk1 = 0;
 tit = 0; % counter of the total number of Newton iterations
