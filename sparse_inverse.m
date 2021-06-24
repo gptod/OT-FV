@@ -2,7 +2,7 @@ classdef sparse_inverse <handle
   properties
     dimblock=0;
     name='empty';
-    preprocesses_agmg=0;
+    preprocess_agmg=0;
     matrix;
     inverse_matrix_diagonal;
     nequ;
@@ -36,6 +36,7 @@ classdef sparse_inverse <handle
        obj.cumulative_iter=0;
        obj.cumulative_cpu=0;
        obj.cumulative_application=0;
+       obj.preprocess_agmg=ctrl.preprocess_agmg;
 
        if ( strcmp(ctrl.approach,'direct'))
 	 obj.matrix_decomposed = decomposition(obj.matrix); 
@@ -45,8 +46,10 @@ classdef sparse_inverse <handle
 	 else
 	   icg=obj.ctrl.nrestart;
 	  end
-	  if (  obj.preprocesses_agmg ) 
-	    obj.mgsolver=agmg(obj.matrix,[],icg,[],ctrl.itermax,0,[],1);
+	  if ( obj.preprocess_agmg > 0 )
+	    agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
+	    %disp( strcat('init',agmg_str));
+	    obj.mgsolver=feval( agmg_str, obj.matrix,[],icg,[],ctrl.itermax,0,[],1);
 	  end
 	  
        elseif ( strcmp(ctrl.approach,'diag') )
@@ -60,6 +63,8 @@ classdef sparse_inverse <handle
 	   setup.droptol = 1e-3;
 	   [obj.IL,obj.IU] = ilu(matrix,setup);
 	 end
+       elseif ( strcmp(ctrl.approach,'krylov_no_prec'))
+	 % nothing to do
        elseif( strcmp(obj.ctrl.approach , 'incomplete') )
 	 if ( obj.is_symmetric)
 	   obj.IL = ichol(matrix, struct('type','ict','droptol',1e-5));
@@ -107,13 +112,16 @@ classdef sparse_inverse <handle
 	 else
 	   icg=obj.ctrl.nrestart;
 	 end
-	 if (obj.preprocesses_agmg )
+	 if (obj.preprocess_agmg>0)
 	   jobagmg=2;
+	   agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
+	   [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
+	   feval( agmg_str, obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,jobagmg);	 
 	 else
 	   jobagmg=0;
+	   [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
+	   agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,jobagmg);
 	 end
-	 [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
-	 agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,jobagmg);	 
 	 obj.info_inverse.approach_used = 'agmg';
        elseif ( strcmp(obj.ctrl.approach,'diag') )
 	 sol=obj.inverse_matrix_diagonal.*rhs;
@@ -130,6 +138,18 @@ classdef sparse_inverse <handle
            bicgstab(obj.matrix,rhs,...
 		 obj.ctrl.tolerance,obj.ctrl.itermax,obj.IL,obj.IU,initial_guess);
 	   obj.info_inverse.approach_used = 'bicgtab+ilu';
+	 end
+       elseif( strcmp(obj.ctrl.approach, 'krylov_no_prec'))
+	 if ( obj.is_symmetric )
+	   [sol,obj.info_inverse.flag,obj.info_inverse.res,obj.info_inverse.iter,obj.info_inverse.resvec]=...
+           pcg(obj.matrix,rhs,...
+               obj.ctrl.tolerance,obj.ctrl.itermax, [], [],initial_guess);
+	   obj.info_inverse.approach_used = 'pcg';
+	 else
+	   [sol,obj.info_inverse.flag,obj.info_inverse.res,obj.info_inverse.iter,obj.info_inverse.resvec]=...
+           bicgstab(obj.matrix,rhs,...
+		 obj.ctrl.tolerance,obj.ctrl.itermax,[],[],initial_guess);
+	   obj.info_inverse.approach_used = 'bicgtab';
 	 end
 
 	%
@@ -186,8 +206,12 @@ classdef sparse_inverse <handle
      % destructor
      function obj = kill(obj)
        if ( strcmp(obj.ctrl.approach ,'agmg'))
-	 if( obj.preprocesses_agmg )
-	   z=agmg(obj.matrix,[],1,[],1000,0,[],-1);
+	 if( obj.preprocess_agmg>0 )
+	   
+	   agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
+	   %disp( strcat('killing',agmg_str));
+	   z=...
+	   feval( agmg_str, obj.matrix,[],1,[],1000,0,[],-1);
 	 end
        end
        clear obj.matrix_decomposed;
