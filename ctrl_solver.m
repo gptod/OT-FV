@@ -6,10 +6,11 @@ classdef ctrl_solver <handle
      nrestart=20;
      omega=1.0;
      verbose=0;
+     preprocess_agmg=0;
      label='';
    end
    methods
-     function obj = init(obj,approach,tolerance,itermax,omega,verbose,label)
+     function obj = init(obj,approach,tolerance,itermax,omega,verbose,label,preprocess_agmg)
        obj.approach=approach;
        obj.tolerance=tolerance;
        obj.itermax=itermax;
@@ -28,6 +29,12 @@ classdef ctrl_solver <handle
 	 obj.label=approach;
        else
 	 obj.label=label;
+       end
+
+       if (~exist('preprocess_agmg','var') )
+	 obj.preprocess_agmg=0;
+       else
+	 obj.preprocess_agmg=preprocess_agmg;
        end
      end
      function obj = info(obj,fid)
