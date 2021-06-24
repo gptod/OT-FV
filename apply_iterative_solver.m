@@ -33,10 +33,9 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,sol
 					     [],@(x) prec(x),...% left  prec
 					     x0);
     end
-
+    info.approach_used='BICGSTAB';
 	    
-	    info.res=norm(matrix_operator(sol)-rhs)/norm(rhs);
-	    %info.flag = (info.res >= ctrl.tolerance);
+    
   elseif (strcmp(ctrl.approach,'pcg'))
       
     [sol,i,j,info.iter] = pcg(@(y) matrix_operator(y),rhs,...
@@ -47,7 +46,9 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,sol
     info.flag=i;
     info.res=norm(matrix_operator(sol)-rhs)/norm(rhs);
     info.flag = (info.res >= ctrl.tolerance);
-	    
+
+    info.approach_used='PCG';
+    
   elseif (strcmp(ctrl.approach,'fgmres'))
     nrestart=40;
     [sol,i,res,iter_total] = fgmres(@(y,tol) matrix_operator(y),...
@@ -59,39 +60,48 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,sol
 				   'P',@(x,tol) prec(x)); %should be right prec
 
     info.iter=iter_total;
-    info.res=norm(matrix_operator(sol)-rhs)/norm(rhs);
     info.flag = (info.res >= ctrl.tolerance);
-
+    info.approach_used='FGMRES';
+    
   elseif (strcmp(ctrl.approach,'gmres'))
+    nrestart=20;
     if (strcmp(left_right,'left'))
       [sol,i,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
-			      20, ... % to fix the total number of iterattion
+			      nrestart, ... % to fix the total number of iterattion
 			      ctrl.tolerance,...
-			      int64(ctrl.itermax/20),...
+			      int64(ctrl.itermax/nrestart),...
  			      @(x) prec(x),[],... %left ,right
 			      x0);      
     else
       [sol,i,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
-			      20, ... % to fix the total number of iterattion
+			      nrestart, ... % to fix the total number of iterattion
 			      ctrl.tolerance,...
-			      int64(ctrl.itermax/20),...
+			      int64(ctrl.itermax/nrestart),...
  			      [],@(x) prec(x),... %left,right
 			      x0);
     end
-      
+
+
+    info.approach_used='GMRES';
     %fprintf('%d %d\n', iters(1),iters(2))
-    info.iter=(iters(1)-1)*20+iters(2);
-    info.res=norm(matrix_operator(sol)-rhs)/norm(rhs);
+    info.iter=(iters(1)-1)*nrestart+iters(2);
     info.flag = (info.res >= ctrl.tolerance);
 
   elseif (strcmp(ctrl.approach,'stationary_iterative_methods'))
     [sol,info.iter,info.res] = stationary_iterative_methods(@(y) matrix_operator(y),rhs,x0,ctrl.tolerance,ctrl.itermax,@(z) prec(z));
     
-    info.res=norm(matrix_operator(sol)-rhs)/norm(rhs);
     info.flag = (info.res >= ctrl.tolerance);
+    info.approach_used='STATIONARY';
   else
     disp('IN apply_iterative_solver: solver not defined')
   end
-  info.realres=info.res/norm(rhs);
+
+  info.flag=i;
+  info.res=norm(matrix_operator(sol)-rhs)/norm(rhs);
+  info.flag = (info.res >= ctrl.tolerance);
+  
   info.rhsnorm=norm(rhs);
-  info.print();
+  info.balance=sum(rhs);
+  info.res=norm(matrix_operator(sol)-rhs);       
+  info.realres=info.res/info.rhsnorm;
+end
