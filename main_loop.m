@@ -4,18 +4,18 @@
 %N = 16;
 %test_case='gauss'
 clear;
-test_case='sin'
+test_case='cross'
 				%test_case='sin_old'
 				%test_case='cross'
 
 	% Type of reconstruction for the density on the diamond cells.
 	% 1 -> weighted arithmetic mean
 	% 2 -> weighted harmonic mean
-rec = 1;
+rec = 2;
 
 eps_0 = 1e-6; % tolerance 
 
-verb = 1; % verbosity level: {0,1,2}
+verb = 2; % verbosity level: {0,1,2}
 
 
 
@@ -29,7 +29,7 @@ h5_file2read='';
 
 
 compute_eigen=0;
-verbose=1;
+verbose=2;
 
      
     % Space discretization. Three types of mesh families available:
@@ -45,10 +45,10 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 1
+  for h_i =3
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=1
+    for i=3
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -316,18 +316,21 @@ for mesh_type = 2
 	  % we can use three approach 
 	  outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
 
+
+	  ctrl_inner22inner=ctrl_solver;
 	  
 	  
           % we need to ground the solution since A_11 is singular
 	  % grounded<0 C^T x1 =0
 	  % grounded=0 no grounding
 	  % grounded>0 solution is grounded on one node
-	  for ii=[-1,1]
+	  for ii=[1]
 	    for jj=[0]
 	      for kk=[1]
 	  grounded_node=ii;
 	  diagonal_scaling=jj;
 	  manipulate=kk;
+	  manipulation_approach=1;
 
           % left or right preconditoner
 	  % only right for fgmres
@@ -356,8 +359,8 @@ for mesh_type = 2
 	      % set here other approximate inverse of block11
 	      ctrl_inner11.init(solvers11{m},1e-12,iters11{m},1.0,0,label11{m});
 
-	      approaches_schurCA={'diagA','iterative','full'};
-	      for k=[1]%:length(approaches_schurCA)
+	      approaches_schurCA={'diagA','iterative','full','iterative+SwithdiagA'};
+	      for k=[4]%:length(approaches_schurCA)
 
 		approach_schurCA=approaches_schurCA{k};
 
@@ -373,12 +376,19 @@ for mesh_type = 2
 		  solvers22={'gmres'  ,'bicgstab'  ,'fgmres','pcg' }
 		  iters22  ={200      ,100       ,100       , 100 };
 		  label22  ={'gmres10','bicgstab100' ,'fgmres100','pcg100'};
+		elseif (strcmp(approach_schurCA,'iterative+SwithdiagA'))
+		  solvers22={'gmres'  ,'bicgstab'  ,'fgmres','pcg' }
+		  iters22  ={200      ,100       ,100       , 100 };
+		  label22  ={'gmres10','bicgstab100' ,'fgmres100','pcg100'};
+		  
+		  
+		  ctrl_inner22inner.init('agmg',1e-2,100,1.0,0,'SCAwithdiagA');
 		end
 
 		
 				% set here from solvers
-		for i=[1];%1:length(solvers)
-		  ctrl_inner22.init(solvers22{i},1e-13,iters22{i},1.0,0,strcat(label22{i},'_S'));
+		for i=[3];%1:length(solvers)
+		  ctrl_inner22.init(solvers22{i},1e-1,iters22{i},1.0,1,strcat(label22{i},'_S'));
 		  extra_info='block';
 		  controls = struct('save_data',save_data,...
 				    'indc',grounded_node,...
@@ -392,6 +402,7 @@ for mesh_type = 2
 				    'approach_inverse_A',approach_inverse_A,...
 				    'ctrl_inner11',ctrl_inner11,...
 				    'ctrl_inner22',ctrl_inner22,...
+				    'ctrl_inner22inner',ctrl_inner22inner,...
 				    'ctrl_outer',ctrl_outer,...
 				    'compute_eigen',compute_eigen,...
 				    'verbose',verbose,...
@@ -420,7 +431,7 @@ for mesh_type = 2
 	  end
 	elseif (sol==13)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('fgmres',1e-5,300);
+	  ctrl_outer.init('fgmres',1e-5,1000);
 
           % left or right prec.
 	  left_right='right'
@@ -433,12 +444,14 @@ for mesh_type = 2
 	  % grounded<0 C^T x1 =0
 	  % grounded=0 no grounding
 	  % grounded>0 solution is grounded on one node
-	  grounded_node=1;
+	  grounded_node=0;
 	  diagonal_scaling=1;
 
 
-          % alpha relaxation
-	  alpha=0.1;
+				% alpha relaxation
+	  alphas={0.01,0.05,0.1,0.5,0.9};
+	  for ll=4
+	  alpha=alphas{ll};
 
 				%
 	  ctrl_innerA=ctrl_solver;
@@ -457,26 +470,26 @@ for mesh_type = 2
 	  	  
 	  
 	  solversA={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-	  itersA  ={1      ,10       ,1       ,1        ,100        ,  1         };
-	  labelA  ={'agmg1','agmg1' ,'direct','krylov1','krylov100','incomplete'};
+	  itersA  ={1      ,100       ,1       ,1        ,100        ,  1         };
+	  labelA  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete'};
 
 	  solversS={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-	  itersS  ={1      ,10       ,1       ,1        ,100        ,  1         };
-	  labelS  ={'agmg1','agmg1' ,'direct','krylov1','krylov100','incomplete'};
+	  itersS  ={1      ,100       ,1       ,1        ,100        ,  1         };
+	  labelS  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete'};
 
-	  ctrl_innerC.init('diag',1e-12,1,1.0,0,'C');
+	  ctrl_innerC.init('agmg',1e-1,100,1.0,1,'C');
 	  
           % IMPORTANT: If we want to use 2 agmg solvers we have to set preprocess=0
 	  % in sparse inverse 
-	  for i=[1];%1:length(solversA)
+	  for i=[2];%1:length(solversA)
 		    % set here other approximate inverse of A
 	    
-	    ctrl_innerA.init(solversA{i},1e-12,itersA{i},1.0,0,labelA{i});
+	    ctrl_innerA.init(solversA{i},1e-1,itersA{i},1.0,1,labelA{i});
 
-	    for j=[1];%1:length(solversA)
+	    for j=[2];%1:length(solversA)
 		      % set here other approximate inverse of A
 	      
-	      ctrl_innerS.init(solversS{j},1e-12,itersS{j},1.0,0,labelS{j});
+	      ctrl_innerS.init(solversS{j},1e-1,itersS{j},1.0,1,labelS{j});
 
 
 	      
@@ -498,10 +511,11 @@ for mesh_type = 2
 				'compute_eigen',compute_eigen,...
 				'verbose',verbose);
 
-	      approach_string=strcat(approach_prec,'_invA',labelA{i},'_invS_',approach_inverse_S,labelS{j});
+	      approach_string=strcat(approach_prec,'alpha',num2str(alpha),'_invA',labelA{i},'_invS_',approach_inverse_S,labelS{j});
 	      disp(approach_string)
 	      geod;	    
 	    end
+	  end
 	  end
 	end
       end
