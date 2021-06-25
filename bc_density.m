@@ -37,15 +37,15 @@ elseif (strcmp(test_case,'sin_old'))
 elseif (strcmp(test_case,'cross'))
 				% % Cross distributed densities
   beta = pi/4; R = [cos(beta) -sin(beta); sin(beta) cos(beta)];
-  ccrot = ([cc2h(:,1) cc2h(:,2)]-0.5)*R+0.5;
+  ccrot = ([cc(:,1) cc(:,2)]-0.5)*R+0.5;
   cross =@(x,y) (x>=0.4).*(x<=0.6).*(y>=0).*(y<=1)+(y>=0.4).*(y<=0.6).*(x>=0).*(x<=1);
-  rho_in = cross(cc2h(:,1),cc2h(:,2));
+  rho_in = cross(cc(:,1),cc(:,2));
   rho_in(rho_in>0) = rho_in(rho_in>0)./rho_in(rho_in>0);
-  mass = sum(area2h.*rho_in);
-  rho_in = rho_in/mass; mass = sum(area2h.*rho_in); %normalization
+  mass = sum(area.*rho_in);
+  rho_in = rho_in/mass; mass = sum(area.*rho_in); %normalization
   rho_f = cross(ccrot(:,1),ccrot(:,2));
   rho_f(rho_f>0) = rho_f(rho_f>0)./rho_f(rho_f>0);
-  rho_f = rho_f*mass/sum(rho_f.*area2h);
+  rho_f = rho_f*mass/sum(rho_f.*area);
 
 
 elseif( strcmp(test_case,'compression'))
