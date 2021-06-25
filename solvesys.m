@@ -620,7 +620,7 @@ elseif sol==10
 
   
 				% init diag(C)^{-1}
-  inverseC_approach=1;
+  inverseC_approach=controls.inverseC_approach;
   if ( inverseC_approach==1)
     
     invC = sparse_inverse;
@@ -638,11 +638,12 @@ elseif sol==10
 
     inverseC = @(x) invC.apply(x);
 
-    diagC = spdiags(C,0)
+    diagC = spdiags(C,0);
     if ( verbose >= 1)
       fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
     end
-    invdiagC = sparse(1:Nr,1:Nr,(1.0/diagC)',Nr,Nr);
+    invdiagC = sparse(1:Nr,1:Nr,(1.0./diagC)',Nr,Nr);
+
    
     % assembly schur AC S=A+B1
     % reduced to system only in phi
@@ -651,10 +652,11 @@ elseif sol==10
     fp = rhs(1:Np)+B1T*(inverseC(rhs(Np+1:Np+Nr)));
     
   elseif ( inverseC_approach==2)
-    % C=R-Dr^{-1}Ds and ~C=D(rho)R-D(S)
+    %  C=-(R-Dr^{-1}M) Ds
+    % ~C=-(D(rho)R - MD(S))
     % thus
     % C=Dr^{-1} ( ~C )
-    tildeC=Dr*R-Ds;
+    tildeC=-Dr*R+M*Ds;
 
     inv_tildeC = sparse_inverse;
 
@@ -667,18 +669,22 @@ elseif sol==10
 		  ctrl_inner22.verbose,...
 		  'C',index_agmg);
     
-    inv_tildeC.init(C,ctrl_loc);
+    inv_tildeC.init(tildeC,ctrl_loc);
 
-    % C^{-1}=(~C)^{-1})*Dr 
-    inverseC = @(x) inv_tildeC.apply(rho.*x);
+				
+    	
+    % C^{-1}=(~C)^{-1})*Dr
+    inverseC = @(x) inv_tildeC.apply(Dr*x);
 
-    diagCtilde = spdiags(tildeC,0)
+    diagCtilde = spdiags(tildeC,0);
     if ( verbose >= 1)
-      fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
+      fprintf('(%9.4e <= Dr <= %18.12e) \n',min(spdiags(Dr,0)),max(spdiags(Dr,0)))
+      fprintf('(%9.4e <= Ds <= %18.12e) \n',min(spdiags(Ds,0)),max(spdiags(Ds,0)))
+      fprintf('(%9.4e <= diag(~C) <= %18.12e) \n',min(diagCtilde),max(diagCtilde))
     end
-    inv_diag_tildeC = sparse(1:Nr,1:Nr,(1.0/diagCtilde)',Nr,Nr);
+    inv_diag_tildeC = sparse(1:Nr,1:Nr,(1.0./diagCtilde)',Nr,Nr);
 
-    S = A+B1T*(inv_diag_tildeC*(Dr*B2));     
+    S = A+B1T*((inv_diag_tildeC*Dr)*B2);     
   end
   
 
@@ -843,7 +849,7 @@ elseif sol==10
   %
   % Define action of preconditoner
   % 
-  prec = @(x) SchurAC_based_preconditioner(x, inverse_block11, @(y) inverseC(y) ,...
+  prec = @(x) SchurAC_based_preconditioner(x, inverse_block11, inverseC ,...
 					   B1T,B2,controls.outer_prec,ncellphi);
 
   %prec = @(x) lower_triang_prec(x,inverse_block11,B2, @(y) invC.apply(y));
