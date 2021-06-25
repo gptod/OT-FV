@@ -26,32 +26,35 @@ ddrhosa = sparse(ncell,ncell);
 KK=edges(ind.internal(:),3);
 LL=edges(ind.internal(:),4);
 
-% possono essere generati nella struttura ind
-indKK = sub2ind([ncell ncell],KK,KK);
-indKL = sub2ind([ncell ncell],KK,LL);
-indLK = sub2ind([ncell ncell],LL,KK);
-indLL = sub2ind([ncell ncell],LL,LL);
-[indu_KK,~,indo_KK] = unique(indKK);
-[indu_KL,~,indo_KL] = unique(indKL);
-[indu_LK,~,indo_LK] = unique(indLK);
-[indu_LL,~,indo_LL] = unique(indLL);
+% % possono essere generati nella struttura ind
+% indKK = sub2ind([ncell ncell],KK,KK);
+% indKL = sub2ind([ncell ncell],KK,LL);
+% indLK = sub2ind([ncell ncell],LL,KK);
+% indLL = sub2ind([ncell ncell],LL,LL);
+% [indu_KK,~,indo_KK] = unique(indKK);
+% [indu_KL,~,indo_KL] = unique(indKL);
+% [indu_LK,~,indo_LK] = unique(indLK);
+% [indu_LL,~,indo_LL] = unique(indLL);
+
 
 % in futuro aggiungiamo il calcolo di dK e dL in edges
-dK = sqrt((mid(ind.internal(:),1)-cc(KK,1)).^2+...
-    (mid(ind.internal(:),2)-cc(KK,2)).^2);
-dL = sqrt((mid(ind.internal(:),1)-cc(LL,1)).^2+...
-    (mid(ind.internal(:),2)-cc(LL,2)).^2);
-ds = edges(ind.internal(:),5);
+% dK = sqrt((mid(ind.internal(:),1)-cc(KK,1)).^2+...
+%     (mid(ind.internal(:),2)-cc(KK,2)).^2);
+% dL = sqrt((mid(ind.internal(:),1)-cc(LL,1)).^2+...
+%     (mid(ind.internal(:),2)-cc(LL,2)).^2);
+dK = edges(ind.internal,8);
+dL = edges(ind.internal,9);
+ds = edges(ind.internal,5);
 
 
-ddrhosa(indu_KK) = ddrhosa(indu_KK) + ...
-                   accumarray(indo_KK,dKdKharm(rho(KK),rho(LL),dK,dL,ds).*a);
-ddrhosa(indu_KL) = ddrhosa(indu_KL) + ...
-                   accumarray(indo_KL,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);         
-ddrhosa(indu_LK) = ddrhosa(indu_LK) + ...
-                   accumarray(indo_LK,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);          
-ddrhosa(indu_LL) = ddrhosa(indu_LL) + ...
-                   accumarray(indo_LL,dKdKharm(rho(LL),rho(KK),dL,dK,ds).*a);
+ddrhosa(ind.u_KK) = ddrhosa(ind.u_KK) + ...
+                   accumarray(ind.o_KK,dKdKharm(rho(KK),rho(LL),dK,dL,ds).*a);
+ddrhosa(ind.u_KL) = ddrhosa(ind.u_KL) + ...
+                   accumarray(ind.o_KL,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);         
+ddrhosa(ind.u_LK) = ddrhosa(ind.u_LK) + ...
+                   accumarray(ind.o_LK,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);          
+ddrhosa(ind.u_LL) = ddrhosa(ind.u_LL) + ...
+                   accumarray(ind.o_LL,dKdKharm(rho(LL),rho(KK),dL,dK,ds).*a);
                
 
 
