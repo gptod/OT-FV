@@ -37,6 +37,8 @@ swap_sign=1;
 
 				% reduced system to phi rho variables
 A = sparse(JF.pp); B1T = sparse(JF.pr); B2 = sparse(JF.rp);
+R = sparse(JF.rr); M   = sparse(JF.rs);
+Ds = sparse(JF.sr); Dr = sparse(JF.ss);
 C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
 f1 = f;
 f2 = g-JF.rs*(JF.ss\h);
@@ -48,12 +50,23 @@ if (swap_sign)
   B1T=-B1T;
   B2=-B2;
   C=-C;
+  
+  R=-R;
+  M=-M;
+  Ds=-Ds;
+  Dr=-Dr;
+  f=-f;
+  g=-g;
+  h=-h;
+  
   f1=-f1;
   f2=-f2;
+  
 end
 
 % assembly rhs
 rhs=[f1;f2];
+rhs_full=[f;g;h];
 
 kernel=ones(ncellphi,1);
 kernel=kernel/norm(kernel);
@@ -606,29 +619,68 @@ elseif sol==10
 
 
   
-   % init diag(C)^{-1}
-  invC = sparse_inverse;
+				% init diag(C)^{-1}
+  inverseC_approach=1;
+  if ( inverseC_approach==1)
+    
+    invC = sparse_inverse;
 
-  ctrl_loc=ctrl_solver;
-  index_agmg=1;
-  ctrl_loc.init(ctrl_inner22.approach,...
-		ctrl_inner22.tolerance,...
-		ctrl_inner22.itermax,...
-		ctrl_inner22.omega,...
-		ctrl_inner22.verbose,...
-		'C',index_agmg);
- 
-  invC.init(C,ctrl_loc);
-  invdiagC = sparse(1:Nr,1:Nr,(invC.inverse_matrix_diagonal)',Nr,Nr);
-  if ( verbose >= 1)
-    fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C,0)),max(spdiags(C,0)))
+    ctrl_loc=ctrl_solver;
+    index_agmg=1;
+    ctrl_loc.init(ctrl_inner22.approach,...
+		  ctrl_inner22.tolerance,...
+		  ctrl_inner22.itermax,...
+		  ctrl_inner22.omega,...
+		  ctrl_inner22.verbose,...
+		  'C',index_agmg);
+    
+    invC.init(C,ctrl_loc);
+
+    inverseC = @(x) invC.apply(x);
+
+    diagC = spdiags(C,0)
+    if ( verbose >= 1)
+      fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
+    end
+    invdiagC = sparse(1:Nr,1:Nr,(1.0/diagC)',Nr,Nr);
+   
+    % assembly schur AC S=A+B1
+    % reduced to system only in phi
+    
+    S = A+B1T*(invdiagC*B2);  
+    fp = rhs(1:Np)+B1T*(inverseC(rhs(Np+1:Np+Nr)));
+    
+  elseif ( inverseC_approach==2)
+    % C=R-Dr^{-1}Ds and ~C=D(rho)R-D(S)
+    % thus
+    % C=Dr^{-1} ( ~C )
+    tildeC=Dr*R-Ds;
+
+    inv_tildeC = sparse_inverse;
+
+    ctrl_loc=ctrl_solver;
+    index_agmg=1;
+    ctrl_loc.init(ctrl_inner22.approach,...
+		  ctrl_inner22.tolerance,...
+		  ctrl_inner22.itermax,...
+		  ctrl_inner22.omega,...
+		  ctrl_inner22.verbose,...
+		  'C',index_agmg);
+    
+    inv_tildeC.init(C,ctrl_loc);
+
+    % C^{-1}=(~C)^{-1})*Dr 
+    inverseC = @(x) inv_tildeC.apply(rho.*x);
+
+    diagCtilde = spdiags(tildeC,0)
+    if ( verbose >= 1)
+      fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
+    end
+    inv_diag_tildeC = sparse(1:Nr,1:Nr,(1.0/diagCtilde)',Nr,Nr);
+
+    S = A+B1T*(inv_diag_tildeC*(Dr*B2));     
   end
-
   
-  % assembly schur AC S=A+B1
-  % reduced to system only in phi
-  S = A+B1T*(invdiagC*B2);  
-  fp = rhs(1:Np)+B1T*(invC.apply(rhs(Np+1:Np+Nr)));
 
   
   if ( compute_eigen)
@@ -776,7 +828,7 @@ elseif sol==10
 
   if( 0 )
     sol_phi=inverse_block11(fp);
-    sol_rho=invC.apply(B2*sol_phi-rhs(Np+1:Np+Nr));
+    sol_rho=inverseC(B2*sol_phi-rhs(Np+1:Np+Nr));
     fprintf(' res |S x -f_r|/f_r = %1.4e \n',norm(S*sol_phi-fp)/norm(fp));
     
     
@@ -791,7 +843,7 @@ elseif sol==10
   %
   % Define action of preconditoner
   % 
-  prec = @(x) SchurAC_based_preconditioner(x, inverse_block11, @(y) invC.apply(y) ,...
+  prec = @(x) SchurAC_based_preconditioner(x, inverse_block11, @(y) inverseC(y) ,...
 					   B1T,B2,controls.outer_prec,ncellphi);
 
   %prec = @(x) lower_triang_prec(x,inverse_block11,B2, @(y) invC.apply(y));
@@ -1335,6 +1387,41 @@ elseif sol==12
     inverse_block22 = @(y) -apply_iterative_solver( SCA, y, ctrl_inner22, @(z) z);
     inner_nequ=Nr;
 
+  elseif(strcmp(approach_schurCA,'iterative+SwithdiagA'))
+    % define explicitely inverse of diag(A)
+    invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
+
+    % assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
+    approx_SCA = (C+B2*invDiagA*B1T);
+
+    % assembly approximate inverse
+    inv_SCA=sparse_inverse;
+
+
+    % we need a new seed for agmg, in case is used
+    index_agmg=index_agmg+1;
+    ctrl_loc=ctrl_solver;
+    % passing index_agmg+1 we will use one copy of agmg, allowing preprocess 
+    ctrl_loc.init(controls.ctrl_inner22inner.approach,...
+		  controls.ctrl_inner22inner.tolerance,...
+		  controls.ctrl_inner22inner.itermax,...
+		  controls.ctrl_inner22inner.omega,...
+		  controls.ctrl_inner22inner.verbose,...
+		  'C+B1diag(A)^{-1}B2',...
+		  index_agmg);
+    
+    inv_SCA.init(approx_SCA+controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
+    inv_SCA.info_inverse.label='schur_ca';
+    inv_SCA.cumulative_iter=0;
+    inv_SCA.cumulative_cpu=0;
+    
+    
+				% define matrix-vector operator
+    SCA = @(x) (C*x + B2*(inv_A(B1T*x)));
+    % assembly inverse of  SAC iterative solver with no precodnitioner
+    inverse_block22 = @(y) -apply_iterative_solver( SCA, y, ctrl_inner22, @(z) inv_SCA.apply(z));
+    inner_nequ=Nr;
+
   elseif(strcmp(approach_schurCA,'full'))
     tildeS=form_minus_SchurCA(inv_A,B1T,B2,C);
 
@@ -1620,6 +1707,29 @@ elseif sol==13
   end
   
   outer_cpu=toc(outer_timing);
+
+  if ( strcmp(approach_inverse_A,'full'))
+    inner_iter_A=invAalpha.cumulative_iter;
+    inner_nequ_A=invAalpha.nequ;
+  elseif ( strcmp(approach_inverse_A,'block'))
+    inner_iter_A=0;
+    inner_nequ_A=diag_block_invA(i).nequ;
+    for i=1:Nt
+      inner_iter_A=inner_iter_A+diag_block_invA(i).cumulative_iter;
+    end
+  end
+
+  inner_iter_S=inv_S11.cumulative_iter;
+  inner_nequ_S=inv_S11.nequ;
+
+  state_message=sprintf('A: iter=%d nequ=%d | %s: iter=%d nequ=%d',inner_iter_A,inner_nequ_A,controls.approach_inverse_S,inner_iter_S,inner_nequ_S);
+
+  fprintf(controls.logID,'%s\n',state_message);
+  fprintf('%s\n',state_message);
+  
+
+
+    
   
   flag=info_J.flag;
   relres=info_J.res;
