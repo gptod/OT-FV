@@ -4,14 +4,14 @@
 %N = 16;
 %test_case='gauss'
 clear;
-test_case='cross'
+test_case='sin'
 				%test_case='sin_old'
 				%test_case='cross'
 
 	% Type of reconstruction for the density on the diamond cells.
 	% 1 -> weighted arithmetic mean
 	% 2 -> weighted harmonic mean
-rec = 2;
+rec = 1;
 
 eps_0 = 1e-6; % tolerance 
 
@@ -45,10 +45,10 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i =4:5
+  for h_i =3
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=4
+    for i=3
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -76,7 +76,7 @@ for mesh_type = 2
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[13];
+      for sol=[10];
 	% Mesh structure:
 	% nodes -> array of nodes coordinates [x y]
 	% cells -> array of cells nodes [#nodes node1 node2 node3 ...]
@@ -157,7 +157,9 @@ for mesh_type = 2
 			    0.0,... %omega
 			    0); %verbose
 	  
-
+	  for kk=1:2
+	  inverseC_approach=kk;
+	  
 	  % cycle approach for S inversion
 	  % full:        :~S=S
 	  % block_triang :~S=upper block triangular of S
@@ -178,10 +180,10 @@ for mesh_type = 2
 	    % set solver for block 11 (schurAC)
 	    solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov'  };
 	    iters  ={1       ,100      ,10      ,1      ,1           ,100       ,1         };
-	    label  ={'direct','agmg100','agmg10','agmg1','incomplete','krylov10','krylov10'};
+	    label  ={'direct','agmg1e-1','agmg10','agmg1','incomplete','krylov10','krylov10'};
 
    	    % set here from solvers
-	    for i=[3];%length(solvers)
+	    for i=[2];%length(solvers)
 	      ctrl_inner11.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
 	      
 	      
@@ -192,6 +194,7 @@ for mesh_type = 2
 				'manipulation_approach',manipulation_approach,...
 				'sol',solver_approach,...
 				'outer_prec',outer_prec,...
+				'inverseC_approach',inverseC_approach,...
 				'ctrl_inner11',ctrl_inner11,...
 				'ctrl_inner22',ctrl_inner22,...
 				'ctrl_outer',ctrl_outer,...
@@ -202,11 +205,11 @@ for mesh_type = 2
 				'relax4inv22',relax4inv22);
 	      
 
-	      approach_string=strcat('testprepostprocess_g_schurACwithdiagC_',...
+	      approach_string=strcat('_schurACwithdiagC_',...
 				   ctrl_outer.approach,'_',...
 				   outer_prec,'_',...
 				   'invSAC',invS_approach{j},ctrl_inner11.label,'_',...
-				   'invC',ctrl_inner22.label);
+				   'invC',num2str(inverseC_approach),'_',ctrl_inner22.label);
 	      
 
 	      if (restart)
@@ -218,6 +221,7 @@ for mesh_type = 2
 
 	      geod;
 	    end
+	  end
 	  end
 	elseif (sol==11)
 	  % krylov based solvers for M [x;y] = [f;g]
