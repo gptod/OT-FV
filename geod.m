@@ -46,6 +46,8 @@ filename=strcat('runs/',str_test,approach_string);%,controls_string);
 disp(filename)
 log_filename=strcat(filename,'.log')
 logID = fopen(log_filename,'w');
+controls.logID=logID;
+
 fprintf(logID,'mesh type       = %d\n',mesh_type);
 fprintf(logID,'rec type       = %d\n',rec);
 fprintf(logID,'ncellphi= %d ncellrho=%d n time step=%d \n',ncell,ncell2h,N);
