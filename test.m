@@ -32,7 +32,7 @@ verbose=0;
 
 
 
-h_i = 2;
+h_i = 1;
 N = 2*2^(h_i-1)-1;
 %N = 4*2^(h_i-1)-1;
 Nt = N+1;
@@ -93,12 +93,12 @@ ctrl_outer=ctrl_solver;
 solver_approach = 13;
        
 % set here bicgstab,gmres,fgmres (for non stationary prec)
-ctrl_outer.init('fgmres',1e-5,3000);
+ctrl_outer.init('fgmres',1e-5,1000);
 
   % left or right prec.
 left_right='right'
 
-% handle singularity
+  % handle singularity
 % change A,B1T,f to remove part of its kernel
 manipulate=0;
 manipulation_approach=1;
@@ -106,80 +106,78 @@ manipulation_approach=1;
 % grounded<0 C^T x1 =0
 % grounded=0 no grounding
 % grounded>0 solution is grounded on one node
-grounded_node=1;
+grounded_node=0;
 diagonal_scaling=1;
 
 
-% alpha relaxation
-alpha=0.1;
+        % alpha relaxation
+alphas={0.01,0.05,0.1,0.5,0.9};
+for ll=4
+    alpha=alphas{ll};
 
-%
-ctrl_innerA=ctrl_solver;
-ctrl_innerC=ctrl_solver;
-ctrl_innerS=ctrl_solver;
+            %
+    ctrl_innerA=ctrl_solver;
+    ctrl_innerC=ctrl_solver;
+    ctrl_innerS=ctrl_solver;
 
-approach_inverse_A='block';
-%approach_inverse_A='full';
+    approach_inverse_A='block';
+    %approach_inverse_A='full';
 
-%approach_inverse_S='SCA';
-approach_inverse_S='SAC';
+    approach_inverse_S='SCA';
+    %approach_inverse_S='SAC';
 
-approach_prec='SH';
-%approach_prec='HS';
-
-solversA={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-itersA  ={1      ,10       ,1       ,1        ,100        ,  1         };
-labelA  ={'agmg1','agmg1' ,'direct','krylov1','krylov100','incomplete'};
-
-solversS={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-itersS  ={1      ,10       ,1       ,1        ,100        ,  1         };
-labelS  ={'agmg1','agmg1' ,'direct','krylov1','krylov100','incomplete'};
-
-%ctrl_innerC.init('diag',1e-12,1,1.0,0,'C');
-ctrl_innerC.init('agmg',1e-12,1,1.0,0,'invC');
-
-  % IMPORTANT: If we want to use 2 agmg solvers we have to set preprocess=0
-% in sparse inverse 
-i=[1];%1:length(solversA)
-    % set here other approximate inverse of A
-
-ctrl_innerA.init(solversA{i},1e-12,itersA{i},1.0,0,labelA{i});
-
-j=[1];%1:length(solversA)
-      % set here other approximate inverse of A
-
-  ctrl_innerS.init(solversS{j},1e-12,itersS{j},1.0,0,labelS{j});
+    approach_prec='SH';
+    %approach_prec='HS';
 
 
 
-  controls = struct('save_data',save_data,...
-        'indc',grounded_node,...
-        'sol',solver_approach,...
-        'alpha',alpha,...
-        'approach_prec',approach_prec,...
-        'manipulate',manipulate,...
-        'manipulation_approach',manipulation_approach,...
-        'ctrl_outer',ctrl_outer,...
-        'left_right',left_right,...
-        'diagonal_scaling',diagonal_scaling,...
-        'approach_inverse_S',approach_inverse_S,...
-        'approach_inverse_A',approach_inverse_A,...
-        'ctrl_innerA',ctrl_innerA,...
-        'ctrl_innerC',ctrl_innerC,...
-        'ctrl_innerS',ctrl_innerS,...
-        'compute_eigen',compute_eigen,...
-        'verbose',verbose);
+    solversA={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
+    itersA  ={1      ,100       ,1       ,1        ,100        ,  1         };
+    labelA  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete'};
 
-  approach_string=strcat(approach_prec,'_invA',labelA{i},'_invS_',approach_inverse_S,labelS{j});
-  disp(approach_string)
-          
-          
+    solversS={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
+    itersS  ={1      ,100       ,1       ,1        ,100        ,  1         };
+    labelS  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete'};
 
-disp(approach_string)
+    ctrl_innerC.init('agmg',1e-1,100,1.0,0,'C');
 
+      % IMPORTANT: If we want to use 2 agmg solvers we have to set preprocess=0
+    % in sparse inverse 
+    for i=[2];%1:length(solversA)
+        % set here other approximate inverse of A
 
+        ctrl_innerA.init(solversA{i},1e-1,itersA{i},1.0,0,labelA{i});
 
-geod;
+        for j=[2];%1:length(solversA)
+              % set here other approximate inverse of A
+
+            ctrl_innerS.init(solversS{j},1e-1,itersS{j},1.0,0,labelS{j});
+
+            controls = struct('save_data',save_data,...
+                'indc',grounded_node,...
+                'sol',solver_approach,...
+                'alpha',alpha,...
+                'approach_prec',approach_prec,...
+                'manipulate',manipulate,...
+                'manipulation_approach',manipulation_approach,...
+                'ctrl_outer',ctrl_outer,...
+                'left_right',left_right,...
+                'diagonal_scaling',diagonal_scaling,...
+                'approach_inverse_S',approach_inverse_S,...
+                'approach_inverse_A',approach_inverse_A,...
+                'ctrl_innerA',ctrl_innerA,...
+                'ctrl_innerC',ctrl_innerC,...
+                'ctrl_innerS',ctrl_innerS,...
+                'compute_eigen',compute_eigen,...
+                'verbose',verbose);
+
+            approach_string=strcat(approach_prec,'alpha',num2str(alpha),'_invA',labelA{i},'_invS_',approach_inverse_S,labelS{j});
+            disp(approach_string)
+            geod;	    
+        end
+    end
+end
+
 
 
 save('save/rho_cross_subtri2_harm_h5N32','rho')
