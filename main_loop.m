@@ -15,7 +15,7 @@ rec = 2;
 
 eps_0 = 1e-6; % tolerance 
 
-verb = 2; % verbosity level: {0,1,2}
+verb = 1; % verbosity level: {0,1,2}
 
 
 
@@ -45,10 +45,10 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i =3
+  for h_i =4:5
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=3
+    for i=4
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -477,19 +477,19 @@ for mesh_type = 2
 	  itersS  ={1      ,100       ,1       ,1        ,100        ,  1         };
 	  labelS  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete'};
 
-	  ctrl_innerC.init('agmg',1e-1,100,1.0,1,'C');
+	  ctrl_innerC.init('agmg',1e-1,100,1.0,0,'C');
 	  
           % IMPORTANT: If we want to use 2 agmg solvers we have to set preprocess=0
 	  % in sparse inverse 
 	  for i=[2];%1:length(solversA)
 		    % set here other approximate inverse of A
 	    
-	    ctrl_innerA.init(solversA{i},1e-1,itersA{i},1.0,1,labelA{i});
+	    ctrl_innerA.init(solversA{i},1e-1,itersA{i},1.0,0,labelA{i});
 
 	    for j=[2];%1:length(solversA)
 		      % set here other approximate inverse of A
 	      
-	      ctrl_innerS.init(solversS{j},1e-1,itersS{j},1.0,1,labelS{j});
+	      ctrl_innerS.init(solversS{j},1e-1,itersS{j},1.0,0,labelS{j});
 
 
 	      
