@@ -1,9 +1,11 @@
-function [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas)
+function [A,B1T,rhs,B1T_perturbation]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas)
 
   N=size(alphas,1);
   Nt=N+1;
   ncellphi=size(A,1)/Nt;
   ncellrho=size(B1T,2)/N;
+
+  B1T_perturbation=sparse(size(B1T,1),size(B1T,2));
   for i=2:Nt
     iblock=i-1; %1
     jblock=i;   %2
@@ -27,7 +29,10 @@ function [A,B1T,rhs]= manipulate_AB1Trhs(A,B1T,rhs,indeces_global,vectors_x,vect
     %B1T(irow,:)=sparse(1,size(B1T,2));
     B1T(irow,:)=B1T(irow,:)+vectors_y(:,iblock)';
 
+    B1T_perturbation(irow,:)=vectors_y(:,iblock)';
     %rhs(irow)=0;
     rhs(irow)=rhs(irow)+alphas(iblock);
   end
+
+
 end
