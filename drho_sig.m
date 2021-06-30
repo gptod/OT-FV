@@ -24,18 +24,20 @@ drhos = sparse(nei,ncell);
 KK=edges(ind.internal(:),3);
 LL=edges(ind.internal(:),4);
 
-% possono essere generati nella struttura ind
-indeK = sub2ind([nei ncell],[1:nei]',KK);
-indeL = sub2ind([nei ncell],[1:nei]',LL);
+% % possono essere generati nella struttura ind
+% indeK = sub2ind([nei ncell],[1:nei]',KK);
+% indeL = sub2ind([nei ncell],[1:nei]',LL);
 
 % in futuro aggiungiamo il calcolo di dK e dL in edges
-dK = sqrt((mid(ind.internal(:),1)-cc(KK,1)).^2+...
-    (mid(ind.internal(:),2)-cc(KK,2)).^2);
-dL = sqrt((mid(ind.internal(:),1)-cc(LL,1)).^2+...
-    (mid(ind.internal(:),2)-cc(LL,2)).^2);
-ds = edges(ind.internal(:),5);
+% dK = sqrt((mid(ind.internal(:),1)-cc(KK,1)).^2+...
+%     (mid(ind.internal(:),2)-cc(KK,2)).^2);
+% dL = sqrt((mid(ind.internal(:),1)-cc(LL,1)).^2+...
+%     (mid(ind.internal(:),2)-cc(LL,2)).^2);
+dK = edges(ind.internal,8);
+dL = edges(ind.internal,9);
+ds = edges(ind.internal,5);
 
-drhos(indeK) = dKharm(rho(KK),rho(LL),dK,dL,ds);
-drhos(indeL) = dKharm(rho(LL),rho(KK),dL,dK,ds);
+drhos(ind.et_K) = dKharm(rho(KK),rho(LL),dK,dL,ds);
+drhos(ind.et_L) = dKharm(rho(LL),rho(KK),dL,dK,ds);
 
 
