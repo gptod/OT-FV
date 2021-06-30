@@ -120,7 +120,7 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
       %rho=-spdiags(JOC.ss,0);
       %slack =-spdiags(JOC.sr,0);
       %sizecell=-spdiags(JOC.rs(1:ncellrho,1:ncellrho),0);
-      M=-JOC.ss*JOC.rr+(-JOC.sr)*(-JOC.rs);
+      M=JOC.ss*JOC.rr-(JOC.sr)*(JOC.rs);
 
       invM=sparse_inverse;
 
@@ -136,28 +136,37 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 		    index_agmg);
       invM.init(M,ctrl_loc);
     end
-   
+
+    vector_q=zeros(Nr,1);
+    % g_i_tilda=diag(rho)*g - M * h
+    g_tilde=rho.*g-JOC*h;
+
+    inv_M_g_tilde=invM.apply(g_tilde);
+
+    
     for i=1:N
       % M(i,i)^{-1}=((R=0)*diag(rho_i)+m*diag(s_i))
       %fprintf('(%1.2e <= S%d <= %1.2e) \n',min(slack(1+(i-1)*m:i*m)),i,max(slack(1+(i-1)*m:i*m)))
-      invM=(1.0./(sizecell.*slack(1+(i-1)*m:i*m)));
+      %invM=(1.0./(sizecell.*slack(1+(i-1)*m:i*m)));
 
-      %
-      vi=(rho(1+(i-1)*m:i*m)).*invM.*sizecell;
-      % B2T(i,i)
+      % support vector
+      vector_q(:)=0;
+      vector_q((i-1)*ncellrho+1:i*ncellrho)=1.0;
 
-      vectors(:,1+(i-1)*2)=B2T(1+(i-1)*n:i*n,1+(i-1)*m:i*m)*vi;
+      wi=invM.apply(vector_qi);
       
+      %
+      vi=rho(1+(i-1)*ncellrho+1:i*ncellrho).*wi(1+(i-1)*ncellrho+1:i*ncellrho);
+      % B2T(i,i)
+      vectors(:,1+(i-1)*2)=B2T((i-1)*n+1:i*n,1+(i-1)*m:i*m)*vi;
       %sum(vectors(:,1+(i-1)*2))
 
       % B2T(i+1,i)
-      vectors(:,2+(i-1)*2)=B2T(1+i*n:(i+1)*n,1+(i-1)*m:i*m)*vi;
+      vectors(:,2+(i-1)*2)=B2T(i*n+1:(i+1)*n,1+(i-1)*m:i*m)*vi;
       %sum(vectors(:,2+(i-1)*2))
       
-      % g_i_tilda=diag(rho)*g - M * h
-      g_i_tilde=rho(1+(i-1)*m:i*m).*g(1+(i-1)*m:i*m)-sizecell.*h(1+(i-1)*m:i*m);
       % <p^i, M^{-1}(diag(rho) g - M h)>-beta(i)
-      alphas(i)=sizecell'*(invM.*(g_i_tilde))-betas(i);
+      alphas(i)=vector_q'*inv_M_g_tilde-betas(i);
     end
 
 
