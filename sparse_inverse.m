@@ -194,7 +194,7 @@ classdef sparse_inverse <handle
 
        obj.info_inverse.label=obj.ctrl.label;
        if (obj.ctrl.verbose)
-	 obj.info_inverse.print();
+	 obj.info_inverse.print(obj.ctrl.unit_out);
        end
        
        
