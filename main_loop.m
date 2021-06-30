@@ -52,7 +52,7 @@ for mesh_type = 2
   for h_i =4
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=5
+    for i=5:6
       N=4*(2^(i-1))
       Nt = N+1;
 
