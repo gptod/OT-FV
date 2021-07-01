@@ -83,7 +83,7 @@ classdef sparse_inverse <handle
 	 obj.M=obj.D;
 	 obj.N=obj.M-obj.matrix;
        else
-	 fprintf('In sparse_inverse.init: approach %s not supported. Execation will be stopped',obj.ctrl.approach)
+	 fprintf('In sparse_inverse.init: approach %s not supported. Execution will be stopped\n',obj.ctrl.approach)
 	 return
        end
        obj.init_cpu=toc(init_cpu);
@@ -100,7 +100,7 @@ classdef sparse_inverse <handle
 	 disp('Nan in RHS')
        end
        
-       apply_cpu=tic;	 
+       apply_cpu=tic;
        if ( strcmp(obj.ctrl.approach ,'direct'))
 	 sol= obj.matrix_decomposed\rhs;
 	 obj.info_inverse.approach_used = 'direct';
@@ -194,7 +194,7 @@ classdef sparse_inverse <handle
 
        obj.info_inverse.label=obj.ctrl.label;
        if (obj.ctrl.verbose)
-	 obj.info_inverse.print();
+	 obj.info_inverse.print(obj.ctrl.unit_out);
        end
        
        

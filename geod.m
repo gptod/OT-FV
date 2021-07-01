@@ -14,7 +14,8 @@ cpu_total=0.0;
 cpu_assembly=0.0;
 
 
-% load mesh
+				% load mesh
+clear 'I'
 load(mesh_name)
 
 if exist('I','var')==0
@@ -42,8 +43,11 @@ end
 %  return
 %end
 
-filename=strcat('runs/',str_test,approach_string);%,controls_string);
+solver_approach=controls.sol
+folder_approach=sprintf('sol%d/',solver_approach);
+filename=strcat('runs/',folder_approach,str_test,approach_string);%,controls_string);
 disp(filename)
+controls.basename=filename;
 log_filename=strcat(filename,'.log')
 logID = fopen(log_filename,'w');
 controls.logID=logID;
@@ -85,12 +89,13 @@ tne = (N+1)*nei; % total number of internal edges
 % set initial data
 if ( read_from_file>0)
   data_name=sprintf('/DS%d',read_from_file);
-  data = h5read(h5_file2read,data_name)
+  data = h5read(h5_file2read,data_name);
   phi0 = data(1:tnp);
-  rho0 = data(1+tnp,tnp+tn2rh);
-  s0   = data(1+tnp+tn2rh,tnp+2*tn2rh);
-  mu0  = data(tnp+2*tn2rh+1);
-  theta0 = data(tnp+2*tn2rh+2);
+  rho0 = data(1+tnp:tnp+tnr2h);
+  s0   = data(1+tnp+tnr2h:tnp+2*tnr2h);
+  mu0  = data(tnp+2*tnr2h+1);
+  theta0 = data(tnp+2*tnr2h+2);
+  uk = [phi0;rho0;s0];
 else
   mu0 = 1;
   phi0 = zeros(tnp,1);
@@ -107,12 +112,10 @@ if (save_data)
   %IDsave = fopen(filename_save,'w');
   %IDsave = write2td_sequence( IDsave, [uk;mu0;theta0], 0.0,'head');
 
-  filename_h5=([strcat('runs/','PhiRhoSMuTheta',str_test,approach_string,'.h5')]);
+  filename_h5=([strcat('runs/',folder_approach,'PhiRhoSMuTheta',str_test,approach_string,'.h5')]);
   if exist(filename_h5, 'file')==2
     delete(filename_h5);
   end
-  h5create(filename_h5,'/DS1',[Np+2*Nr+2])
-  h5write(filename_h5,'/DS1',[uk;mu0;theta0]')
 end
 
 
@@ -186,12 +189,26 @@ while true
     itk2 = 0;
     flag2 = 0;
 
+
+    if (save_data)
+      data_name=sprintf('/DS%d',itk1);
+      if exist(filename_h5, 'file')==2
+	delete(filename_h5);
+      end
+      h5create(filename_h5,data_name,[Np+2*Nr+2])
+      h5write(filename_h5,data_name,[uk;mu;theta]')
+    end
+
+
+
+    
     sum_assembly=0;
     sum_total=0;
     sum_linsys=0;
     sum_iter_newton=0;
     sum_iter_outer_linear=0;
     sum_iter_inner_linear=0;
+    
     while true
       total=tic;
       assembly=tic;
@@ -299,13 +316,17 @@ while true
     
 	% Solve the linear system
 	timelinsys=tic;
-        [omegak, info_solver_newton] = solvesys(JOC,OC, controls,logID);
+        [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls,logID);
 	
 	sum_linsys= sum_linsys+toc(timelinsys);
         sum_total = sum_total+toc(total);
-	print_info_solver(info_solver_newton)
-	print_info_solver(info_solver_newton,logID)
-
+	if (strcmp(resume_msg,''))
+	  print_info_solver(info_solver_newton)
+	  print_info_solver(info_solver_newton,logID)
+	else
+	  fprintf('%s\n',resume_msg);
+	  fprintf(logID,'%s\n',resume_msg);
+	end
 	
 	
 	if (restart)
@@ -494,13 +515,7 @@ while true
     rhomu = uk(tnp+1:tnp+tnr2h);
     smu = uk(tnp+tnr2h+1:end);
 
-    if (save_data)
-      %disp('start saving')
-      data_name=sprintf('/DS%d',itk1+1);
-      h5create(filename_h5,data_name,[Np+2*Nr+2])
-      h5write(filename_h5,data_name,[uk;mu;theta]')
-      %disp('finished saving')
-    end
+    
     
     % error bound on optimality
     delta_0 = (N/Nt)*sum(area)*mu;
@@ -534,8 +549,9 @@ while true
 end
 
 if (save_data)
-  %IDsave=write2td_sequence( IDsave, [uk;mu;theta], itk2,'tail');
-%  fclose(IDsave);
+  data_name=sprintf('/DS%d',itk1+1);
+  h5create(filename_h5,data_name,[Np+2*Nr+2])
+  h5write(filename_h5,data_name,[uk;mu;theta]')
 end
 
 
