@@ -238,9 +238,6 @@ for mesh_type = 2
 				   'invC',num2str(inverseC_approach),'_',ctrl_inner22.label);
 	      
 
-	      if (restart)
-		approach_string=strcat('restarted_',approach_string);
-	      end
 
 	      disp(approach_string)
               %approach_string=def_approach_string(controls);
