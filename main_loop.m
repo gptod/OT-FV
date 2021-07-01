@@ -45,7 +45,7 @@ read_from_file=0;
 compute_eigen=0;
 verbose=0;
 
-mkdir 'runs'
+%mkdir 'runs'
 
      
     % Space discretization. Three types of mesh families available:
