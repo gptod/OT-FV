@@ -5,8 +5,7 @@ function [drhos] = drho_sig(ind,edges,mid,cc,rho)
 
 ncell = size(cc,1);
 nei = length(ind.internal);
-drhos = sparse(nei,ncell);
- 
+
 % for e=1:nei
 %     
 %     K = edges(ind.internal(e),3);
@@ -20,9 +19,8 @@ drhos = sparse(nei,ncell);
 %         
 % end
 
-
-KK=edges(ind.internal(:),3);
-LL=edges(ind.internal(:),4);
+KK=edges(ind.internal,3);
+LL=edges(ind.internal,4);
 
 % % possono essere generati nella struttura ind
 % indeK = sub2ind([nei ncell],[1:nei]',KK);
@@ -37,7 +35,14 @@ dK = edges(ind.internal,8);
 dL = edges(ind.internal,9);
 ds = edges(ind.internal,5);
 
-drhos(ind.et_K) = dKharm(rho(KK),rho(LL),dK,dL,ds);
-drhos(ind.et_L) = dKharm(rho(LL),rho(KK),dL,dK,ds);
+
+% drhos2 = sparse(nei,ncell);
+% drhos2(ind.et_K) = dKharm(rho(KK),rho(LL),dK,dL,ds);
+% drhos2(ind.et_L) = dKharm(rho(LL),rho(KK),dL,dK,ds);
+
+% this assigning is faster than the other one
+drhos = sparse(1:nei,KK,dKharm(rho(KK),rho(LL),dK,dL,ds),nei,ncell);
+drhos = drhos + sparse(1:nei,LL,dKharm(rho(LL),rho(KK),dL,dK,ds),nei,ncell);
+
 
 
