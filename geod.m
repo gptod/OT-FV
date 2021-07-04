@@ -12,9 +12,9 @@ end
 
 cpu_total=0.0;
 cpu_assembly=0.0;
+cpu_linsys=0.0;
 
-
-				% load mesh
+% load mesh
 clear 'I'
 load(mesh_name)
 
@@ -330,7 +330,8 @@ while true
           fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
         end
 
-    resvar.set(kel,eps_lin,delta_mu);
+    resvar.set(kel,eps_lin,delta_mu,tnr2h+tnp);
+    %resvar.set(kel,0.5*mu,delta_mu,tnr2h+tnp);
     ctrl_outer.tolerance = resvar.etak;
     
 	% Solve the linear system
@@ -338,7 +339,7 @@ while true
         [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls,logID);
 	
 	sum_linsys= sum_linsys+toc(timelinsys);
-        sum_total = sum_total+toc(total);
+    sum_total = sum_total+toc(total);
 	if (strcmp(resume_msg,''))
 	  print_info_solver(info_solver_newton)
 	  print_info_solver(info_solver_newton,logID)
@@ -554,6 +555,7 @@ while true
     end
     cpu_total=cpu_total+sum_total;
     cpu_assembly=cpu_assembly+sum_assembly;
+    cpu_linsys=cpu_linsys+sum_linsys;
     fprintf(logID,'%s \n',state_message);
   
     cost_message=sprintf('LINSYS: NEWTON %8.1e %2d OUT %3d IN %5d | CPU: LINSYS %1.4e ASSEMBLY %1.4e',...
@@ -588,7 +590,7 @@ rho = uk(tnp+1:tnp+tnr2h);
 rho_all = [rho_in;rho;rho_f];
 W2th = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
 fprintf(controls.logID,'%35s %1.4e \n','Approximated Wasserstein distance: ',W2th);
-
+fprintf(controls.csvID,'%19s %1.4e %21s %1.4e \n','Total linsys time: ',cpu_linsys,'Total assembly time: ',cpu_assembly);
 
 if bc_sol==1&&compute_err==1
     

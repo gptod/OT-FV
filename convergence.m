@@ -5,7 +5,7 @@ close all
 % Convergence test
 % test 1: sin -> pure translation
 % test 2: compression -> contraction
-test_case='sin';
+test_case='compression';
 
 % Type of mesh
 mesh_type = 2;
@@ -16,7 +16,7 @@ mesh_type = 2;
 rec = 1;
 
 % number of refinement
-nstep = 2;
+nstep = 5;
 
 compute_err = 0;
 
@@ -142,7 +142,8 @@ for h_i = 1:nstep
     solver_approach = 13;
 
     % set here bicgstab,gmres,fgmres (for non stationary prec)
-    ctrl_outer.init('fgmres',1e-5,1000);
+    %ctrl_outer.init('fgmres',1e-5,1000);
+    ctrl_outer.init('fgmres',1e-5,2000);
 
       % left or right prec.
     left_right='right'
@@ -241,7 +242,7 @@ for h_i = 1:nstep
     phi = phi+(potential(0.5,0.5,0)-phi(indc));
     
     % Compute the errors
-    cost(i) = W2th;
+    cost(h_i) = W2th;
     err_cost(h_i) = abs(W2-W2th); % cost error
     err_mid(h_i) = sum(Mx2h*abs(rhomid-rho_m)); % density error in the midpoint
     for k=1:Nt
@@ -268,7 +269,7 @@ for h_i = 1:nstep
     axis equal
     axis off
     str =num2str(h_i);
-    outname=strcat('figures/shift_subtri2_linear_mid',str,'.jpg');
+    outname=strcat('figures/compression_subtri2_linear_mid',str,'.jpg');
     saveas(fig,outname)
     close all
 
@@ -285,6 +286,6 @@ rates = [rates log(A(2:end,9)./A(1:end-1,9))./log(A(2:end,1)./A(1:end-1,1))];
 rates = [[0 0 0 0 0]; rates];
 A = [A(:,1:5) rates(:,1) A(:,6) rates(:,2) A(:,7) rates(:,3) A(:,8) rates(:,4) A(:,9) rates(:,5)];
 
-save('save/A_shift_subtri2_linear','A')
+save('save/A_compression_subtri2_linear','A')
 
 

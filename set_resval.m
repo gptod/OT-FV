@@ -14,11 +14,13 @@ classdef set_resval <handle
             else
                 if isempty(obj.fnrm0)
                     delta = varargin{1};
+                    N = varargin{2};
                     obj.theta=.9;
                     %etamax=.9;
                     obj.etamax = 0.1;
                     obj.etak = obj.etamax;
-                    obj.fnrm = delta;%/sqrt(tnp+2*tnr2h);
+                    obj.fnrm = delta;
+                    %obj.fnrm = delta/sqrt(N);
                     obj.fnrm0 = 1;
                     %atol = 1e-6; rtol = 1e-8;
                     %atol = eps; rtol = 0.01*eps;
@@ -26,7 +28,9 @@ classdef set_resval <handle
                     obj.stop_tol = eps;
                 else
                     delta = varargin{1};
+                    N = varargin{2};
                     obj.fnrm = delta;
+                    %obj.fnrm = delta/sqrt(N);
                     rat=obj.fnrm/obj.fnrm0;
                     obj.fnrm0=obj.fnrm;
                     % adjust eta:
@@ -35,9 +39,8 @@ classdef set_resval <handle
                         etanew = obj.theta*rat*rat;
                         if obj.theta*etaold*etaold > .1
                             etanew = max(etanew,obj.theta*etaold*etaold);
-                        else
-                            obj.etak = min([etanew,obj.etamax]);
                         end
+                        obj.etak = min([etanew,obj.etamax]);
                         %obj.etak = min(obj.etamax,max(obj.etak,0.5*obj.stop_tol/obj.fnrm));
                         obj.etak = min(obj.etamax,max(obj.etak,0.5*obj.stop_tol));
                     end
