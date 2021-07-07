@@ -41,7 +41,10 @@ JOC.ntimestep=N;
 JOC.ncellrho = ncell2h;
 JOC.ncellphi = ncell;
 
-JOC.B_time=(Mxt*Nt*Dt*It*I_all)';
-JOC.B_space=(divt*spdiags(gradphi,0,te,te)*drhos)';
+JOC.B1T_time=Mxt*Nt*Dt*It*I_all;
+JOC.B1T_space=divt*spdiags(gradphi,0,te,te)*drhos;
+JOC.LT=spdiags(gradphi,0,te,te)*drhos;
+JOC.diagrho=spdiags(rhos,0,te,te);
 
+JOC.Mxt=Mxt;
 end
