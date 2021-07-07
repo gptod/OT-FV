@@ -76,7 +76,7 @@ function [out] = SchurAC_based_preconditioner(in, invSAC,invC,B1T,B2,prec_type,d
      out(n+1:n+m)=-invC(in(n+1:n+m));
     
      % x = SAC^{-1} (f- B1T y)
-     v=in(1:n) - B1T*out(n+1:n+m)
+     v=in(1:n) - B1T*out(n+1:n+m);
      
      if( verbose && dimblock>0 )
        disp(n/dimblock);

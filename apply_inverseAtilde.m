@@ -10,8 +10,11 @@ function [sol]=apply_inverseAtilde(array_sparse_inverse,Amatrix,vectors_x,indece
   ncol_block=size(array_sparse_inverse(1).matrix,2);
   
   total_ncol=ncol_block;
-  
+
   sol(1:nrow_block)=array_sparse_inverse(1).apply(rhs(1:nrow_block));
+  if (0)
+    fprintf('rhs(inode1)=%1.1e sol(inode1)=%1.1e \n',rhs(indeces_global(1)),sol(indeces_global(1)))
+  end
   start=nrow_block+1;
   for i=2:nblocks    
     %start
