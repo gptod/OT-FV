@@ -43,6 +43,8 @@ end
 %  return
 %end
 
+controls.swap_sign=1;
+
 solver_approach=controls.sol
 folder_approach=sprintf('sol%d/',solver_approach);
 filename=strcat('runs/',folder_approach,str_test,approach_string);%,controls_string);
@@ -68,7 +70,7 @@ ctrl_inner22.info(logID);
 
 csv_filename=strcat(filename,'.csv')
 csvID = fopen(csv_filename,'w');
-fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,      mu,   theta, cpulinsys, cpuassemb\n');
+fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,      mu,   theta, cpulinsys, cpuassemb,   cpuprec\n');
 
 % Boundary conditions:
 [rho_in,rho_f,mass] = bc_density(test_case,cc2h,area2h);
@@ -108,10 +110,6 @@ Np = ncell*Nt;
 Nr = ncell2h*N;
 save_data=controls.save_data;
 if (save_data)
-  %filename_save=strcat('runs/','PhiRhoSMuTheta',str_test,approach_string,'.dat');%,controls_string);
-  %IDsave = fopen(filename_save,'w');
-  %IDsave = write2td_sequence( IDsave, [uk;mu0;theta0], 0.0,'head');
-
   filename_h5=([strcat('runs/',folder_approach,'PhiRhoSMuTheta',str_test,approach_string,'.h5')]);
   if exist(filename_h5, 'file')==2
     delete(filename_h5);
@@ -192,9 +190,6 @@ while true
 
     if (save_data)
       data_name=sprintf('/DS%d',itk1);
-      if exist(filename_h5, 'file')==2
-	delete(filename_h5);
-      end
       h5create(filename_h5,data_name,[Np+2*Nr+2])
       h5write(filename_h5,data_name,[uk;mu;theta]')
     end
@@ -205,6 +200,7 @@ while true
     sum_assembly=0;
     sum_total=0;
     sum_linsys=0;
+    sum_prec=0;
     sum_iter_newton=0;
     sum_iter_outer_linear=0;
     sum_iter_inner_linear=0;
@@ -227,7 +223,7 @@ while true
       FOCtime=toc(ctime);
       delta_mu = norm([OC.p;OC.r;OC.s]);
 
-      state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e - CPU %1.4e \n' ,...
+      state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e - CPU %1.4e' ,...
 			    itk2+1, norm(OC.p),norm(OC.r),norm(OC.s),FOCtime);
       fprintf(logID,'%s \n',state_message);
       if verb>1
@@ -294,6 +290,8 @@ while true
             continue
         end
 
+	sys_name=sprintf('out%02d_in%02d',itk1+1,itk2+1);
+	controls.sys_name=sys_name;
 
 	% Compute the jacobian of the system of equations
 	message="BEGIN ASSEMBLY JFOC";
@@ -308,7 +306,6 @@ while true
 	sum_assembly=sum_assembly+toc(assembly);
 	JFOCtime=toc(ctime);
 	
-	sum_assembly=sum_assembly+toc(assembly);	
 	if verb>1
           fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
         end
@@ -316,10 +313,11 @@ while true
     
 	% Solve the linear system
 	timelinsys=tic;
-        [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls,logID);
+        [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls);
 	
 	sum_linsys= sum_linsys+toc(timelinsys);
         sum_total = sum_total+toc(total);
+	sum_prec  = sum_prec+info_solver_newton.prec_cpu;
 	if (strcmp(resume_msg,''))
 	  print_info_solver(info_solver_newton)
 	  print_info_solver(info_solver_newton,logID)
@@ -327,6 +325,12 @@ while true
 	  fprintf('%s\n',resume_msg);
 	  fprintf(logID,'%s\n',resume_msg);
 	end
+
+	if (~ (info_solver_newton.flag == 0) )
+	  disp('ERROR')
+				%return
+	end
+
 	
 	
 	if (restart)
@@ -540,11 +544,11 @@ while true
     fprintf('%s \n',cost_message);
     fprintf(logID,'%s \n',cost_message);
 
-    fprintf(csvID,'%6d,%6d,%6d,%5d,%8.3e,%6d,%7d,%8d,%11d,%1.2e,%1.2e,%1.2e,%1.4e,%1.4e \n',...
+    fprintf(csvID,'%6d,%6d,%6d,%5d,%8.3e,%6d,%7d,%8d,%11d,%1.2e,%1.2e,%1.2e,%1.4e,%1.4e,%1.4e \n',...
 	    ncell2h,ncell,N,...
 	    itk1,delta_0,itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
 	   info_solver_newton.inner_nequ,min(uk(tnp+1:tnp+tnr2h)),mu,theta,...
-	   sum_linsys,sum_assembly);
+	   sum_linsys,sum_assembly,sum_prec);
 
 end
 
