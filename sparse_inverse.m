@@ -38,9 +38,9 @@ classdef sparse_inverse <handle
        obj.cumulative_application=0;
        obj.preprocess_agmg=ctrl.preprocess_agmg;
 
-       if ( strcmp(ctrl.approach,'direct'))
+       if ( contains(ctrl.approach,'direct'))
 	 obj.matrix_decomposed = decomposition(obj.matrix); 
-       elseif ( strcmp(ctrl.approach,'agmg') )
+       elseif ( contains(ctrl.approach,'agmg') )
 	  if (obj.is_symmetric)
 	    icg=1;
 	 else
@@ -106,23 +106,33 @@ classdef sparse_inverse <handle
 	 obj.info_inverse.approach_used = 'direct';
 	 obj.info_inverse.iter=0;
 	 obj.info_inverse.flag=0;
-       elseif ( strcmp(obj.ctrl.approach ,'agmg'))
+       elseif ( contains(obj.ctrl.approach ,'agmg'))
 	 if (obj.is_symmetric)
 	   icg=1;
 	 else
 	   icg=obj.ctrl.nrestart;
 	 end
 	 if (obj.preprocess_agmg>0)
-	   jobagmg=2;
-	   agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
-	   [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
-	   feval( agmg_str, obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,jobagmg);	 
+	   if (strcmp(obj.ctrl.approach ,'agmg'))
+	     jobagmg=2;
+	     agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
+	     [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
+	     feval( agmg_str, obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,[],jobagmg);
+	     obj.info_inverse.approach_used = 'agmg';
+	   elseif(strcmp(obj.ctrl.approach ,'precagmg'))
+	     jobagmg=3;
+	     agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
+	     [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
+	     feval( agmg_str, obj.matrix,rhs,icg,[],[],-1,[],jobagmg);
+	     obj.info_inverse.approach_used = 'precagmg';
+	   end
 	 else
 	   jobagmg=0;
 	   [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
 	   agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,jobagmg);
+	   obj.info_inverse.approach_used = 'agmg';
 	 end
-	 obj.info_inverse.approach_used = 'agmg';
+	 
        elseif ( strcmp(obj.ctrl.approach,'diag') )
 	 sol=obj.inverse_matrix_diagonal.*rhs;
 	 obj.info_inverse.iter=0;
@@ -205,7 +215,7 @@ classdef sparse_inverse <handle
      end
      % destructor
      function obj = kill(obj)
-       if ( strcmp(obj.ctrl.approach ,'agmg'))
+       if ( contains(obj.ctrl.approach ,'agmg'))
 	 if( obj.preprocess_agmg>0 )
 	   
 	   agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
