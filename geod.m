@@ -228,8 +228,10 @@ while true
 	end	
 	fprintf('%s \n',message);
       end
+
       [rhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
       [drhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
+
       ctime=tic;
       OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu);
       FOCtime=toc(ctime);
@@ -590,7 +592,7 @@ rho = uk(tnp+1:tnp+tnr2h);
 rho_all = [rho_in;rho;rho_f];
 W2th = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
 fprintf(controls.logID,'%35s %1.4e \n','Approximated Wasserstein distance: ',W2th);
-fprintf(controls.csvID,'%19s %1.4e %21s %1.4e \n','Total linsys time: ',cpu_linsys,'Total assembly time: ',cpu_assembly);
+fprintf(csvID,'%19s %1.4e %21s %1.4e \n','Total linsys time: ',cpu_linsys,'Total assembly time: ',cpu_assembly);
 
 if bc_sol==1&&compute_err==1
     
@@ -619,9 +621,12 @@ if bc_sol==1&&compute_err==1
         err_rhoth = err_rhoth + (1/Nt)*sum(Mx2h*abs(rho_t-rho_real));
     end
     err_p = sqrt(err_p);
+    
+    fprintf(controls.logID,'%10s %1.4e \t %11s %1.4e \t %11s %1.4e \n','W2-error: ',err_cost,'phi-error: ',err_p,'rho-error: ',err_rhoth);
+    
 end
 
-fprintf(controls.logID,'%10s %1.4e \t %11s %1.4e \t %11s %1.4e \n','W2-error: ',err_cost,'phi-error: ',err_p,'rho-error: ',err_rhoth);
+
 
 % plot
 if (plot_figures)
