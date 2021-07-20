@@ -61,16 +61,17 @@ for mesh_type = 2
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i =1
+  for h_i = 2
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=1
+    for i=3
       N=4*(2^(i-1))
       Nt = N+1;
 
+      str_folder=sprintf('%s_mesh%d_rec%d',test_case,mesh_type,rec)
       str_test=sprintf('%s_mesh%d_h%d_rec%d_N%0.5d_',test_case,mesh_type,h_i,rec,N)
 
-      h5_file2read=strcat('runs/sol10/PhiRhoSMuTheta',str_test(1:strlength(str_test)-1),'.h5')
+      h5_file2read=strcat('runs/',str_folder,'/PhiRhoSMuTheta',str_test(1:strlength(str_test)-1),'.h5')
       if (read_from_file>0)
 	str=sprintf('restart%d_',read_from_file);
 	str_test=strcat(str,str_test);
@@ -98,7 +99,7 @@ for mesh_type = 2
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[13];
+      for sol=[12];
 
 	folder_run=sprintf('runs/sol%d',sol)
 	mkdir folder_run
@@ -143,10 +144,14 @@ for mesh_type = 2
 	
 
 	elseif (sol==9)
+	  % directly solve S=A+B1T C^{-1} B2 for linear recostruction
+	  
 	  for kk=1
 	    inverseC_approach=1;
+
+	    permute=1;
 	    
-	    for kkk=[1]
+	    for kkk=[0]
 	      for jj=[0]
 		for iii=[0]
 		  grounded_node=kkk;
@@ -161,7 +166,7 @@ for mesh_type = 2
 		  
 				% set solver for block 11 (schurAC)
 		  solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov'  };
-		  iters  ={1       ,200     ,10      ,1      ,1           ,100       ,1         };
+		  iters  ={1       ,400     ,10      ,1      ,1           ,100       ,1         };
 		  label  ={'direct','agmg1e-5','agmg10','agmg1','incomplete','krylov10','krylov10'};
 		  
    				% set here from solvers
@@ -176,6 +181,7 @@ for mesh_type = 2
 		    
 				% store all controls
 		    controls = struct('save_data',save_data,...
+				      'permute',permute,...
 				      'indc',grounded_node,...
 				      'manipulate',manipulate,...
 				      'manipulation_approach',manipulation_approach,...
@@ -193,6 +199,7 @@ for mesh_type = 2
 		    approach_string=strcat('grounded',num2str(grounded_node),...
 					     '_diagscal',num2str(diagonal_scaling),...
 					     '_manA',num2str(manipulate),...
+					     '_perm',num2str(permute),...
 					     '_fullyreduced_',...
 					     'invSAC',ctrl_inner11.label);
 		      
@@ -307,8 +314,8 @@ for mesh_type = 2
 
 	  % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 	  for isolver=[3]%1:length(outer_solvers)
-	  ctrl_outer.init(outer_solvers{isolver},1e-5,2000,0.0,0); % verbose=[1,2] works only for fgmres
-
+	  ctrl_outer.init(outer_solvers{isolver},1e-10,3000,0.0,0); % verbose=[1,2] works only for fgmres
+	  
 	  
 	  % external prec appraoch
 	  outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
@@ -343,8 +350,8 @@ for mesh_type = 2
 	  % set grounded_node>0 to gorund the potential in grounded node
 	  grounded_node=0;
 	  diagonal_scaling=0;
-	  manipulate=0;
-	  manipulation_approach=3;
+	  manipulate=1;
+	  manipulation_approach=4;
 
 	  
 
@@ -374,6 +381,7 @@ for mesh_type = 2
 			      'extra_info',extra_info,...
 			      'relax4inv11',relax4_inv11,...
 			      'relax4inv22',relax4_inv22);
+	   
 
 	    approach_string=strcat('grounded',num2str(grounded_node),...
 				   '_diagscal',num2str(diagonal_scaling),...
@@ -385,7 +393,6 @@ for mesh_type = 2
 				   'invSCA',ctrl_inner22.label);
 				   %...'_fullprecSCA_invA',label{i},'_invSCA',ctrl_inner22.label);
 
-	    disp(approach_string)
 	    %approach_string=def_approach_string(controls);
 	    geod;
 	  end
@@ -395,8 +402,7 @@ for mesh_type = 2
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
 	  ctrl_outer.init('fgmres',1e-5,1000,0.0,0);
 
-	  % we can use three approach 
-	  outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
+	 
 
 
 	  ctrl_inner22inner=ctrl_solver;
@@ -406,10 +412,11 @@ for mesh_type = 2
 	  % grounded<0 C^T x1 =0
 	  % grounded=0 no grounding
 	  % grounded>0 solution is grounded on one node
-	  for ii=[0]
+	  % geounded=float add grounded *identity to block A11
+	  for ii=[1]
 	    for jj=[0]
-	      for kk=[1]
-	  grounded_node=ii;
+	      for kk=[0]
+	  grounded_node=ii;	
 	  diagonal_scaling=jj;
 	  manipulate=kk;
 	  manipulation_approach=3;
@@ -419,24 +426,26 @@ for mesh_type = 2
 	  left_right='right';
 
 	  % we may add an identity matrix to the blocks
-	  relax4_inv11=0;
+	  relax4_inv11=0;%1e-8;
 	  relax4_inv22=0;
 
 	  % 
-	  compute_eigen=1;
-	  
+	  compute_eigen=0;
+
+	  % we can use three approach 
+	  outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
 	  for j=[1]
 	    outer_prec=outer_precs{j};
 
 	    
-	    %approach_inverse_A='full';
-	    approach_inverse_A ='block';
+	    approach_inverse_A='full';
+	    %approach_inverse_A ='block';
 
 	    
 	    solvers11={'diag','agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-	    iters11  ={1      ,1      ,100       ,1       ,1        ,100        ,  1         };
+	    iters11  ={1      ,1      ,200       ,1       ,1        ,100        ,  1         };
 	    label11  ={'diagA','agmgA1','agmg1e-1' ,'directA','krylovA1','krylovA100','incompleteA'};
-	    for m=[4]
+	    for m=[1]
 	      
 
 	      % set here other approximate inverse of block11
@@ -457,11 +466,11 @@ for mesh_type = 2
 		  label22  ={'agmg10','agmg1' ,'direct','krylov1','krylov100','incomplete'};
 		elseif (strcmp(approach_schurCA,'iterative'))
 		  solvers22={'gmres'  ,'bicgstab'  ,'fgmres','pcg' }
-		  iters22  ={200      ,100       ,100       , 100 };
+		  iters22  ={200      ,100       ,2000       , 100 };
 		  label22  ={'gmres10','bicgstab100' ,'fgmres100','pcg100'};
 		elseif (strcmp(approach_schurCA,'iterative+SwithdiagA'))
 		  solvers22={'gmres'  ,'bicgstab'  ,'fgmres','pcg' }
-		  iters22  ={200      ,100       ,100       , 100 };
+		  iters22  ={200      ,100       ,2000       , 100 };
 		  label22  ={'gmres10','bicgstab100' ,'fgmres100','pcg100'};
 		  
 		  
@@ -474,7 +483,7 @@ for mesh_type = 2
 
 		
 				% set here from solvers
-		for i=[3];%1:length(solvers)
+		for i=[1];%1:length(solvers)
 		  ctrl_inner22.init(solvers22{i},1e-1,iters22{i},1.0,0,strcat(label22{i},'_S'));
 		  extra_info='block';
 		  controls = struct('save_data',save_data,...
@@ -506,7 +515,19 @@ for mesh_type = 2
 					 'invA_',approach_inverse_A,label11{m},...
 					 '_precSCA_',approach_schurCA,'_',label22{i})
 
-		  geod;
+		  % begin=read_from_file;
+		  % for rest=begin:;
+		  %   read_from_file=rest;
+		  %   str_test=sprintf('%s_mesh%d_h%d_rec%d_N%0.5d_',test_case,mesh_type,h_i,rec,N)
+
+		  %   h5_file2read=strcat('runs/sol10/PhiRhoSMuTheta',str_test(1:strlength(str_test)-1),'.h5')
+		  %   if (read_from_file>0)
+		  %     str=sprintf('restart%d_',read_from_file);
+		  %     str_test=strcat(str,str_test);
+		  %   end
+		  %   geod;
+		  % end
+		  geod
 		end
 	      end
 	    end
@@ -536,8 +557,8 @@ for mesh_type = 2
 
 
 				% alpha relaxation
-	  alphas={0.01,0.05,0.1,0.5,0.9};
-	  for ll=4
+	  alphas={0.5};
+	  for ll=1
 	  alpha=alphas{ll};
 
 				%
@@ -549,11 +570,11 @@ for mesh_type = 2
 	  %approach_inverse_A='full';
 
 	  approaches_S={'SCA','SAC'};
-	  for ll=1:2
+	  for ll=1
 	    approach_inverse_S=approaches_S{ll};
 
 	    approach_prec='SH';
-				%approach_prec='HS';
+	    %approach_prec='HS';
 	    
 	  	  
 	  
@@ -561,9 +582,9 @@ for mesh_type = 2
 	  itersA  ={1      ,100       ,1       ,1        ,100        ,  1         };
 	  labelA  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete'};
 
-	  solversS={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-	  itersS  ={1      ,100       ,1       ,1        ,100        ,  1         };
-	  labelS  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete'};
+	  solversS={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete','diag'};
+	  itersS  ={1      ,100       ,1       ,1        ,100        ,  1         ,1};
+	  labelS  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete','diag'};
 
 	  ctrl_innerC=ctrl_solver;
 	  ctrl_innerC.init('diag',1e-1,100,1.0,0,'diag');
@@ -574,10 +595,10 @@ for mesh_type = 2
 	  for i=[2];%1:length(solversA)
 		    % set here other approximate inverse of A
 	    ctrl_innerA=ctrl_solver;
-	    ctrl_innerA.init(solversA{i},1e-1,itersA{i},1.0,1,labelA{i});
+	    ctrl_innerA.init(solversA{i},1e-1,itersA{i},1.0,0,labelA{i});
 
-	    for j=[2];%1:length(solversA)
-		      % set here other approximate inverse of A
+	    for j=[2];%1:length(solversS)
+		      % set here other approximate inverse of S
 	      
 	      ctrl_innerS.init(solversS{j},1e-1,itersS{j},1.0,0,labelS{j});
 
@@ -620,14 +641,6 @@ for mesh_type = 2
 
 	  % preconditioner approach
 	  outer_prec='full'
-
-          % set here other approximate inverse of block22
-	  relax4inv22=0;
-	  ctrl_inner22.init('diag',... %approach
-			    1e-12,... %tolerance
-			    1,...% itermax
-			    0.0,... %omega
-			    0); %verbose
 	  
 	  for kk=1
 	  inverseC_approach=kk;
@@ -636,21 +649,36 @@ for mesh_type = 2
 	  % full:        :~S=S
 	  % block_triang :~S=upper block triangular of S
 	  % block_diag   :~S=block diagonal of S
-	  invS_approach={'full'};
+	  invS_approach={'upper_triang'};
 
 	  diagonal_scaling=0;
 	  grounded_node=0;
 	  manipulation_approach=3;
 	  manipulate=0;
 
-	  W_approach='C';
-				%W_approach='cutC';
-	  inverse22_approach='diag';
-	  lower_bound=1e-12;
-	  upper_bound=1e12;
+	  % W matrix approach
+	  W_approach='Mass';
+	  %W_approach='MassgammaC';
+          W_approach='cutC';
+	  %W_approach='C';
+
+	  gamma=0.1;
+	  lower_bound=1e-9;
+	  upper_bound=1e6;
+
+	  % set here other approximate inverse of block22
+	  S_approach='C';
+	  S_approach='GammaMassC';
+	  %S_approach='Mass';
+	  S_approach='W';
+
+	  relax4inv22=0;
+	  ctrl_inner22.init('agmg',... %approach
+			    1e-1,... %tolerance
+			    1,...% itermax
+			    0.0,... %omega
+			    0); %verbose
 	  
-	  
-	  relax4inv11=0;
 
 	  
 	  % set here 
@@ -661,6 +689,8 @@ for mesh_type = 2
 	    iters  ={1       ,100      ,10      ,1      ,1           ,100       ,1         };
 	    label  ={'direct','agmg1e-1','agmg10','agmg1','incomplete','krylov10','krylov10'};
 
+
+	    relax4inv11=0;
    	    % set here from solvers
 	    for i=[2];%length(solvers)
 	      ctrl_inner11.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
@@ -679,6 +709,8 @@ for mesh_type = 2
 				'lower_bound',lower_bound,...
 				'upper_bound',upper_bound,...
 				'ctrl_inner11',ctrl_inner11,...
+				'S_approach',S_approach,...
+				'gamma',gamma,...
 				'ctrl_inner22',ctrl_inner22,...
 				'ctrl_outer',ctrl_outer,...
 				'compute_eigen',compute_eigen,...
@@ -694,8 +726,9 @@ for mesh_type = 2
 				     'augemented_',...
 				     ctrl_outer.approach,'_',...
 				     outer_prec,'_',...
-				     'invSAC',invS_approach{j},ctrl_inner11.label,'_',...
-				     'invC',num2str(inverseC_approach),'_',ctrl_inner22.label);
+				     'W_',W_approach,ctrl_inner11.label,'_',...
+				     '_invS',S_approach,...
+				     '_gamma',num2str(gamma),'_',ctrl_inner22.label);
 	      
 
 	      
