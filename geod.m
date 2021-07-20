@@ -12,9 +12,9 @@ end
 
 cpu_total=0.0;
 cpu_assembly=0.0;
+cpu_linsys=0.0;
 
-
-				% load mesh
+% load mesh
 clear 'I'
 load(mesh_name)
 
@@ -73,15 +73,18 @@ csvID = fopen(csv_filename,'w');
 fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,      mu,   theta, cpulinsys, cpuassemb,   cpuprec\n');
 
 % Boundary conditions:
-[rho_in,rho_f,mass] = bc_density(test_case,cc2h,area2h);
+[rho_in,rho_f,mass,midpoint,potential,geodesic,W2,bc_sol] = bc_density(test_case,cc2h,area2h);
 
-% Barrier method's parameters:
-%eps_0 = 1e-6; % tolerance for the final solution
-k2max = 30; % maximum number of inner (Newton) iterations
-k1max = 20; % maximum number of outer iterations
-theta0 = 0.2; % decay ratio for the perturbation parameter mu
-alfamin = 0.1; % minimal step length accepted
-
+% % Barrier method's parameters:
+% eps_0 = 1e-6; % tolerance for the final solution
+% k2max = 30; % maximum number of inner (Newton) iterations
+% k1max = 20; % maximum number of outer iterations
+% theta0 = 0.2; % decay ratio for the perturbation parameter mu
+% theta_min = 0.2;
+% theta_max = 0.2;
+% alfamin = 0.1; % minimal step length accepted
+% mu0_up = 0;
+flag_theta = 0;
 
 tnp = (N+1)*ncell; % total number of dofs for the potential
 tnr2h = N*ncell2h; % total number of dofs for the density
@@ -171,15 +174,19 @@ while true
     end
     itk1 = itk1+1;
     if itk1>k1max
-        mu0 = 5*mu0;
-        theta = theta0;
-        s0 = mu0./rho0;
-        mu = mu0/theta;
-        itk1 = 0;
-        tit = 0;
-        uk = [phi0;rho0;s0];
-        delta_0 = 2*eps_0;
-        continue
+        if mu0_up==1
+            mu0 = 5*mu0;
+            theta = theta0;
+            s0 = mu0./rho0;
+            mu = mu0/theta;
+            itk1 = 0;
+            tit = 0;
+            uk = [phi0;rho0;s0];
+            delta_0 = 2*eps_0;
+            continue
+        else
+            break
+        end
     end
     
     mu = theta*mu;
@@ -187,7 +194,8 @@ while true
     itk2 = 0;
     flag2 = 0;
 
-
+    resvar = set_resval;
+    
     if (save_data)
       data_name=sprintf('/DS%d',itk1);
       h5create(filename_h5,data_name,[Np+2*Nr+2])
@@ -267,7 +275,11 @@ while true
 
         if delta_mu < eps_mu  
             if itk2<4
-                theta = 0.8*theta;
+                if 0.8*theta>=theta_min
+                    theta = 0.8*theta;
+                else 
+                    theta = theta_min;
+                end
             end
             tit = tit+itk2;
             break
@@ -280,9 +292,14 @@ while true
                 itk1 = k1max;
                 break
             end
-            mu = mu/theta;
-            theta = theta+0.2*(1-theta);
-            mu = theta*mu;
+            if theta+0.2*(1-theta)<=theta_max
+                mu = mu/theta;
+                theta = theta+0.2*(1-theta);
+                mu = theta*mu;
+            else
+                flag_theta = 1;
+                break
+            end
             uk = [phimu;rhomu;smu];
             tit = tit+itk2;
             itk2 = 0;
@@ -310,6 +327,9 @@ while true
           fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
         end
 
+    resvar.set(kel,eps_lin,delta_mu,tnr2h+tnp);
+    %resvar.set(kel,0.5*mu,delta_mu,tnr2h+tnp);
+    ctrl_outer.tolerance = resvar.etak;
     
 	% Solve the linear system
 	timelinsys=tic;
@@ -333,121 +353,121 @@ while true
 
 	
 	
-	if (restart)
-	  solver_approach=11;
-
-	  ctrl_inner11=ctrl_solver;
-	  ctrl_inner22=ctrl_solver;
-	  ctrl_outer=ctrl_solver;
-	  
-          % krylov based solvers for M [x;y] = [f;g]
- 	  % pcg works only with full
-	  outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
-
-      % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
-	  for isolver=[3]%1:length(outer_solvers)
-	    ctrl_outer.init(outer_solvers{isolver},controls.ctrl_outer.tolerance,3000,0.0,0); % verbose=[1,2] works only for fgmres
-	    %ctrl_outer.init(outer_solvers{isolver},1e-10,3000,0.0,0); % verbose=[1,2] works only for fgmres
-	    
-	    
-				% external prec appraoch
-	    outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
-	    nouter_precs=length(outer_precs);
-	    
-				% pcg works only with full
-	    if (strcmp(outer_solvers,'pcg'))
-	      nouter_precs=1
-	    end
-	    
-				% fgmres works only with right prec
-				%if (strcmp(outer_solvers,'fgmres'))
-				%  nouter_precs=1
-				%end
-	    left_right='right';
-	    
-	    
-	    for iprec=[3]%1:nouter_precs
-	      outer_prec=outer_precs{iprec};
-	      
-		       % set here other approximate inverse of block11
-	      ctrl_inner11.init('agmg',... %approach
-				1e-12,... %tolerance
-				10,...% itermax
-				0.0,... %omega
-				0,... %verbose
-				'agmg10'); %label
-					 %extra_info='full';
-	      extra_info='block';
-	      relax4_inv11=1e-12;
-	      
-	% set grounded_node>0 to gorund the potential in grounded node
-	      indc=0;
-	      indeces=set_grounding_node(JF.pp,ncellphi);
-
-	      % ground other potential
-	      grounded_values=omegak(indeces);
-	      		      % set here list of solvers for block 22 
-	      solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete','diag'};
-	      iters  ={1      ,10      ,100,1       ,1        ,10        ,  1          ,0};
-	      label  ={'agmg1','agmg10','agmg100','direct','krylov1','krylov10','incomplete','diag'};
-	      relax4_inv22=0;
-	      
-	      for i=[2];%1:length(solvers)
-		ctrl_inner22.init(solvers{i},1e-13,iters{i},1.0,0,label{i});
-		restart_controls = struct('indc',grounded_node,...
-				  'grounded_values',grounded_values,...
-				  'sol',solver_approach,...
-				  'outer_prec',outer_prec,...
-				  'left_right',left_right,...
-				  'ctrl_inner11',ctrl_inner11,...
-				  'ctrl_inner22',ctrl_inner22,...
-				  'ctrl_outer',ctrl_outer,...
-				  'compute_eigen',compute_eigen,...
-				  'verbose',verbose,...
-				  'extra_info',extra_info,...
-				  'relax4inv11',relax4_inv11,...
-				  'relax4inv22',relax4_inv22);
-
-
-	      end
-	    end
-	  end
-	  timelinsys=tic;
-	  omegak_old=omegak;
-          [omegak, info_solver_newton] = solvesys(JOC,OC, restart_controls,logID);
-	  sum_linsys=sum_linsys+toc(timelinsys);
-	   print_info_solver(info_solver_newton);
-	   print_info_solver(info_solver_newton,logID);
-	  
-	   if( 0 )
-	     for i=1:Nt
-	       grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
-	       fprintf('diff dir %1.4e diff phi%1.4e\n', ...
-		       abs(restart_controls.grounded_values(i)-omegak(grounded_node+(i-1)*ncell)),...
-		       norm(omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell))...
-		      )
-	     end
-	     for i=1:N
-	       grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
-	       fprintf('diff rho %1.4e\n', ...
-		       norm(omegak(Np+1+(i-1)*ncell2h:Np+i*ncell2h)-omegak_old(Np+1+(i-1)*ncell2h:Np+i*ncell2h))...
-		      )
-	     end
-	   end
-	   
-	  %i=1;
-	  %X=linspace(0,1,ncell)';
-	  %diff=-omegak(controls.indc)+omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell);
-	  %plot(X,diff)
-
-	  
-	  fprintf('diff  sol = %1.4e \n', norm(omegak-omegak_old));
-	  fprintf(logID,'diff  sol = %1.4e \n', norm(omegak-omegak_old));
-
-	  
-	 
-	  
-	end
+% 	if (restart)
+% 	  solver_approach=11;
+% 
+% 	  ctrl_inner11=ctrl_solver;
+% 	  ctrl_inner22=ctrl_solver;
+% 	  ctrl_outer=ctrl_solver;
+% 	  
+%           % krylov based solvers for M [x;y] = [f;g]
+%  	  % pcg works only with full
+% 	  outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
+% 
+%       % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
+% 	  for isolver=[3]%1:length(outer_solvers)
+% 	    ctrl_outer.init(outer_solvers{isolver},controls.ctrl_outer.tolerance,3000,0.0,0); % verbose=[1,2] works only for fgmres
+% 	    %ctrl_outer.init(outer_solvers{isolver},1e-10,3000,0.0,0); % verbose=[1,2] works only for fgmres
+% 	    
+% 	    
+% 				% external prec appraoch
+% 	    outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
+% 	    nouter_precs=length(outer_precs);
+% 	    
+% 				% pcg works only with full
+% 	    if (strcmp(outer_solvers,'pcg'))
+% 	      nouter_precs=1
+% 	    end
+% 	    
+% 				% fgmres works only with right prec
+% 				%if (strcmp(outer_solvers,'fgmres'))
+% 				%  nouter_precs=1
+% 				%end
+% 	    left_right='right';
+% 	    
+% 	    
+% 	    for iprec=[3]%1:nouter_precs
+% 	      outer_prec=outer_precs{iprec};
+% 	      
+% 		       % set here other approximate inverse of block11
+% 	      ctrl_inner11.init('agmg',... %approach
+% 				1e-12,... %tolerance
+% 				10,...% itermax
+% 				0.0,... %omega
+% 				0,... %verbose
+% 				'agmg10'); %label
+% 					 %extra_info='full';
+% 	      extra_info='block';
+% 	      relax4_inv11=1e-12;
+% 	      
+% 	% set grounded_node>0 to gorund the potential in grounded node
+% 	      indc=0;
+% 	      indeces=set_grounding_node(JF.pp,ncellphi);
+% 
+% 	      % ground other potential
+% 	      grounded_values=omegak(indeces);
+% 	      		      % set here list of solvers for block 22 
+% 	      solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete','diag'};
+% 	      iters  ={1      ,10      ,100,1       ,1        ,10        ,  1          ,0};
+% 	      label  ={'agmg1','agmg10','agmg100','direct','krylov1','krylov10','incomplete','diag'};
+% 	      relax4_inv22=0;
+% 	      
+% 	      for i=[2];%1:length(solvers)
+% 		ctrl_inner22.init(solvers{i},1e-13,iters{i},1.0,0,label{i});
+% 		restart_controls = struct('indc',grounded_node,...
+% 				  'grounded_values',grounded_values,...
+% 				  'sol',solver_approach,...
+% 				  'outer_prec',outer_prec,...
+% 				  'left_right',left_right,...
+% 				  'ctrl_inner11',ctrl_inner11,...
+% 				  'ctrl_inner22',ctrl_inner22,...
+% 				  'ctrl_outer',ctrl_outer,...
+% 				  'compute_eigen',compute_eigen,...
+% 				  'verbose',verbose,...
+% 				  'extra_info',extra_info,...
+% 				  'relax4inv11',relax4_inv11,...
+% 				  'relax4inv22',relax4_inv22);
+% 
+% 
+% 	      end
+% 	    end
+% 	  end
+% 	  timelinsys=tic;
+% 	  omegak_old=omegak;
+%           [omegak, info_solver_newton] = solvesys(JOC,OC, restart_controls,logID);
+% 	  sum_linsys=sum_linsys+toc(timelinsys);
+% 	   print_info_solver(info_solver_newton);
+% 	   print_info_solver(info_solver_newton,logID);
+% 	  
+% 	   if( 0 )
+% 	     for i=1:Nt
+% 	       grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
+% 	       fprintf('diff dir %1.4e diff phi%1.4e\n', ...
+% 		       abs(restart_controls.grounded_values(i)-omegak(grounded_node+(i-1)*ncell)),...
+% 		       norm(omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell))...
+% 		      )
+% 	     end
+% 	     for i=1:N
+% 	       grounded_values(i)=omegak(grounded_node+(i-1)*ncell);
+% 	       fprintf('diff rho %1.4e\n', ...
+% 		       norm(omegak(Np+1+(i-1)*ncell2h:Np+i*ncell2h)-omegak_old(Np+1+(i-1)*ncell2h:Np+i*ncell2h))...
+% 		      )
+% 	     end
+% 	   end
+% 	   
+% 	  %i=1;
+% 	  %X=linspace(0,1,ncell)';
+% 	  %diff=-omegak(controls.indc)+omegak(1+(i-1)*ncell:i*ncell)-omegak_old(1+(i-1)*ncell:i*ncell);
+% 	  %plot(X,diff)
+% 
+% 	  
+% 	  fprintf('diff  sol = %1.4e \n', norm(omegak-omegak_old));
+% 	  fprintf(logID,'diff  sol = %1.4e \n', norm(omegak-omegak_old));
+% 
+% 	  
+% 	 
+% 	  
+% 	end
 
 
 
@@ -514,6 +534,9 @@ while true
 
     end
 
+    if flag_theta==1
+        break
+    end
     
     phimu = uk(1:tnp);
     rhomu = uk(tnp+1:tnp+tnr2h);
@@ -536,6 +559,7 @@ while true
     end
     cpu_total=cpu_total+sum_total;
     cpu_assembly=cpu_assembly+sum_assembly;
+    cpu_linsys=cpu_linsys+sum_linsys;
     fprintf(logID,'%s \n',state_message);
   
     cost_message=sprintf('LINSYS: NEWTON %8.1e %2d OUT %3d IN %5d | CPU: LINSYS %1.4e ASSEMBLY %1.4e',...
@@ -560,6 +584,8 @@ end
 
 
 fprintf('%17s %4i %7s %1.4e \n','Total Newton its:',tit,'Error: ',delta_0)
+fprintf(controls.logID,'%17s %4i %7s %1.4e \n','Total Newton its:',tit,'Error: ',delta_0);
+
 
 phi = uk(1:tnp);
 rho = uk(tnp+1:tnp+tnr2h);
@@ -567,6 +593,39 @@ rho = uk(tnp+1:tnp+tnr2h);
 % Compute Wasserstein distance
 rho_all = [rho_in;rho;rho_f];
 W2th = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
+fprintf(controls.logID,'%35s %1.4e \n','Approximated Wasserstein distance: ',W2th);
+fprintf(controls.csvID,'%19s %1.4e %21s %1.4e \n','Total linsys time: ',cpu_linsys,'Total assembly time: ',cpu_assembly);
+
+if bc_sol==1&&compute_err==1
+    
+    % if the solution is known compute errors
+    
+    % shift the constant of phi
+    [~,indc]=min((cc(:,1)-0.5).^2+(cc(:,2)-0.5).^2);
+    phi = phi+(potential(0.5,0.5,0)-phi(indc));
+    
+    rhoa = RHt*It*rho_all;
+    [rhos]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+
+    % Compute the errors
+    err_cost = abs(W2-W2th); % cost error
+    err_p = 0;
+    err_rhoth = 0;
+    for k=1:Nt
+        t = (k-0.5)/Nt;
+        phi_real = potential(cc(:,1),cc(:,2),t);
+        rho_real = geodesic(cc2h(:,1),cc2h(:,2),t);
+        rho_real = rho_real*mass/sum(rho_real.*area2h);
+        rho_t = 0.5*(rho_all((k-1)*ncell2h+1:k*ncell2h)+rho_all(k*ncell2h+1:(k+1)*ncell2h));
+        % error on the potential
+        err_p = err_p + (1/Nt)*sum( rhoa((k-1)*ncell+1:k*ncell).*Mx*(phi_real-phi((k-1)*ncell+1:k*ncell)).^2 );
+        % error on the geodesic
+        err_rhoth = err_rhoth + (1/Nt)*sum(Mx2h*abs(rho_t-rho_real));
+    end
+    err_p = sqrt(err_p);
+end
+
+fprintf(controls.logID,'%10s %1.4e \t %11s %1.4e \t %11s %1.4e \n','W2-error: ',err_cost,'phi-error: ',err_p,'rho-error: ',err_rhoth);
 
 % plot
 if (plot_figures)
@@ -610,4 +669,3 @@ end
 fclose(logID);
 fclose(csvID);
 %h5disp(filename_h5)
-

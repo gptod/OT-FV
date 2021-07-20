@@ -5,7 +5,6 @@ function [ddrhosa] = ddrho_siga(ind,edges,mid,cc,rho,a)
 
 ncell = size(cc,1);
 nei = length(ind.internal);
-ddrhosa = sparse(ncell,ncell);
 
 % for e=1:nei
 %     
@@ -23,8 +22,8 @@ ddrhosa = sparse(ncell,ncell);
 % end
 
 
-KK=edges(ind.internal(:),3);
-LL=edges(ind.internal(:),4);
+KK=edges(ind.internal,3);
+LL=edges(ind.internal,4);
 
 % % possono essere generati nella struttura ind
 % indKK = sub2ind([ncell ncell],KK,KK);
@@ -47,15 +46,25 @@ dL = edges(ind.internal,9);
 ds = edges(ind.internal,5);
 
 
-ddrhosa(ind.u_KK) = ddrhosa(ind.u_KK) + ...
-                   accumarray(ind.o_KK,dKdKharm(rho(KK),rho(LL),dK,dL,ds).*a);
-ddrhosa(ind.u_KL) = ddrhosa(ind.u_KL) + ...
-                   accumarray(ind.o_KL,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);         
-ddrhosa(ind.u_LK) = ddrhosa(ind.u_LK) + ...
-                   accumarray(ind.o_LK,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);          
-ddrhosa(ind.u_LL) = ddrhosa(ind.u_LL) + ...
-                   accumarray(ind.o_LL,dKdKharm(rho(LL),rho(KK),dL,dK,ds).*a);
-               
+% ddrhosa = sparse(ncell,ncell);
+% ddrhosa(ind.u_KK) = ddrhosa(ind.u_KK) + ...
+%                    accumarray(ind.o_KK,dKdKharm(rho(KK),rho(LL),dK,dL,ds).*a);
+% ddrhosa(ind.u_KL) = ddrhosa(ind.u_KL) + ...
+%                    accumarray(ind.o_KL,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);         
+% ddrhosa(ind.u_LK) = ddrhosa(ind.u_LK) + ...
+%                    accumarray(ind.o_LK,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a);          
+% ddrhosa(ind.u_LL) = ddrhosa(ind.u_LL) + ...
+%                    accumarray(ind.o_LL,dKdKharm(rho(LL),rho(KK),dL,dK,ds).*a);           
+
+
+% no need to use the accumarray function as the sparse function sums by
+% default values with the same indices
+% this assigning is not faster than the other one
+ddrhosa = sparse(KK,KK,dKdKharm(rho(KK),rho(LL),dK,dL,ds).*a,ncell,ncell);
+ddrhosa = ddrhosa + sparse(KK,LL,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a,ncell,ncell);
+ddrhosa = ddrhosa + sparse(LL,KK,dLdKharm(rho(KK),rho(LL),dK,dL,ds).*a,ncell,ncell);
+ddrhosa = ddrhosa + sparse(LL,LL,dKdKharm(rho(LL),rho(KK),dL,dK,ds).*a,ncell,ncell);
+
 
 
 

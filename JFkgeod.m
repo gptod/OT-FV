@@ -41,10 +41,23 @@ JOC.ntimestep=N;
 JOC.ncellrho = ncell2h;
 JOC.ncellphi = ncell;
 
+JOC.DtT=Nt*Dt*It*I_all;
 JOC.B1T_time=Mxt*Nt*Dt*It*I_all;
 JOC.B1T_space=divt*spdiags(gradphi,0,te,te)*drhos;
+  
 JOC.LT=spdiags(gradphi,0,te,te)*drhos;
 JOC.diagrho=spdiags(rhos,0,te,te);
+% for i=2:N-1
+%   irow=i
+%   jcol=i-1
+%   diff=JOC.LT(1+(irow-1)*ncell:(irow+1)*ncell,1+(jcol-1)*ncell2h:(jcol)*ncell2h)-...
+%        JOC.LT(1+(irow-1)*ncell:(irow+1)*ncell,1+(jcol-1)*ncell2h:(jcol)*ncell2h);
+%   norm(full(diff))
+% end
+
+JOC.It=It;
 
 JOC.Mxt=Mxt;
+
+
 end

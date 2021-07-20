@@ -16,15 +16,27 @@ for kk=1
   
 rec = recs{kk};
 
-eps_0 = 1e-6; % tolerance 
+
+eps_0 = 1e-6; % tolerance for the IPM
+k2max = 30; % maximum number of inner (Newton) iterations
+k1max = 20; % maximum number of outer iterations
+theta0 = 0.2; % decay ratio for the perturbation parameter mu
+theta_min = 0.2;
+theta_max = 0.2;
+alfamin = 0.1; % minimal step length accepted
+mu0_up = 0;
+
 
 verb = 1; % verbosity level: {0,1,2}
+eps_lin = 1e-5; % tolerance for the solution of the linear systems
+kel = 0; % set 1 for adaptive tolerance for the Newton scheme
+% eps_lin = eps_0;
+% kel = 1;
 
-
+compute_err = 1;
 
 plot_figures=0
 
-restart=0;
 
 save_data=1;
 read_from_file=0;
@@ -33,7 +45,7 @@ read_from_file=0;
 compute_eigen=0;
 verbose=0;
 
-mkdir 'runs'
+%mkdir 'runs'
 
      
     % Space discretization. Three types of mesh families available:
@@ -276,9 +288,6 @@ for mesh_type = 2
 				     'invC',num2str(inverseC_approach),'_',ctrl_inner22.label);
 	      
 
-	      if (restart)
-		approach_string=strcat('restarted_',approach_string);
-	      end
 
 	      disp(approach_string)
               %approach_string=def_approach_string(controls);
