@@ -48,8 +48,9 @@ classdef sparse_inverse <handle
 	  end
 	  if ( obj.preprocess_agmg > 0 )
 	    agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
-	    %disp( strcat('init',agmg_str));
-	    obj.mgsolver=feval( agmg_str, obj.matrix,[],icg,[],ctrl.itermax,0,[],1);
+				%disp( strcat('init',agmg_str));
+	    verbose_agmg=0;
+	    obj.mgsolver=feval( agmg_str, obj.matrix,[],icg,verbose_agmg,ctrl.itermax,0,[],1);
 	  end
 	  
        elseif ( strcmp(ctrl.approach,'diag') )
@@ -112,31 +113,32 @@ classdef sparse_inverse <handle
 	 else
 	   icg=obj.ctrl.nrestart;
 	 end
+	 verbose_agmg=0;
 	 if (obj.preprocess_agmg>0)
 	   if (strcmp(obj.ctrl.approach ,'agmg'))
 	     jobagmg=2;
 	     agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
 	     [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
-	     feval( agmg_str, obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,[],jobagmg);
+	     feval( agmg_str, obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,verbose_agmg,[],jobagmg);
 	     obj.info_inverse.approach_used = 'agmg';
 	   elseif(strcmp(obj.ctrl.approach ,'precagmg'))
 	     jobagmg=3;
 	     agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
 	     [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
-	     feval( agmg_str, obj.matrix,rhs,icg,[],[],-1,[],jobagmg);
+	     feval( agmg_str, obj.matrix,rhs,icg,[],[],verbose_agmg,[],jobagmg);
 	     obj.info_inverse.approach_used = 'precagmg';
 	   end
 	 else
 	   jobagmg=0;
 	   [sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
-	   agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,-1,initial_guess,jobagmg);
+	   agmg(obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,verbose_agmg,initial_guess,jobagmg);
 	   obj.info_inverse.approach_used = 'agmg';
 	 end
 	 
        elseif ( strcmp(obj.ctrl.approach,'diag') )
 	 sol=obj.inverse_matrix_diagonal.*rhs;
-	 obj.info_inverse.iter=0;
-	 obj.info_inverse.flag= 0; 
+	 obj.info_inverse.iter=1;
+	 obj.info_inverse.flag=0; 
        elseif( strcmp(obj.ctrl.approach, 'krylov'))
 	 if ( obj.is_symmetric )
 	   [sol,obj.info_inverse.flag,obj.info_inverse.res,obj.info_inverse.iter,obj.info_inverse.resvec]=...
