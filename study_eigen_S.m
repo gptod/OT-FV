@@ -33,7 +33,7 @@ function [Mtt,Mss,dense_S]=study_eigen_S(A,invA,B2_time,B2_space,B1T_time,B1T_sp
   M_space_space = prec_times_matrix(@(x) real_inverseS.apply(x), Mss);
   M_time_space  = prec_times_matrix(@(x) real_inverseS.apply(x), Mts);
   M_space_time  = prec_times_matrix(@(x) real_inverseS.apply(x), Mst);
-  M_P           = prec_times_matrix(@(x) real_inverseS.apply(x), Msp+Mts);
+  M_P           = prec_times_matrix(@(x) real_inverseS.apply(x), Msp+Mtp);
 
     
   mc=norm(M_C);
@@ -42,28 +42,29 @@ function [Mtt,Mss,dense_S]=study_eigen_S(A,invA,B2_time,B2_space,B1T_time,B1T_sp
   mst=norm(M_space_time);
   mss=norm(M_space_space);
   mp=norm(M_P);
-  %total=M_C+M_time_time+M_time_space+M_space_time+M_space_space+M_P ;
-  %norm(total-speye(Nr,Nr))
+  total=M_C+M_time_time+M_time_space+M_space_time+M_space_space+M_P ;
+  disp('Norm that should be zero')
+  norm(total-speye(Nr,Nr))
 
   fprintf('mc=%1.1e mtt=%1.1e mts=%1.1e mst=%1.1e mss=%1.1e mp=%1.1e \n',mc,mtt,mts,mst,mss,mp);
 
-  candidate=M_C+M_time_time+M_time_space ;
+  %candidate=M_C+M_time_time+M_time_space+M_time_space+M_space_time+M_P ;
   end 
 
   disp('candidate')
-  prec=C+Mtt;
+  prec=C+Mtt+Mss;
   candidate=prec_times_matrix(@(x) real_inverseS.apply(x),prec);
   
   
-  eigenvalues=study_eigenvalues(candidate, 'S^{-1}(Candidate)',1);
+  eigenvalues=study_eigenvalues(prec\dense_S, 'S^{-1}(Candidate)',1);
 
-  %figure
-  %plot(eigenvalues,'o')
-  
-  
   figure
-  spy(candidate)
-  saveas(gcf,strcat('candidate.png'));
+  plot(eigenvalues,'o')
+  
+  
+  %figure
+  %spy(candidate)
+  %saveas(gcf,strcat('candidate.png'));
 end 
 
   
