@@ -1,4 +1,4 @@
-function [A,B1T,rhs,B1T_perturbation]=preprocess_system(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas,controls)
+function [A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls)
   indc=controls.indc;
   Nr=size(B1T,2);
   N=size(indeces_global,1)-1;
@@ -20,7 +20,7 @@ function [A,B1T,rhs,B1T_perturbation]=preprocess_system(A,B1T,rhs,indeces_global
 	disp('GROUNDING')
       end
       irow=indeces_global(1);
-      [A,B1T,rhs]=grounding(A,B1T,rhs,irow,0);
+      [A,B1T,B2,rhs]=grounding(A,B1T,B2,rhs,irow,0);
       B1T_perturbation(irow,:)=sparse(1,Nr);
     elseif(indc<0)
       if (print)
@@ -28,6 +28,7 @@ function [A,B1T,rhs,B1T_perturbation]=preprocess_system(A,B1T,rhs,indeces_global
       end
       irow=indeces_global(1);
       A(irow,1:ncellphi) = ones(1,ncellphi)/ncellphi;
+      %A(irow,1:ncellphi) = -vectors_x(:,1);
       B1T(irow,:)=sparse(1,Nr);
       rhs(irow,:)=0.0;
       B1T_perturbation(irow,:)=sparse(1,Nr);
