@@ -5,15 +5,15 @@ close all
 % Convergence test
 % test 1: sin -> pure translation
 % test 2: compression -> contraction
-test_case='compression';
+test_case='sin';
 
 % Type of mesh
-mesh_type = 2;
+mesh_type = 3;
 
 % Type of reconstruction
 % 1 -> weighted arithmetic mean
 % 2 -> weighted harmonic mean
-rec = 1;
+rec = 2;
 
 % number of refinement
 nstep = 5;
@@ -21,7 +21,7 @@ nstep = 5;
 compute_err = 0;
 
 eps_0 = 1e-8; % tolerance 
-k2max = 30; % maximum number of inner (Newton) iterations
+k2max = 40; % maximum number of inner (Newton) iterations
 k1max = 20; % maximum number of outer iterations
 theta0 = 0.2; % decay ratio for the perturbation parameter mu
 theta_min = 0.01;
@@ -197,7 +197,7 @@ for h_i = 1:nstep
 
             ctrl_innerA.init(solversA{i},1e-1,itersA{i},1.0,0,labelA{i});
 
-            for j=[2];%1:length(solversA)
+            for j=[2]%1:length(solversA)
                   % set here other approximate inverse of A
 
                 ctrl_innerS.init(solversS{j},1e-1,itersS{j},1.0,0,labelS{j});
@@ -238,8 +238,18 @@ for h_i = 1:nstep
     rhoa = RHt*It*rho_all;
     [rhos]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
     
-    [~,indc]=min((cc(:,1)-0.5).^2+(cc(:,2)-0.5).^2);
-    phi = phi+(potential(0.5,0.5,0)-phi(indc));
+    %[~,indc]=min((cc(:,1)-0.5).^2+(cc(:,2)-0.5).^2);
+    %phi = phi+(potential(0.5,0.5,0)-phi(indc));
+    
+    intphi=0;
+    intphi_ht=0;
+    for k=1:Nt
+        %intphi=intphi+(1/Nt)*sum(Mx*potential(cc(:,1),cc(:,2),(k-0.5)/Nt));
+        %intphi_ht=intphi_ht+(1/Nt)*sum(Mx*phi((k-1)*ncell+1:k*ncell));
+        intphi=intphi+(1/Nt)*sum(rhoa((k-1)*ncell+1:k*ncell).*Mx*potential(cc(:,1),cc(:,2),(k-0.5)/Nt));
+        intphi_ht=intphi_ht+(1/Nt)*sum(rhoa((k-1)*ncell+1:k*ncell).*Mx*phi((k-1)*ncell+1:k*ncell));
+    end
+    phi = phi+(intphi-intphi_ht);
     
     % Compute the errors
     cost(h_i) = W2th;
@@ -269,7 +279,7 @@ for h_i = 1:nstep
     axis equal
     axis off
     str =num2str(h_i);
-    outname=strcat('figures/compression_subtri2_linear_mid',str,'.jpg');
+    outname=strcat('figures/shift_sq_harm_mid',str,'.jpg');
     saveas(fig,outname)
     close all
 
@@ -286,6 +296,6 @@ rates = [rates log(A(2:end,9)./A(1:end-1,9))./log(A(2:end,1)./A(1:end-1,1))];
 rates = [[0 0 0 0 0]; rates];
 A = [A(:,1:5) rates(:,1) A(:,6) rates(:,2) A(:,7) rates(:,3) A(:,8) rates(:,4) A(:,9) rates(:,5)];
 
-save('save/A_compression_subtri2_linear','A')
+save('save/A_shift_sq_harm','A')
 
 
