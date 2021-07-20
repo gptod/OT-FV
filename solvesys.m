@@ -24,6 +24,13 @@ ncellphi=JF.ncellphi;
 ncellrho=JF.ncellrho;
 inner_nequ=0;
 
+
+inner_iter2=0;
+inner_iter3=0;
+
+inner_nequ2=0;
+inner_nequ3=0;
+
 flag=0;
 iter=0;
 res=1e30;
@@ -457,13 +464,29 @@ elseif sol==9
   [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
   
    % grounding ,manipualtion etc
-  [A,B1T,rhs,B1T_perturbation]=preprocess_system(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
+  [A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
   
 % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
+
+  if ( controls.permute)
+    permutation = symrcm(A(1:ncellphi,1:ncellphi));
+    p=permutation;
+    for i=1:Nt
+      range=[(i-1)*ncellphi+1:i*ncellphi];
+      A(range,range) = A((i-1)*(ncellphi)+p,(i-1)*ncellphi+p);
+      B1T(range,:)   = B1T((i-1)*(ncellphi)+p,:);
+      B2(:,range)    = B2(:,(i-1)*(ncellphi)+p);
+      rhs(range)     = rhs((i-1)*(ncellphi)+p);
+    end
+  end
+
+
   if (controls.diagonal_scaling)
     [A,B1T,B2,C,rhs,diagA_scaling,diagC_scaling]=scaling_system(A,B1T,B2,C,rhs);
   end
+
+
   
   cpu_manipulate=toc(time_manipulate);
   msg=sprintf('MANIPULATE LIN. SYS= %1.4e',cpu_manipulate);
@@ -495,9 +518,9 @@ elseif sol==9
     inverseC = @(x) invC.apply(x);
 
     diagC = spdiags(C,0);
-    if ( verbose >= 1)
-      fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
-    end
+    %if ( verbose >= 1)
+    fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
+    %end
     invdiagC = sparse(1:Nr,1:Nr,(1.0./diagC)',Nr,Nr);
 
     
@@ -561,6 +584,8 @@ elseif sol==9
   relax4prec=0.0;
   debug=0;
 
+  
+
   build_S=tic;
   if ( verbose >= 2)
     fprintf('INIT inverse S\n')
@@ -582,6 +607,7 @@ elseif sol==9
   inverse_cpu=inv_S.init_cpu;
 
   preprocess_S=toc(build_S);
+  prec_cpu=preprocess_S;
 
   preprocess_cpu=toc(prep);
   
@@ -592,6 +618,7 @@ elseif sol==9
   % apply inverse S
   linsys=tic;
   dp=inv_S.apply(fp);
+
   
   % get y=C^{-1}(B2*x-g)
   dr=inverseC(B2*dp-rhs(Np+1:Np+Nr));
@@ -603,6 +630,16 @@ elseif sol==9
     d(1:Np)      =diagA_scaling*d(1:Np);
     d(1+Np:Np+Nr)=diagC_scaling*d(1+Np:Np+Nr);
   end
+
+
+  if (controls.permute)
+    for i=1:Nt
+      range=[(i-1)*ncellphi+1:i*ncellphi];
+      d((i-1)*(ncellphi)+p) = d(range);
+    end
+  end
+
+  
   
   dp = d(1:Np); dr = d(Np+1:end);
   ds = JF.ss\(-F.s-JF.sr*dr);
@@ -660,7 +697,7 @@ elseif sol==10
   [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
  
   % grounding ,manipualtion etc
-  [A,B1T,rhs,B1T_perturbation]=preprocess_system(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
+  [A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
   size(  B1T_perturbation)
   
@@ -668,7 +705,9 @@ elseif sol==10
   if (controls.diagonal_scaling)
     [A,B1T,B2,C,rhs,diagA_scaling,diagC_scaling]=scaling_system(A,B1T,B2,C,rhs);
   end
+
   
+    
   cpu_manipulate=toc(time_manipulate);
   msg=sprintf('MANIPULATE LIN. SYS= %1.4e',cpu_manipulate);
   if (verbose>1)
@@ -749,7 +788,25 @@ elseif sol==10
 
   cpu_invC_builS=toc(time_invC_builS);
 
+  
+  
+  figure
+  spy(S)
 
+
+  ps = symrcm(S);
+
+  S=S(ps,ps);
+
+  figure
+  spy(S)
+
+  plot(ps)
+
+  
+  
+  
+  return
   
   msg=sprintf('invC + BUILD S=%1.4e',cpu_invC_builS);
   if ( verbose >= 2)
@@ -1054,7 +1111,7 @@ elseif sol==11
   [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
  
   % grounding ,manipualtion etc
-  [A,B1T,rhs]=preprocess_system(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
+  [A,B1T,B2,rhs]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
   % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
   if (controls.diagonal_scaling)
@@ -1067,6 +1124,7 @@ elseif sol==11
     fprintf('%s\n',msg);
     fprintf(controls.logID,'%s\n',msg);
   end
+
 
   time_prec=tic;
   % define approxiamte inverse of (~A)^{-1}  
@@ -1221,6 +1279,10 @@ elseif sol==11
   
   normd = norm(d);
 
+  if (1)    
+    test_vectors(d,vectors_x,vectors_y,alphas,N,Np,Nr);
+  end
+
   [ressys,resp,resr,ress]=compute_linear_system_residuum(JF,F,d);
 
 
@@ -1260,7 +1322,7 @@ elseif sol==12
   [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
  
   % grounding ,manipualtion etc
-  [A,B1T,rhs,B1T_perturbation]=preprocess_system(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
+  [A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
   % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
   if (controls.diagonal_scaling)
@@ -1284,7 +1346,7 @@ elseif sol==12
   % inverse A action
   build_inverseA=tic;
   approach_inverse_A=controls.approach_inverse_A;
-  if (strcmp(approach_inverse_A,"full"))
+  if (strcmp(approach_inverse_A,'full'))
     % we need a new seed for agmg, in case is used
     index_agmg=index_agmg+1;
     ctrl_loc=ctrl_solver;
@@ -1304,7 +1366,7 @@ elseif sol==12
 
     inverse11  = @(x) inverseA.apply(x);
     
-  elseif(strcmp(approach_inverse_A,"block"))
+  elseif(strcmp(approach_inverse_A,'block'))
 				% define array of sparse inverse
     diag_block_invA(Nt,1)=sparse_inverse;
 
@@ -1326,7 +1388,7 @@ elseif sol==12
       diag_block_invA(i).name=sprintf('inverse A%d',i);
       
       % get block add relaxation
-      matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)+(i==1)*relax4prec*speye(nAi,nAi);
+      matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)+relax4prec*speye(nAi,nAi);
       
 				% define inverse
       diag_block_invA(i).init( matrixAi,ctrl_loc);     
@@ -1420,41 +1482,169 @@ elseif sol==12
 
     deltat=1/(N+1);
 
-			       % define explicitely inverse of diag(A)
-    DiagA = spdiags(A,0);
-    invDiagA = 1.0./DiagA;
+	    % coarse A with PAPT ( maybe only diag(block A) is enough)
 
-    % (D1/D2, D2/D3       DN/(DN+1))
-    scale=DiagA(1:Np-ncellrho).*invDiagA(ncellrho+1:Np);
+   
+ 
+
+   
+    
+    
+
+
+    DiagA = spdiags(A,0);
+    invDiagA = sparse(1:Np,1:Np,(1.0./DiagA)',Np,Np);
+	
+				% define time laplacian
+
+
 
     
-    D = sparse(1:Nr,1:Nr,(1/deltat^2)*(scale+ones(Nr,1))',Nr,Nr);
-    E = sparse(ncellrho+1:Nr,1:Nr-ncellrho,-scale(ncellrho+1:Nr)',Nr,Nr);
-    L = E+D+E';
+    B1T_time=-JF.B1T_time;
+
+
+    B1T_space=-JF.B1T_space;
+    DtT=-JF.DtT;
+    if (~controls.indc==0)
+      irow=indeces_global(1);
+      B1T_time(irow,:)=sparse(1,Nr);
+      B1T_space(irow,:)=sparse(1,Nr);
+      DtT(irow,:)=sparse(1,Nr);
+    end
+
+    P=JF.It(1:Np,1:Nr);
+    coarseA=(P')*JOC.Mxt*A*JOC.Mxt*(P)/3.0;
+
+    
+    time_laplacian=(DtT')*DtT;
+    original=(B1T_time')*(A\B1T_time);
+    size(coarseA)
+    size(original)
+    my=coarseA\time_laplacian;
+
+    time_laplacian=(B1T_time')*(A\B1T_time);
+    %figure
+    %imagesc(original);
+
+    %figure
+    %imagesc(my);
+
+    
+    test=full(my-original);
+    norm(test)
+    eigenvalues=study_eigenvalues(test, '(commutator)',1);
+    
     figure
-    approx_SCA = C*A(ncellphi+1:Np,ncellphi+1:Np)+L;
+    plot(eigenvalues,'o')
+    return
+    
+    time_space=(B1T_space')*(A\(B1T_time ));
+    %space=(JF.B1T_space')*(A\JF.B1T_space);
+    space=(B1T_space')*(A\(B1T_space))+time_space+time_space';
+    
+    if (controls.diagonal_scaling)
+      time_laplacian=diagC_scaling*time_laplacian*diagC_scaling;
+      space=diagC_scaling*space*diagC_scaling;
+    end
+
+    SCA_left_right='left';
+    if (strcmp(SCA_left_right,'right'))
+      
+      approx_SCA = C*coarseA+time_laplacian+space*coarseA;
 
 			% we need a new seed for agmg, in case is used
-    index_agmg=index_agmg+1;
-    ctrl_loc=ctrl_solver;
+      index_agmg=index_agmg+1;
+      ctrl_loc=ctrl_solver;
 % passing index_agmg+1 we will use one copy of agmg, allowing preprocess
-    ctrl_loc.init(controls.ctrl_inner22.approach,...
-		  controls.ctrl_inner22.tolerance,...
-		  controls.ctrl_inner22.itermax,...
-		  controls.ctrl_inner22.omega,...
-		  controls.ctrl_inner22.verbose,...
-		  'timelaplacian',...
-		  index_agmg);
+      ctrl_loc.init(controls.ctrl_inner22.approach,...
+		    controls.ctrl_inner22.tolerance,...
+		    controls.ctrl_inner22.itermax,...
+		    controls.ctrl_inner22.omega,...
+		    controls.ctrl_inner22.verbose,...
+		    'timelaplacian',...
+		    index_agmg);
 
-    % assembly approximate inverse
-    inv_SCA=sparse_inverse;
-    inv_SCA.init(approx_SCA+controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
-    inv_SCA.info_inverse.label='schur_ca';
-    inv_SCA.cumulative_iter=0;
-    inv_SCA.cumulative_cpu=0;
+				% assembly approximate inverse
+      inv_SCA=sparse_inverse;
+      inv_SCA.init(approx_SCA+controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
+      inv_SCA.info_inverse.label='schur_ca';
+      inv_SCA.cumulative_iter=0;
+      inv_SCA.cumulative_cpu=0;
 
-    inverse_block22 = @(x) -A(ncellphi+1:Np,ncellphi+1:Np)*inv_SCA.apply(x);
+      inverse_block22 = @(x) -coarseA*inv_SCA.apply(x);
 
+    elseif (strcmp(SCA_left_right,'left'))
+      
+      approx_SCA = coarseA*C+time_laplacian+coarseA*space;
+
+			% we need a new seed for agmg, in case is used
+      index_agmg=index_agmg+1;
+      ctrl_loc=ctrl_solver;
+% passing index_agmg+1 we will use one copy of agmg, allowing preprocess
+      ctrl_loc.init(controls.ctrl_inner22.approach,...
+		    controls.ctrl_inner22.tolerance,...
+		    controls.ctrl_inner22.itermax,...
+		    controls.ctrl_inner22.omega,...
+		    controls.ctrl_inner22.verbose,...
+		    'timelaplacian',...
+		    index_agmg);
+
+				% assembly approximate inverse
+      inv_SCA=sparse_inverse;
+      inv_SCA.init(approx_SCA+controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
+      inv_SCA.info_inverse.label='schur_ca';
+      inv_SCA.cumulative_iter=0;
+      inv_SCA.cumulative_cpu=0;
+
+      inverse_block22 = @(x) -inv_SCA.apply(coarseA*x);
+    end
+     
+      
+    if (1)
+      %space=sparse((JF.B1T_space')*(A\JF.B1T_space));
+      dense_S=(C+B2*(A\B1T));
+
+      
+
+      %invDiagS = sparse(1:Nr,1:Nr,(1.0./sqrt(spdiags(dense_S,0)))',Nr,Nr);
+      %spacediag=sqrt(spdiags(space,0));
+      %Dspace = sparse(1:Nr,1:Nr,(spacediag)',Nr,Nr);
+      %invDspace = sparse(1:Nr,1:Nr,(1.0./spacediag)',Nr,Nr);
+      
+
+      %figure;
+      %colorbar;
+				%imagesc(invDiagS*dense_S*invDiagS);
+      %scaled=invDspace*space*invDspace;
+      
+      %droped=scaled;
+      %droped(abs(droped)<1e-2)=0.0;
+      %fprintf('nnz per row %f , %d - sparsity=%1.4e\n', nnz(droped)/Nr ,Nr/N, (nnz(droped)/(Nr^2))*100)
+      %imagesc(droped);
+      %res=Dspace*(droped-scaled)*Dspace;
+
+      %test=full(dense_S\(approx_SCA));
+		   % Create figure
+      test=prec_times_matrix(inverse_block22,-dense_S);
+      eigenvalues=study_eigenvalues(test, '(S)^{-1}droped',1);
+
+      figure
+      plot(eigenvalues,'o')
+      
+
+
+      saveas(gcf,strcat(controls.basename,controls.sys_name,'denseS.png'));
+
+      
+      %out=prec_times_matrix(inverse_block22,-dense_S);
+      
+      %eigenvalues=study_eigenvalues(out, '(Candidate)^{-1}S',1);
+      
+      %plot(eigenvalues,'o')
+      return
+    end
+
+	
   elseif(strcmp(approach_schurCA,'full'))
     out=prec_times_matrix(@(x) inverse11(x),B1T);
     tildeS=C+B2*out;
@@ -1500,7 +1690,7 @@ elseif sol==12
   cpu_assembly_inverseS=toc(build_inverseS);
 
 
-  prec_cpu=toc(time_prec)
+  prec_cpu=toc(time_prec);
 
   
   if (controls.compute_eigen)
@@ -1534,10 +1724,12 @@ elseif sol==12
 
     nullA=sparse(Np,Np);
     nullrhs=sparse(Np,1);
-    [nullA,B1T_time,nullrhs]=preprocess_system(nullA,B1T,nullrhs,indeces_global,vectors_x,vectors_y,alphas,controls);
-    [nullA,B1T_space,nullrhs]=preprocess_system(nullA,B1T,nullrhs,indeces_global,vectors_x,vectors_y,alphas,controls);
-    [nullA,B1T_perturbation,nullrhs]=preprocess_system(nullA,B1T,nullrhs,indeces_global,vectors_x,vectors_y,alphas,controls);
-
+    nullB2=sparse(Nr,Np);
+    if (~controls.indc==0)
+      irow=indeces_global(1);
+      B1T_time(irow,:)=sparse(1,Nr);
+      B1T_space(irow,:)=sparse(1,Nr);
+    end
     [mtt,mss,dense_S]=study_eigen_S(A,@(x) invA.apply(x),B2_time,B2_space,B1T_time,B1T_space,B1T_perturbation,C);%,JF.diagrho,LT,...
 %				    strcat(controls.basename,controls.sys_name));
 
@@ -1581,8 +1773,12 @@ elseif sol==12
   jacobian = [A B1T; B2 -C];
   outer_timing=tic;
 
-  
+  info_J=info_solver;
+
   [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec );
+  %d=jacobian\rhs;
+  %figure
+  %spy(jacobian)
   if (controls.diagonal_scaling)
     d(1:Np)      =diagA_scaling*d(1:Np);
     d(1+Np:Np+Nr)=diagC_scaling*d(1+Np:Np+Nr);  
@@ -1625,8 +1821,9 @@ elseif sol==12
     total_Ainversion=0;
     total_Ainner=0;
     inner_nequ_A=diag_block_invA(1).nequ;
+    
     for i=1:Nt
-      total_Ainner=diag_block_invA(i).cumulative_iter;
+      total_Ainner=total_Ainner+diag_block_invA(i).cumulative_iter;
       total_Ainversion=total_Ainversion+diag_block_invA(i).cumulative_application;
       diag_block_invA(i).kill();
     end
@@ -1643,8 +1840,10 @@ elseif sol==12
     inner_nequ_S=Nr;
     inner_nequ_S=0;
     total_Sinner=0;
+  elseif (strcmp(approach_schurCA,'timelaplacian'))
+    inner_nequ_S=Nr;
+    total_Sinner=inv_SCA.cumulative_iter;
   end
-
 
   
 
@@ -1656,7 +1855,11 @@ elseif sol==12
 	  approach_inverse_A,inner_nequ_A, total_Ainner,cpu_assembly_inverseA, ...
 	  inner_nequ_S, total_Sinner,cpu_assembly_inverseS);
 
+  inner_nequ=inner_nequ_A;
+  inner_iter=total_Ainner;
   
+  inner_nequ2=inner_nequ_S;
+  inner_iter2=total_Sinner;
   
 elseif sol==13
   verbose=controls.verbose;
@@ -1680,7 +1883,7 @@ elseif sol==13
   [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
  
   % grounding ,manipualtion etc
-  [A,B1T,rhs]=preprocess_system(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
+  [A,B1T,B2,rhs]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
   % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
   if (controls.diagonal_scaling)
@@ -1837,6 +2040,17 @@ elseif sol==13
 		     inv_Calpha.ctrl.label,inv_Calpha.cumulative_iter,...
 		     inner_nequ_S, inner_iter_S,cpu_assembly_inverseS);
 
+  inner_nequ=inner_nequ_A;
+  inner_iter=inner_iter_A;
+  
+  inner_nequ2=inner_nequ_S;
+  inner_iter2=inner_iter_S;
+
+  inner_nequ3=Nr;
+  inner_iter3=inv_Calpha.cumulative_iter;
+
+  
+  
   % free memory
   if ( strcmp(approach_inverse_A,'full'))
     invAalpha.kill();
@@ -1874,7 +2088,7 @@ elseif sol==14
   [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
  
   % grounding ,manipualtion etc
-  [A,B1T,rhs,B1T_perturbation]=preprocess_system(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
+  [A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
   % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
   if (controls.diagonal_scaling)
@@ -1888,34 +2102,46 @@ elseif sol==14
     fprintf(controls.logID,'%s\n',msg);
   end
 
-  % init diag(C)^{-1}
+  gamma=controls.gamma;
+				% init diag(C)^{-1}
+  
   W_approach=controls.W_approach;
   if ( strcmp(W_approach,'C') )
     diagW=spdiags(C,0);
     W=sparse(1:Nr,1:Nr,diagW,Nr,Nr);
     invW=sparse(1:Nr,1:Nr,(1.0./diagW)',Nr,Nr);
-  elseif ( strcmpt(W_approach,'cutC') )
+  elseif ( strcmp(W_approach,'cutC') )
     diagW=spdiags(C,0);
-    diagW(abs(diagW)<controls.lower_bound)=controls.lower_bound
-    diagW(abs(diagW)>controls.upper_bound)=controls.upper_bound
+    fprintf('(%9.4e <= w=diag(~C) <= %18.12e) \n',min(diagW),max(diagW))
+    diagW(abs(diagW)<controls.lower_bound)=controls.lower_bound;
+    diagW(abs(diagW)>controls.upper_bound)=controls.upper_bound;
     W=sparse(1:Nr,1:Nr,diagW,Nr,Nr);
     invW=sparse(1:Nr,1:Nr,(1.0./diagW)',Nr,Nr);
+  elseif ( strcmp(W_approach,'Mass') )
+    W=-JF.rs;
+    invW=sparse(1:Nr,1:Nr,(1.0./spdiags(W,0))',Nr,Nr);
+  elseif ( strcmp(W_approach,'MassgammaC') )
+    W=-JF.rs+gamma*sparse(1:Nr,1:Nr,spdiags(C,0),Nr,Nr);
+    invW=sparse(1:Nr,1:Nr,(1.0./spdiags(W,0))',Nr,Nr);
   end
     
 
   build_inv_augA=tic;
 				% augemented system
 
-  augA=A+B1T*invW*B2;
-  augB1T=B1T*(speye(Nr,Nr)-invW*C);
-  aug_f=rhs(1:Np)+B1T*invW*rhs(Np+1:Np+Nr);
-  augrhs=zeros(Np+Nr,1);
-  augrhs(1:Np)=aug_f;
-  augrhs(1+Np:Np+Nr)=g;
-
-				% init inverse of full S
   
+  
+  augA=A+gamma*B1T*invW*B2;
+  augB1T=B1T*(speye(Nr,Nr)-gamma*invW*C);
+  %norm(nonzeros(augB1T))
+  aug_f=rhs(1:Np)+gamma*B1T*invW*rhs(Np+1:Np+Nr);
+  augrhs=zeros(Np+Nr,1);
+  augrhs(1:Np)=aug_f; %f_gamma
+  augrhs(1+Np:Np+Nr)=rhs(Np+1:Np+Nr); %g
 
+  % init inverse of augA
+
+  tA=tic;
   ctrl_loc=ctrl_solver;
   index_agmg=0;
   index_agmg=index_agmg+1;
@@ -1932,37 +2158,90 @@ elseif sol==14
   inv_augA.cumulative_cpu=0;
   inv_augA.dimblock=ncellphi;
 				%inv_S.info();
-  inverse_cpu=inv_augA.init_cpu;
-  if ( verbose >= 2)
-    fprintf('DONE inverse S\n') 
-  end
-  inverse_block11 = @(x) inv_augA.apply(x);
+  
+  inverse11 = @(x) inv_augA.apply(x);
+
   inner_nequ=Np;
+  
+  cpu_augA=toc(tA);
 
-  preprocess_S=toc(build_inv_augA);
   
-  
+  tS=tic;
   % init diag(W)^{-1}
-  ctrl_loc=ctrl_solver;
-  index_agmg=1;
-  ctrl_loc.init(ctrl_inner22.approach,...
-		ctrl_inner22.tolerance,...
-		ctrl_inner22.itermax,...
-		ctrl_inner22.omega,...
-		ctrl_inner22.verbose,...
-		'W',index_agmg);
+  S_approach=controls.S_approach;
+  if ( strcmp(S_approach,'Mass') )
+    ctrl_loc=ctrl_solver;
+    index_agmg=index_agmg+1;
+    ctrl_loc.init(ctrl_inner22.approach,...
+		  ctrl_inner22.tolerance,...
+		  ctrl_inner22.itermax,...
+		  ctrl_inner22.omega,...
+		  ctrl_inner22.verbose,...
+		  'W',index_agmg);
+    
+    inv_S = sparse_inverse;
+    inv_S.init(W,ctrl_loc);
+   
+    inverse22 = @(x) -gamma*inv_S.apply(x);
 
-  inv_W = sparse_inverse;
-  inv_W.init(W,ctrl_loc);
-  inverse22 = @(x) inv_W.apply(x);
+  elseif ( strcmp(S_approach,'GammaMassC') )
+      ctrl_loc=ctrl_solver;
+      index_agmg=index_agmg+1;
+      ctrl_loc.init(ctrl_inner22.approach,...
+		    ctrl_inner22.tolerance,...
+		    ctrl_inner22.itermax,...
+		    ctrl_inner22.omega,...
+		    ctrl_inner22.verbose,...
+		    'gammaMassC',index_agmg);
+      
+      inv_S = sparse_inverse;
+      inv_S.init(1/gamma*W+C,ctrl_loc);
+      inverse22 = @(x) -inv_S.apply(x);
+  elseif ( strcmp(S_approach,'W') )
+      ctrl_loc=ctrl_solver;
+      index_agmg=index_agmg+1;
+      ctrl_loc.init(ctrl_inner22.approach,...
+		    ctrl_inner22.tolerance,...
+		    ctrl_inner22.itermax,...
+		    ctrl_inner22.omega,...
+		    ctrl_inner22.verbose,...
+		    'gammaMassC',index_agmg);
+      
+      inv_S = sparse_inverse;
+      inv_S.init(1/gamma*W,ctrl_loc);
+      inverse22 = @(x) -inv_S.apply(x);
+  elseif ( strcmp(S_approach,'C') )
+      ctrl_loc=ctrl_solver;
+      index_agmg=index_agmg+1;
+      ctrl_loc.init(ctrl_inner22.approach,...
+		    ctrl_inner22.tolerance,...
+		    ctrl_inner22.itermax,...
+		    ctrl_inner22.omega,...
+		    ctrl_inner22.verbose,...
+		    'invC',index_agmg);
+      
+      inv_S = sparse_inverse;
+      inv_S.init(C,ctrl_loc);
+      inverse22 = @(x) -inv_S.apply(x);
+
+  end
+  cpu_S=toc(tS);
+
+  prec_cpu=cpu_augA+ cpu_S;
+
   
   
   
   %
   % Define action of preconditoner
-  % 
-  prec = @(x) SchurAC_based_preconditioner(x, inverse_block11, inverse22 ,...
-					   B1T,B2,'upper_triang',ncellphi);
+  %
+  % assembly 2x2 prec
+  prec = @(x) SchurCA_based_preconditioner(x, inverse11,...
+					   inverse22,...
+					   @(y) augB1T*y,...
+					   @(z) B2*z,...
+					   Np,Nr,...
+					   controls.outer_prec,ncellphi);
 
 
 
@@ -1971,8 +2250,6 @@ elseif sol==14
   
   % solve with fgmres 
   outer_timing=tic;
-
-  
   augjacobian = [augA augB1T; B2 -C];
   if ( verbose >= 2)
     fprintf('START SOLVER \n')
@@ -1981,7 +2258,7 @@ elseif sol==14
   if ( verbose >= 2)
     fprintf('END SOLVER \n')
   end
-
+  info_J.print();
   outer_iter=uint64(info_J.iter);
   outer_cpu=toc(outer_timing);
 
@@ -2006,14 +2283,32 @@ elseif sol==14
 
   relres=ressys;
 
-  resume_msg=sprintf('outer: %d ressys=%1.1e [%1.2e,%1.2e,%1.2e] iter=%d cpu=%1.2e | nequ=%d - inner iter=%d | assembly=%1.2e invS=%1.2e',...
+  S_approach=controls.S_approach;
+  if ( strcmp(S_approach,'Mass') )
+    inner_nequ2=inv_S.nequ;
+    inner_iter2=inv_S.cumulative_iter;
+  elseif ( strcmp(S_approach,'GammaMassC') )
+    inner_nequ2=inv_S.nequ;
+    inner_iter2=inv_S.cumulative_iter;
+  elseif ( strcmp(S_approach,'C') )
+    inner_nequ2=inv_S.nequ;
+    inner_iter2=inv_S.cumulative_iter;
+
+  end
+
+  resume_msg=sprintf('outer: %d ressys=%1.1e [%1.2e,%1.2e,%1.2e] iter=%d cpu=%1.2e | Aug nequ=%d - iter=%d  built=%1.2e| S: nequ=%d - iter=%d  built=%1.2e',...
 		     info_J.flag,relres,resp,resr,ress,outer_iter,outer_cpu,...
-		     inner_nequ, inner_iter, ...
-		     preprocess_cpu,preprocess_S);
+		     inner_nequ, inner_iter,cpu_augA, ...
+		     inner_nequ2, inner_iter2,cpu_S);
+
+  
+  inner_nequ3=0;
+  inner_iter3=0;
 
 
   % free memory (mandatory for agmg)
   inv_augA.kill();
+  inv_S.kill();
 
 elseif (sol==15)
 			  % solve full system using recursive function
@@ -2049,7 +2344,7 @@ elseif (sol==16)
   [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
   
 				% grounding ,manipualtion etc
-  [A,B1T,rhs,B1T_perturbation]=preprocess_system(A,B1T,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
+  [A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
 % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
   if (controls.diagonal_scaling)
@@ -2272,7 +2567,11 @@ sol_stat = struct('flag',flag,...
 		  'inner_iter', inner_iter,...
 		  'outer_iter', outer_iter,...
 		  'outer_cpu',  outer_cpu,...
-		  'prec_cpu',prec_cpu);
+		  'prec_cpu',prec_cpu,...
+		  'inner_nequ2', inner_nequ2,...
+		  'inner_iter2', inner_iter2,...
+		  'inner_nequ3', inner_nequ3,...
+		  'inner_iter3', inner_iter3);
 
 %print_info_solver(sol_stat)
 %return
