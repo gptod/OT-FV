@@ -699,7 +699,6 @@ elseif sol==10
   % grounding ,manipualtion etc
   [A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
-  size(  B1T_perturbation)
   
   % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
   if (controls.diagonal_scaling)
@@ -790,23 +789,23 @@ elseif sol==10
 
   
   
-  figure
-  spy(S)
+  %figure
+  %spy(S)
 
 
-  ps = symrcm(S);
+  %ps = symrcm(S);
 
-  S=S(ps,ps);
+  %S=S(ps,ps);
 
-  figure
-  spy(S)
+  %figure
+  %spy(S)
 
-  plot(ps)
+  %plot(ps)
 
   
   
   
-  return
+  %return
   
   msg=sprintf('invC + BUILD S=%1.4e',cpu_invC_builS);
   if ( verbose >= 2)
@@ -1068,7 +1067,6 @@ elseif sol==10
   ds = JF.ss\(-F.s-JF.sr*dr);
   d = [dp; dr; ds];
 
-  norm(jacobian(1:Np,:)*d(1:Np+Nr)-rhs(1:Np))/norm(rhs(1:Np))
 
   
   normd = norm(d);
@@ -1382,7 +1380,7 @@ elseif sol==12
 		    controls.ctrl_inner11.tolerance,...
 		    controls.ctrl_inner11.itermax,...
 		    controls.ctrl_inner11.omega,...
-		    controls.ctrl_inner11.verbose*(i==1),...
+		    controls.ctrl_inner11.verbose,...
 		    sprintf('%s A%d',ctrl_inner11.label,i),...
 		    index_agmg);
       diag_block_invA(i).name=sprintf('inverse A%d',i);
@@ -1775,6 +1773,20 @@ elseif sol==12
 
   info_J=info_solver;
 
+  if (1)
+    %out=prec_times_matrix(prec,jacobian);
+    
+    %eigenvalues=study_eigenvalues(out, '(prec)^{-1}J',1);
+    eig6=eigs(@(x) jacobian*x,Nr+Np,40)
+    
+    %figure
+    %plot(eigenvalues,'o')
+
+    return
+  end
+
+
+  
   [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec );
   %d=jacobian\rhs;
   %figure
@@ -1804,7 +1816,7 @@ elseif sol==12
   
   normd = norm(d);
 
-  if (0)    
+  if (1)    
     test_vectors(d,vectors_x,vectors_y,alphas,N,Np,Nr);
   end
 
@@ -2223,6 +2235,37 @@ elseif sol==14
       inv_S = sparse_inverse;
       inv_S.init(C,ctrl_loc);
       inverse22 = @(x) -inv_S.apply(x);
+  elseif( strcmp(S_approach,'Adiag'))
+    % define explicitely inverse of diag(A)
+    invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(augA,0))',Np,Np);
+
+    % assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
+    approx_SCA = (C+B2*invDiagA*augB1T);
+
+    % assembly approximate inverse
+    inv_S=sparse_inverse;
+
+
+    % we need a new seed for agmg, in case is used
+    index_agmg=index_agmg+1;
+    ctrl_loc=ctrl_solver;
+    % passing index_agmg+1 we will use one copy of agmg, allowing preprocess 
+    ctrl_loc.init(ctrl_inner22.approach,...
+		  ctrl_inner22.tolerance,...
+		  ctrl_inner22.itermax,...
+		  ctrl_inner22.omega,...
+		  ctrl_inner22.verbose,...
+		  'C+B1diag(A)^{-1}B2',...
+		  index_agmg);
+    
+    inv_S.init(approx_SCA+controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
+    inv_S.info_inverse.label='schur_ca';
+    inv_S.cumulative_iter=0;
+    inv_S.cumulative_cpu=0;
+    
+    inverse_cpu=inv_S.init_cpu;
+    inverse22 = @(x) -inv_S.apply(x);
+
 
   end
   cpu_S=toc(tS);
@@ -2258,7 +2301,7 @@ elseif sol==14
   if ( verbose >= 2)
     fprintf('END SOLVER \n')
   end
-  info_J.print();
+  %info_J.print();
   outer_iter=uint64(info_J.iter);
   outer_cpu=toc(outer_timing);
 

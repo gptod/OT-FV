@@ -48,7 +48,10 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
   rho=-spdiags(JOC.ss,0);
   slack =-spdiags(JOC.sr,0);
   sizecell=-spdiags(JOC.rs(1:ncellrho,1:ncellrho),0);
+  %fprintf('(%d %d %9.4e <= sizecell<= %18.12e) \n',size(sizecell,1),ncellphi,min(sizecell),max(sizecell))
 
+
+  
   B2T=JOC.rp';
   B2=B2T';
   
@@ -203,7 +206,7 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
       
 			    % <p^i, M^{-1}(diag(rho) g - M h)>-beta(i)
       alphas(i)=vector_q'*inv_M_g_tilde-betas(i);
-    end
+    end      
 
 
     invM.kill();
@@ -218,7 +221,15 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
     C = -C;
 
     CT=C';
-    
+
+    if (0)
+      
+      B2T=B2T*JOC.ss;
+      C=sparse(JOC.ss*JOC.rr - JOC.rs*JOC.sr);
+      C=-C;
+      CT = C';
+      gtilde = JOC.ss*g-JOC.rs*h;
+    end
 				% allocations
     alphas=zeros(N,1);
     vectors=zeros(ncellphi,2*N);
@@ -231,20 +242,32 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 
 				% compute imbalances given by rhs
    
-    vi=ones(m,1);
     for i=1:N
+      vi=ones(m,1)/1e8;
+      vi=(sizecell)/deltat*m;
+      %vi=randn(m,1);
+      %vi=CT(1+(i-1)*m:i*m,1+(i-1)*m:i*m)\(sizecell/deltat)/m;
+      
 				% B2T(i,i)*vi
       vectors(:,1+(i-1)*2)=B2T(1+(i-1)*n:i*n,1+(i-1)*m:i*m)*vi;
       
       
 				% B2T(i+1,i)*vi
       vectors(:,2+(i-1)*2)=B2T(1+i*n:(i+1)*n,1+(i-1)*m:i*m)*vi;
-      
+      if (0)
+	adiag=abs(nonzeros(JOC.pp(1+(i-1)*n,1+(i-1)*n)));
+      fprintf('%03d | A(i,i)=%1.2e  | %1.1e<=p1<=%1.1e sum %1.2e norm %1.2e | %1.1e<=p2<=%1.1e sum %1.2e norm %1.2e \n',...
+	      i,adiag,min(vectors(:,1+(i-1)*2)),max(vectors(:,1+(i-1)*2)),...
+	      sum(vectors(:,1+(i-1)*2)),norm(vectors(:,1+(i-1)*2)),...
+	      min((vectors(:,2+(i-1)*2))),max(vectors(:,2+(i-1)*2)),...
+	      sum(vectors(:,2+(i-1)*2)),norm(vectors(:,2+(i-1)*2)));
+      end
 				% q=-C(:,i)*wi
       vectors_y(:,i) = -CT(:,1+(i-1)*m:i*m)*vi;
       
       alphas(i)=vi'*(gtilde(1+(i-1)*m:i*m));
     end
+
 
   elseif(approach==4)
 				% get B2 x -C y = ~g
@@ -267,17 +290,16 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
     check_supports=0;
 				% compute imbalances given by rhs
 
+    if (check_supports>1)
+      fprintf('+ or - sizecell/deltat\n')
+    end
     kernels=zeros(Np,1);
     for i=1:Nt
-      imbalances(i)=sum(f(1+(i-1)*n:i*n));
-      if (check_supports)
-	fprintf('%d imb=%1.4e \n',i,imbalances(i))
-      end
       kernels(:)=0;
       kernels(1+(i-1)*n:i*n)=1.0;
+
+      imbalances(i)=kernels'*f;
       if (check_supports>1)
-	%fprintf('%d norm(A*kernel)= %1.4e \n',i,norm(JOC.pp*kernels))
-      
 	support=blanks(N);
 	B_times_kernel=B2*kernels;
 	support(:)='_';
@@ -289,7 +311,8 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 	    support(j)='-';
 	  end
 	end
-	fprintf('B*kernels %03d %s \n',i,support);
+	fprintf('%03d imb=%1.4e | B*kernels %s | norm(A*kernel)= %1.4e \n',...
+		i,norm(JOC.pp*kernels),support,norm(JOC.pp*kernels));
       end
       
     end
@@ -309,8 +332,115 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 		  [],...
 		  index_agmg);
     invCT.init(CT,ctrl_loc);
+
+    if (check_supports)
+      fprintf('+ positive, - negative, ? both \n')
+    end 
+    vector=zeros(Nr,1);
+    for i=1:N
+      vector(:)=0;
+      vector(1+(i-1)*m:i*m)=sizecell/deltat;
+      wi=CT\vector;
+      if (0)
+	invCT.info_inverse.print();
+      end
+      B2T_times_wi=B2T*wi;
+
+      if (check_supports)
+	support=blanks(N+1);
+	support(:)='_';
+	for j=1:N+1
+	  if (norm(B2T_times_wi(1+(j-1)*n:j*n))>1e-15)
+	    if ( min(B2T_times_wi(1+(j-1)*n:j*n))>0.0)
+	      support(j)='+';
+	    elseif ( max(B2T_times_wi(1+(j-1)*n:j*n))<0.0)
+	      support(j)='-';
+	    else
+	      support(j)='?';
+	    end
+	  end
+	end
+	%fprintf('%03d %s \n',i,support);
+      end
+
+      
+				% B2T(i,i)*vi
+      vectors(:,1+(i-1)*2)=B2T_times_wi(1+(i-1)*n:i*n);
+      %vectors(:,1+(i-1)*2)=B2T(1+(i-1)*n:i*n,1+(i-1)*m:i*m)*wi(1+(i-1)*m:i*m);
+      
+				% B2T(i+1,i)*vi
+      vectors(:,2+(i-1)*2)=B2T_times_wi(1+i*n:(i+1)*n);
+      %vectors(:,2+(i-1)*2)=B2T(1+i*n:(i+1)*n,1+(i-1)*m:i*m)*wi(1+(i-1)*m:i*m);
+
+      if (check_supports)
+      fprintf('%03d %s | p1 sum %1.2e norm %1.2e |  p2 sum %1.2e norm %1.2e \n',...
+	      i,support,sum(vectors(:,1+(i-1)*2)),norm(vectors(:,1+(i-1)*2)),...
+	      sum(vectors(:,2+(i-1)*2)),norm(vectors(:,2+(i-1)*2)));
+      end
+				% q=-C(:,i)*wi
+      vectors_y(:,i) = -CT*wi;
+      if (check_supports)
+	support=blanks(N);
+	support(:)='_';
+	for j=1:N
+	  if (norm(vectors_y(1+(j-1)*m:j*m,i))>1e-15)
+	    support(j)='o';
+	  end
+	end
+	fprintf('%03d %s , norm(CT*wi+area)%1.2e \n',i,support,norm(vectors_y(:,i)+vector));
+      end
+      
+      
+      %vectors_y(:,i)=0;
+
+      alphas(i)=wi'*(gtilde);%+betas(i);
+    end
+
+    invCT.kill();
+
+ elseif(approach==5)
+				% get B2 x -C y = ~g
+
+   B2=JOC.ss*B2;
+   B2T=B2';
+   %C = sparse(JOC.rr - JOC.rs*(JOC.ss\JOC.sr));
+   C =sparse(JOC.ss*JOC.rr-JOC.rs*JOC.sr);
+   gtilde=JOC.ss*gtilde;
+
+% swap C sign for having standard saddle point notation 
+   C = -C;
+   
+   CT=C';
     
-    
+				% allocations
+   alphas=zeros(N,1);
+   vectors=zeros(ncellphi,2*N);
+   
+   vectors_y=zeros(Nr,N);
+   
+   deltat=1/(N+1);
+   
+   check_supports=0;
+				% compute imbalances given by rhs
+   
+   
+    invCT=sparse_inverse;
+
+    ctrl_loc=ctrl_solver;
+    index_agmg=1;
+			      % passing index_agmg we will use agmg-i 
+    ctrl_loc.init('direct',...
+		  1e-12,...
+		  100,...
+		  0,...
+		  0,...
+		  [],...
+		  index_agmg);
+    invCT.init(CT,ctrl_loc);
+
+    if (check_supports)
+      fprintf('+ positive, - negative, ? both \n')
+    end 
     vector=zeros(Nr,1);
     for i=1:N
       vector(:)=0;
@@ -335,20 +465,23 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 	    end
 	  end
 	end
-	fprintf('%03d %s \n',i,support);
+	%fprintf('%03d %s \n',i,support);
       end
       
 				% B2T(i,i)*vi
       vectors(:,1+(i-1)*2)=B2T_times_wi(1+(i-1)*n:i*n);
-      %fprintf('%03d sum %1.2e norm %1.2e \n',i,sum(vectors(:,1+(i-1)*2)),norm(vectors(:,1+(i-1)*2)));
+      
       
 				% B2T(i+1,i)*vi
       vectors(:,2+(i-1)*2)=B2T_times_wi(1+i*n:(i+1)*n);
-      %fprintf('%03d sum %1.2e norm %1.2e\n',i,sum(vectors(:,2+(i-1)*2)),norm(vectors(:,2+(i-1)*2)));
-      
+      if (check_supports)
+	fprintf('%03d %s | p1 sum %1.2e norm %1.2e |  p2 sum %1.2e norm %1.2e \n',...
+		i,support,sum(vectors(:,1+(i-1)*2)),norm(vectors(:,1+(i-1)*2)),...
+		sum(vectors(:,2+(i-1)*2)),norm(vectors(:,2+(i-1)*2)));
+      end
 				% q=-C(:,i)*wi
       vectors_y(:,i) = -CT*wi;
-      if (0)
+      if (check_supports)
 	support=blanks(N);
 	support(:)='_';
 	for j=1:N
@@ -356,17 +489,17 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 	    support(j)='o';
 	  end
 	end
-	fprintf('%03d %s \n',i,support);
-	fprintf('%03d norm(CT*wi+area)%1.2e \n',i,norm(vectors_y(:,i)+vector));
+	fprintf('%03d %s , norm(CT*wi+area)%1.2e \n',i,support,norm(vectors_y(:,i)+vector));
       end
       
       
-      vectors_y(:,i)=0;
+      %vectors_y(:,i)=0;
 
-      alphas(i)=wi'*(gtilde)+betas(i);
+      alphas(i)=wi'*(gtilde);%+betas(i);
     end
 
     invCT.kill();
+ 
     
   end
 

@@ -64,7 +64,7 @@ for mesh_type = 2
   for h_i = 2
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=3
+    for i=4
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -99,7 +99,7 @@ for mesh_type = 2
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[12];
+      for sol=[10];
 
 	folder_run=sprintf('runs/sol%d',sol)
 	mkdir folder_run
@@ -236,7 +236,7 @@ for mesh_type = 2
 	  % block_diag   :~S=block diagonal of S
 	  invS_approach={'full','block_triang', 'block_diag'};
 
-	  for kkk=[1]
+	  for kkk=[0]
 	    for jj=[0]
 	      for iii=[0]
 	  grounded_node=kkk;
@@ -257,7 +257,7 @@ for mesh_type = 2
 	    label  ={'direct','agmg1e-1','agmg10','agmg1','incomplete','krylov10','krylov10'};
 
    	    % set here from solvers
-	    for i=[3];%length(solvers)
+	    for i=[2];%length(solvers)
 	      ctrl_inner11.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
 
 	      ctrl_inner22.init('diag',... %approach
@@ -400,7 +400,7 @@ for mesh_type = 2
 	  end
 	elseif (sol==12)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('fgmres',1e-5,1000,0.0,0);
+	  ctrl_outer.init('fgmres',1e-5,1000,0.0,2);
 
 	 
 
@@ -415,7 +415,7 @@ for mesh_type = 2
 	  % geounded=float add grounded *identity to block A11
 	  for ii=[1]
 	    for jj=[0]
-	      for kk=[0]
+	      for kk=[1]
 	  grounded_node=ii;	
 	  diagonal_scaling=jj;
 	  manipulate=kk;
@@ -426,7 +426,7 @@ for mesh_type = 2
 	  left_right='right';
 
 	  % we may add an identity matrix to the blocks
-	  relax4_inv11=0;%1e-8;
+	  relax4_inv11=1e-8;
 	  relax4_inv22=0;
 
 	  % 
@@ -438,18 +438,18 @@ for mesh_type = 2
 	    outer_prec=outer_precs{j};
 
 	    
-	    approach_inverse_A='full';
-	    %approach_inverse_A ='block';
+	    %approach_inverse_A='full';
+	    approach_inverse_A ='block';
 
 	    
 	    solvers11={'diag','agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-	    iters11  ={1      ,1      ,200       ,1       ,1        ,100        ,  1         };
+	    iters11  ={1      ,1      ,400       ,1       ,1        ,100        ,  1         };
 	    label11  ={'diagA','agmgA1','agmg1e-1' ,'directA','krylovA1','krylovA100','incompleteA'};
-	    for m=[1]
+	    for m=[3]
 	      
 
 	      % set here other approximate inverse of block11
-	      ctrl_inner11.init(solvers11{m},1e-1,iters11{m},1.0,0,label11{m});
+	      ctrl_inner11.init(solvers11{m},1e-5,iters11{m},1.0,0,label11{m});
 
 	      approaches_schurCA={'diagA','iterative','full','iterative+SwithdiagA','timelaplacian'};
 	      for k=[1]%:length(approaches_schurCA)
@@ -458,7 +458,7 @@ for mesh_type = 2
 
 		if (strcmp(approach_schurCA,'diagA'))
 		  solvers22={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
-		  iters22  ={100      ,1       ,1       ,1        ,100        ,  1         };
+		  iters22  ={1000      ,1       ,1       ,1        ,100        ,  1         };
 		  label22  ={'agmg1e-1','agmg1' ,'direct','krylov1','krylov100','incomplete'};
 		elseif (strcmp(approach_schurCA,'full'))
 		  solvers22={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
@@ -474,7 +474,7 @@ for mesh_type = 2
 		  label22  ={'gmres10','bicgstab100' ,'fgmres100','pcg100'};
 		  
 		  
-		  ctrl_inner22inner.init('agmg',1e-2,100,1.0,0,'SCAwithdiagA');
+		  ctrl_inner22inner.init('agmg',1e-1,100,1.0,0,'SCAwithdiagA');
 		elseif (strcmp(approach_schurCA,'timelaplacian'))
 		  solvers22={'agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
 		  iters22  ={100      ,1       ,1       ,1        ,100        ,  1         };
@@ -484,7 +484,7 @@ for mesh_type = 2
 		
 				% set here from solvers
 		for i=[1];%1:length(solvers)
-		  ctrl_inner22.init(solvers22{i},1e-1,iters22{i},1.0,0,strcat(label22{i},'_S'));
+		  ctrl_inner22.init(solvers22{i},1e-4,iters22{i},1.0,0,strcat(label22{i},'_S'));
 		  extra_info='block';
 		  controls = struct('save_data',save_data,...
 				    'indc',grounded_node,...
@@ -649,20 +649,20 @@ for mesh_type = 2
 	  % full:        :~S=S
 	  % block_triang :~S=upper block triangular of S
 	  % block_diag   :~S=block diagonal of S
-	  invS_approach={'upper_triang'};
+	  invS_approach={'full'};
 
 	  diagonal_scaling=0;
-	  grounded_node=0;
+	  grounded_node=1;
 	  manipulation_approach=3;
 	  manipulate=0;
 
 	  % W matrix approach
 	  W_approach='Mass';
 	  %W_approach='MassgammaC';
-          W_approach='cutC';
-	  %W_approach='C';
+          %W_approach='cutC';
+	  W_approach='C';
 
-	  gamma=0.1;
+	  gamma=1;
 	  lower_bound=1e-9;
 	  upper_bound=1e6;
 
@@ -671,11 +671,12 @@ for mesh_type = 2
 	  S_approach='GammaMassC';
 	  %S_approach='Mass';
 	  S_approach='W';
+	  S_approach='Adiag'; % form C+B2 diag(augA)^{-1} augB1T and approximate
 
 	  relax4inv22=0;
 	  ctrl_inner22.init('agmg',... %approach
 			    1e-1,... %tolerance
-			    1,...% itermax
+			    100,...% itermax
 			    0.0,... %omega
 			    0); %verbose
 	  
@@ -686,7 +687,7 @@ for mesh_type = 2
 
 	    % set solver for block 11 (schurAC)
 	    solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov'  };
-	    iters  ={1       ,100      ,10      ,1      ,1           ,100       ,1         };
+	    iters  ={1       ,200      ,10      ,1      ,1           ,100       ,1         };
 	    label  ={'direct','agmg1e-1','agmg10','agmg1','incomplete','krylov10','krylov10'};
 
 
