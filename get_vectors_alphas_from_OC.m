@@ -387,13 +387,13 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 	    support(j)='o';
 	  end
 	end
-	fprintf('%03d %s , norm(CT*wi+area)%1.2e \n',i,support,norm(vectors_y(:,i)+vector));
+	fprintf('%03d %s , norm(CT*wi+area/deltat)%1.2e \n',i,support,norm(vectors_y(:,i)+vector));
       end
       
       
       %vectors_y(:,i)=0;
 
-      alphas(i)=wi'*(gtilde);%+betas(i);
+      alphas(i)=wi'*(gtilde)+betas(i);
     end
 
     invCT.kill();
