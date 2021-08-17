@@ -218,7 +218,7 @@ for mesh_type = 5
 	  end
 	elseif (sol==10)
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('fgmres',1e-5,200,0.0,0);
+	  ctrl_outer.init('fgmres',1e-5,400,0.0,0);
 
 	  % preconditioner approach
 	  outer_prec='full'
@@ -253,7 +253,7 @@ for mesh_type = 5
 
 	    % set solver for block 11 (schurAC)
 	    solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov'  };
-	    iters  ={1       ,100     ,10      ,1      ,1           ,100       ,1         };
+	    iters  ={1       ,200     ,10      ,1      ,1           ,100       ,1         };
 	    label  ={'direct','agmg1e-1','agmg10','agmg1','incomplete','krylov10','krylov10'};
 
    	    % set here from solvers
