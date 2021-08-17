@@ -6,8 +6,17 @@ if mesh_type == 1
     mesh_name = strcat('meshes/tri2_mesh',num2str(h_i));
 elseif mesh_type == 2
     mesh_name = strcat('meshes/subtri2_mesh',num2str(h_i));
+elseif mesh_type == 3
+  mesh_name = strcat('meshes/sq_mesh',num2str(h_i));
+elseif mesh_type == 4
+      mesh_name = strcat('meshes/tri2ord_mesh',num2str(h_i));
+elseif mesh_type == 5
+  mesh_name = strcat('meshes/subtri2ord_mesh',num2str(h_i));
+elseif mesh_type == 6
+  mesh_name = strcat('meshes/sqord_mesh',num2str(h_i));
 else
-    mesh_name = strcat('meshes/sq_mesh',num2str(h_i));
+  disp('Mesh not supprted')
+  return
 end
 
 cpu_total=0.0;
