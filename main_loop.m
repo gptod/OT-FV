@@ -56,15 +56,15 @@ verbose=0;
 % 3 -> cartesian grids
 
 % set here 1 to 2
-for mesh_type = 2
+for mesh_type = 5
   % INCRESINg DISCRETIZATION SPACE
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 2
+  for h_i = 1:4
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=4
+    for i=1:6
       N=4*(2^(i-1))
       Nt = N+1;
 
