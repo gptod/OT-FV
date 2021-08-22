@@ -64,7 +64,7 @@ for mesh_type = 5
   for h_i = 1:4
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=1:6
+    for i=2:5
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -99,7 +99,7 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[10];
+      for sol=[11,13];
 
 	folder_run=sprintf('runs/sol%d',sol)
 	mkdir folder_run
@@ -310,11 +310,13 @@ for mesh_type = 5
 	elseif (sol==11)
 	  % krylov based solvers for M [x;y] = [f;g]
 	  % pcg works only with full
+	  
 	  outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
 
 	  % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 	  for isolver=[3]%1:length(outer_solvers)
-	  ctrl_outer.init(outer_solvers{isolver},1e-10,3000,0.0,0); % verbose=[1,2] works only for fgmres
+	    ctrl_outer=ctrl_solver;
+	    ctrl_outer.init(outer_solvers{isolver},1e-5,4000,0.0,0); % verbose=[1,2] works only for fgmres
 	  
 	  
 	  % external prec appraoch
@@ -350,7 +352,7 @@ for mesh_type = 5
 	  % set grounded_node>0 to gorund the potential in grounded node
 	  grounded_node=0;
 	  diagonal_scaling=0;
-	  manipulate=1;
+	  manipulate=0;
 	  manipulation_approach=4;
 
 	  
@@ -393,7 +395,8 @@ for mesh_type = 5
 				   'invSCA',ctrl_inner22.label);
 				   %...'_fullprecSCA_invA',label{i},'_invSCA',ctrl_inner22.label);
 
-	    %approach_string=def_approach_string(controls);
+		       %approach_string=def_approach_string(controls);
+	    
 	    geod;
 	  end
 	  end
@@ -413,11 +416,11 @@ for mesh_type = 5
 	  % grounded=0 no grounding
 	  % grounded>0 solution is grounded on one node
 	  % geounded=float add grounded *identity to block A11
-	  for ii=[1]
+	  for ii=[0]
 	    for jj=[0]
 	      for kk=[1]
 	  grounded_node=ii;	
-	  diagonal_scaling=jj;
+	  diagonal_scaling=1;
 	  manipulate=kk;
 	  manipulation_approach=3;
 
@@ -434,22 +437,22 @@ for mesh_type = 5
 
 	  % we can use three approach 
 	  outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
-	  for j=[1]
+	  for j=[3]
 	    outer_prec=outer_precs{j};
 
 	    
-	    %approach_inverse_A='full';
+	    approach_inverse_A='full';
 	    approach_inverse_A ='block';
 
 	    
 	    solvers11={'diag','agmg'  ,'agmg'  ,'direct','krylov' ,'krylov'  ,'incomplete'};
 	    iters11  ={1      ,1      ,400       ,1       ,1        ,100        ,  1         };
 	    label11  ={'diagA','agmgA1','agmg1e-1' ,'directA','krylovA1','krylovA100','incompleteA'};
-	    for m=[3]
+	    for m=[4]
 	      
 
 	      % set here other approximate inverse of block11
-	      ctrl_inner11.init(solvers11{m},1e-5,iters11{m},1.0,0,label11{m});
+	      ctrl_inner11.init(solvers11{m},1e-3,iters11{m},1.0,0,label11{m});
 
 	      approaches_schurCA={'diagA','iterative','full','iterative+SwithdiagA','timelaplacian'};
 	      for k=[1]%:length(approaches_schurCA)
@@ -483,8 +486,8 @@ for mesh_type = 5
 
 		
 				% set here from solvers
-		for i=[1];%1:length(solvers)
-		  ctrl_inner22.init(solvers22{i},1e-4,iters22{i},1.0,0,strcat(label22{i},'_S'));
+		for i=[3];%1:length(solvers)
+		  ctrl_inner22.init(solvers22{i},5e-1,iters22{i},1.0,0,strcat(label22{i},'_S'));
 		  extra_info='block';
 		  controls = struct('save_data',save_data,...
 				    'indc',grounded_node,...
@@ -538,8 +541,10 @@ for mesh_type = 5
 	    
 	  end
 	elseif (sol==13)
+
+	  ctrl_outer=ctrl_solver;
 	  % set here bicgstab,gmres,fgmres (for non stationary prec)
-	  ctrl_outer.init('fgmres',1e-5,1000);
+	  ctrl_outer.init('fgmres',1e-5,3000);
 
           % left or right prec.
 	  left_right='right'
@@ -547,7 +552,7 @@ for mesh_type = 5
           % handle singularity
 	  % change A,B1T,f to remove part of its kernel
 	  manipulate=0;
-	  manipulation_approach=1;
+	  manipulation_approach=3;
 	  % we need to ground the solution since A_11 is singular
 	  % grounded<0 C^T x1 =0
 	  % grounded=0 no grounding
@@ -587,7 +592,7 @@ for mesh_type = 5
 	  labelS  ={'agmg1','agmg1e-1' ,'direct','krylov1','krylov100','incomplete','diag'};
 
 	  ctrl_innerC=ctrl_solver;
-	  ctrl_innerC.init('diag',1e-1,100,1.0,0,'diag');
+	  %ctrl_innerC.init('diag',1e-1,100,1.0,0,'diag');
 	  ctrl_innerC.init('agmg',1e-1,100,1.0,0,'agmg1e-1');
 	  
           % IMPORTANT: If we want to use 2 agmg solvers we have to set preprocess=0
@@ -652,17 +657,19 @@ for mesh_type = 5
 	  invS_approach={'full'};
 
 	  diagonal_scaling=0;
-	  grounded_node=1;
+	  grounded_node=0;
 	  manipulation_approach=3;
 	  manipulate=0;
 
 	  % W matrix approach
 	  W_approach='Mass';
+	  W_approach='Ones';
 	  %W_approach='MassgammaC';
           %W_approach='cutC';
-	  W_approach='C';
+	  
+	  %W_approach='C';
 
-	  gamma=1;
+	  gamma=0.01;
 	  lower_bound=1e-9;
 	  upper_bound=1e6;
 
@@ -670,8 +677,8 @@ for mesh_type = 5
 	  S_approach='C';
 	  S_approach='GammaMassC';
 	  %S_approach='Mass';
-	  S_approach='W';
-	  S_approach='Adiag'; % form C+B2 diag(augA)^{-1} augB1T and approximate
+	  %S_approach='W';
+	  %S_approach='Adiag'; % form C+B2 diag(augA)^{-1} augB1T and approximate
 
 	  relax4inv22=0;
 	  ctrl_inner22.init('agmg',... %approach

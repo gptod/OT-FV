@@ -3,8 +3,7 @@ function [d, sol_stat, normd,resume_msg] = solvesys(JF,F,controls)
 % solve the linear system d = -JF\F, reducing the system by eliminating the
 % additional variable s and imposing the condition d(indc) = 0 to fix the 
 % constant of the potential dp
-
-
+  
 sol=controls.sol;
 indc=controls.indc;
 
@@ -1277,7 +1276,7 @@ elseif sol==11
   
   normd = norm(d);
 
-  if (1)    
+  if (0)    
     test_vectors(d,vectors_x,vectors_y,alphas,N,Np,Nr);
   end
 
@@ -1596,7 +1595,7 @@ elseif sol==12
 
       inverse_block22 = @(x) -inv_SCA.apply(coarseA*x);
     end
-     
+    
       
     if (1)
       %space=sparse((JF.B1T_space')*(A\JF.B1T_space));
@@ -1629,10 +1628,10 @@ elseif sol==12
       figure
       plot(eigenvalues,'o')
       
-
-
-      saveas(gcf,strcat(controls.basename,controls.sys_name,'denseS.png'));
-
+      disp('here')
+      
+      %saveas(gcf,strcat(controls.basename,controls.sys_name,'denseS.png'));
+      saveas(gcf,'denseS.png');
       
       %out=prec_times_matrix(inverse_block22,-dense_S);
       
@@ -1774,13 +1773,13 @@ elseif sol==12
   info_J=info_solver;
 
   if (1)
-    %out=prec_times_matrix(prec,jacobian);
+    out=prec_times_matrix(prec,jacobian);
     
-    %eigenvalues=study_eigenvalues(out, '(prec)^{-1}J',1);
-    eig6=eigs(@(x) jacobian*x,Nr+Np,40)
+    eigenvalues=study_eigenvalues(out, '(prec)^{-1}J',1);
+    %eig6=eigs(@(x) jacobian*x,Nr+Np,40)
     
-    %figure
-    %plot(eigenvalues,'o')
+    figure
+    plot(eigenvalues,'o')
 
     return
   end
@@ -2006,7 +2005,7 @@ elseif sol==13
   prec_cpu=toc(time_prec);
 
   % solve 
-  outer_timing=tic;
+  outer_timing=tic; 
   [d,info_J]=apply_iterative_solver(@(x) matrixM*x, rhs, controls.ctrl_outer, prec,[],controls.left_right );
   if (controls.diagonal_scaling)
     d(1:Np)      =diagA_scaling*d(1:Np);
@@ -2135,6 +2134,9 @@ elseif sol==14
   elseif ( strcmp(W_approach,'MassgammaC') )
     W=-JF.rs+gamma*sparse(1:Nr,1:Nr,spdiags(C,0),Nr,Nr);
     invW=sparse(1:Nr,1:Nr,(1.0./spdiags(W,0))',Nr,Nr);
+  elseif ( strcmp(W_approach,'Ones') )
+    W=speye(Nr);
+    invW=speye(Nr);%sparse(1:Nr,1:Nr,(1.0./spdiags(W,0))',Nr,Nr);
   end
     
 
