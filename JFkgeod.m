@@ -55,6 +55,139 @@ JOC.diagrho=spdiags(rhos,0,te,te);
 %   norm(full(diff))
 % end
 
+if (0)
+   %
+  JOC.pp(ncell,1:ncell)=(Nt*Mxt*It*rho(1:ncell))';
+  %JOC.pr(ncell,1:ncell2h)=phi(1:ncell)*Nt*Mxt*It;
+
+				%
+  JOC.ss=sparse(ncell,ncell2h);
+
+  % G_k=phi_k^T * Fphi_k + rho_k^T * Frho_k
+  % G_{k+1} = deltat * phi^{k+1} I rho^{k}  
+  
+  % d G / phi
+  for i=1:N
+    phik = phi(1+i*ncell  :(i+1)*ncell);
+    rhok = rho(1+i*ncell2h:(i+1)*ncell2h);
+
+    Fphik = OC.p(1+(i-1)*ncell  :1+(i-1)*ncell  );
+    Frhok = OC.r(1+(i-1)*ncell2h:1+(i-1)*ncell2h);
+
+    % d Gk /d phik
+    % irwo icol = lhs position in J.pp
+    irow = i 
+    icol = i
+
+    JOC.pp(ncell+(irow-1)*ncell , 1+(icol-1)*ncell:icol*ncell) = ...%
+    Frhok'+...% Frho_k
+    phik' * JOC.pp(1+(irow-1)*ncell:(irow)*ncell,1+(irow-1)*ncell  :(irow)*ncell  ) + ...%phi_k*d Fphi_k/d phi_k
+    rhok' * JOC.rp(1+(irow-1)*ncell:(irow)*ncell,1+(icol-1)*ncell2h:(icol)*ncell2h);      %rho_k*d Frho_k/d phi_k
+
+    % d Gk /d phi_(k+1)
+    % irwo icol = lhs position in J.pp
+    irow = i 
+    icol = i+1
+    JOC.pp(ncell+(irow-1)*ncell , 1+(icol-1)*ncell:icol*ncell) = ...
+    rhok' * JOC.rp(1+(irow-1)*ncell:(irow)*ncell,1+(icol-1)*ncell2h:(icol)*ncell2h);      %rho_k*d Frho_k/d phi_(k+1)
+
+  end
+  irow = N+1
+  icol = N+1
+  JOC.pp(ncell+(irow-1)*ncell , 1+(icol-1)*ncell:icol*ncell)=(N+1)*It(1:ncell,1:ncell2h)*rho(1+(N-1)*ncell2h:N*ncell2h);
+
+  % d G / rho
+
+  i=1
+  phik = phi(1+i*ncell  :(i+1)*ncell);
+  rhok = rho(1+i*ncell2h:(i+1)*ncell2h);
+  
+  Fphik = OC.p(1+(i-1)*ncell  :1+(i-1)*ncell  );
+  Frhok = OC.r(1+(i-1)*ncell2h:1+(i-1)*ncell2h);
+
+  % d Gphik /d rho1
+  % irwo icol = lhs position in J.pp
+  irow = 1 
+  icol = 1
+  JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=...
+  phik'*JOC.pr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(irow-1)*ncell  :(irow)*ncell  ) +...   % phi_1 * d Fphi_1/ d rho_1 +
+  Frhok'+...                                                                                % Frho_1 +
+  rhok' * JOC.rr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(icol-1)*ncell2h:(icol)*ncell2h)     % rho_1 * d Frho_1/ d rho_1
+
+  % d Gphik /d rho{2}
+  % irwo icol = lhs position in J.pp
+  irow = 1
+  icol = 2
+  JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=...
+  phik'*JOC.pr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(irow-1)*ncell  :(irow)*ncell  ) +...   % phi1 * d Fphi_1/ d rho_2 +
+  rhok'*JOC.rr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(icol-1)*ncell2h:(icol)*ncell2h)        % rho1 * d Frho_1/ d rho_2
+
+  for i=2:N-1
+    phik = phi(1+i*ncell  :(i+1)*ncell);
+    rhok = rho(1+i*ncell2h:(i+1)*ncell2h);
+
+    Fphik = OC.p(1+(i-1)*ncell  :1+(i-1)*ncell  );
+    Frhok = OC.r(1+(i-1)*ncell2h:1+(i-1)*ncell2h);
+
+    % d Gphik /d rho{k-1}
+    % irwo icol = lhs position in J.pp
+    irow = i 
+    icol = i-1
+    JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=...
+    phik'*JOC.pr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(irow-1)*ncell  :(irow)*ncell  ) +...   % phi_k * d Fphi_k/ d rho_{k-1} +
+    rhok'*JOC.rr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(icol-1)*ncell2h:(icol)*ncell2h)        % rho_k * d Frho_k/ d rho_{k-1}
+    
+  
+    % d Gphik /d rhok
+    % irwo icol = lhs position in J.pp
+    irow = i 
+    icol = i
+    JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=...
+    phik'*JOC.pr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(irow-1)*ncell  :(irow)*ncell  ) +...   % phi_k * d Fphi_k/ d rhok +
+    Frhok'+...                                                                               % Frho_k +
+    rhok' * JOC.rr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(icol-1)*ncell2h:(icol)*ncell2h)      % rho_k * d Frho_k/ d rho_k
+
+    % d Gphik /d rho{k+1}
+    % irwo icol = lhs position in J.pp
+    irow = i 
+    icol = i+1
+    JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=...
+    phik'*JOC.pr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(irow-1)*ncell  :(irow)*ncell  ) + ...   % phi_k * d Fphi_k/ d rho_{k+1} +
+    rhok'*JOC.rr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(icol-1)*ncell2h:(icol)*ncell2h)        % rho_k * d Frho_k/ d rho_{k+1}
+  end
+
+  i=N
+  phik = phi(1+i*ncell  :(i+1)*ncell);
+  rhok = rho(1+i*ncell2h:(i+1)*ncell2h);
+  
+  Fphik = OC.p(1+(i-1)*ncell  :1+(i-1)*ncell  );
+  Frhok = OC.r(1+(i-1)*ncell2h:1+(i-1)*ncell2h);
+
+  % d Gphik /d rho{k-1}
+  % irwo icol = lhs position in J.pp
+  irow = i 
+  icol = i-1
+  JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=...
+  phik'*JOC.pr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(irow-1)*ncell  :(irow)*ncell  ) +...  % phi_k * d Fphi_k/ d rho_{k-1} +
+  rhok'*JOC.rr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(icol-1)*ncell2h:(icol)*ncell2h)        % rho_k * d Frho_k/ d rho_{k-1}
+
+  % d Gphik /d rhok
+  % irwo icol = lhs position in J.pp
+  irow = i 
+  icol = i
+  JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=...
+  phik'*JOC.pr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(irow-1)*ncell  :(irow)*ncell  ) +...  % phi_k * d Fphi_k/ d rhok +
+  Frhok'+...                                                                                % Frho_k +
+  rhok' * JOC.rr(1+(irow-1)*ncell2h:(irow)*ncell2h,1+(icol-1)*ncell2h:(icol)*ncell2h)      % rho_k * d Frho_k/ d rho_k
+
+  % d GK+1 / d rho_k
+  irow = N+1
+  icol = N
+  JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=(N+1)*phi(1+N*ncell:(N+1)*ncell)*It(1:ncell,1:ncell2h);
+  
+end
+  
+
 JOC.It=It;
 
 JOC.Mxt=Mxt;
