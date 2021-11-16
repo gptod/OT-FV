@@ -39,7 +39,7 @@ plot_figures=0
 
 
 save_data=1;
-read_from_file=0;
+read_from_file=5;
 %h5_file2read='runs/sol10/PhiRhoSMuThetasin_h1_rec1_N00032__schurACwithdiagC_fgmres_full_invSACfullagmg1e-1_invC1_diag.h5';
 
 compute_eigen=0;
@@ -61,10 +61,10 @@ for mesh_type = 5
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 1:4
+  for h_i = 1
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=2:5
+    for i=2
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -99,7 +99,7 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[11,13];
+      for sol=[14];
 
 	folder_run=sprintf('runs/sol%d',sol)
 	mkdir folder_run
@@ -663,23 +663,34 @@ for mesh_type = 5
 
 	  % W matrix approach
 	  W_approach='Mass';
-	  W_approach='Ones';
+	  %W_approach='Ones';
 	  %W_approach='MassgammaC';
           %W_approach='cutC';
-	  
+	  %W_approach='select'	  
 	  %W_approach='C';
+	  %W_approach='rho';
+	  W_approach='rank';
 
-	  gamma=0.01;
+	  gamma=0e2;
+	  gamma='auto';
+	  %gamma=1e2;
 	  lower_bound=1e-9;
 	  upper_bound=1e6;
 
 	  % set here other approximate inverse of block22
-	  S_approach='C';
-	  S_approach='GammaMassC';
+	  %S_approach='C';
+	  %S_approach='GammaMassC';
 	  %S_approach='Mass';
 	  %S_approach='W';
-	  %S_approach='Adiag'; % form C+B2 diag(augA)^{-1} augB1T and approximate
+	  S_approach='Adiag'; % form C+B2 diag(augA)^{-1} augB1T and approximate
 
+	  if ( strcmp(W_approach,'select'))
+				% only approach possible
+	   
+	    S_approach='Adiag';
+	  end
+
+	  % agmg will take care of sparse and diagonal matrix
 	  relax4inv22=0;
 	  ctrl_inner22.init('agmg',... %approach
 			    1e-1,... %tolerance
@@ -688,19 +699,21 @@ for mesh_type = 5
 			    0); %verbose
 	  
 
+	  approach_inverse_A='full';
+	  %approach_inverse_A='block'
 	  
 	  % set here 
 	  for j=[1]%length(invS_approach)
 
 	    % set solver for block 11 (schurAC)
-	    solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov'  };
-	    iters  ={1       ,200      ,10      ,1      ,1           ,100       ,1         };
-	    label  ={'direct','agmg1e-1','agmg10','agmg1','incomplete','krylov10','krylov10'};
+	    solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov','diag'  };
+	    iters  ={1       ,400      ,10      ,1      ,1           ,100       ,1       ,1  };
+	    label  ={'direct','agmg1e-1','agmg10','agmg1','incomplete','krylov10','krylov10','diag'};
 
 
 	    relax4inv11=0;
    	    % set here from solvers
-	    for i=[2];%length(solvers)
+	    for i=[1];%length(solvers)
 	      ctrl_inner11.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
 	      
 	      
@@ -713,6 +726,7 @@ for mesh_type = 5
 				'sol',solver_approach,...
 				'outer_prec',outer_prec,...
 				'inverseC_approach',inverseC_approach,...
+				'approach_inverse_A',approach_inverse_A,...
 				'W_approach',W_approach,...
 				'lower_bound',lower_bound,...
 				'upper_bound',upper_bound,...
