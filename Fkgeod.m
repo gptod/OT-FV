@@ -25,6 +25,23 @@ OCr = (Nt*Mxt*Dt*It*I_all)'*phi - (0.5*drhosk'*Mst*(gradphi).^2) - Mxt2h(1:tnr2h
 OCs = (-rho.*s+mu);
 
 
+if (0)
+  for i=1:N
+    %G^k=(phi_k)^T *(F^phi_k ) + (rho_k)^T*(F^rho_k)
+    pi=phi(1+(i-1)*ncell  :i*ncell  )'*OCp(1+(i-1)*ncell  :i*ncell  )+...
+       rho(1+(i-1)*ncell2h:i*ncell2h)'*OCr(1+(i-1)*ncell2h:i*ncell2h);
+
+    % 
+    OCp((i+1)*ncell)=pi;    
+  end
+
+  % 1/Deltat* phi_{N+1} ^T * I * rho_N
+  OCp(Np)= Nt* phi(1+N*ncell  :(N+1)*ncell  )'* ...
+	      ( Mxt(1:ncell,1:ncell) * It(1:ncell,1:ncell2h)*rho(1+(N-1)*ncell2h:N*ncell2h))
+  
+end
+
+
 OC.p = OCp;
 OC.r = OCr;
 OC.s = OCs;
