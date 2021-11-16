@@ -2113,8 +2113,12 @@ elseif sol==14
     fprintf(controls.logID,'%s\n',msg);
   end
 
-  gamma=controls.gamma;
-				% init diag(C)^{-1}
+  if (strcmp(controls.gamma,'auto'))
+    gamma=norm(A,'fro')/(norm(B1T,'fro')^2);
+  else
+    gamma=controls.gamma;
+  end				% init diag(C)^{-1}
+
   
   W_approach=controls.W_approach;
   if ( strcmp(W_approach,'C') )
@@ -2137,15 +2141,44 @@ elseif sol==14
   elseif ( strcmp(W_approach,'Ones') )
     W=speye(Nr);
     invW=speye(Nr);%sparse(1:Nr,1:Nr,(1.0./spdiags(W,0))',Nr,Nr);
+  elseif ( strcmp(W_approach,'select') )
+    W=speye(Nr);
+    selection=zeros(Nr,1);
+    for i=1:N
+      selection(1+(i-1)*ncellrho)=1.0;
+    end
+    invW=sparse(1:Nr,1:Nr,(selection)',Nr,Nr);
+  elseif ( strcmp(W_approach,'rho') )
+    W=speye(Nr);
+    invW=-JF.ss;
+  elseif ( strcmp(W_approach,'rank') )
+    W=speye(Nr);
+    vectors=zeros(Nr,N);
+    for i=1:N
+      vectors(1+(i-1)*ncellrho:i*ncellrho,i)=1;
+    end
+    invW=vectors*vectors';
   end
     
 
   build_inv_augA=tic;
 				% augemented system
 
-  
-  
+  %figure
+  %plot(selection)
   augA=A+gamma*B1T*invW*B2;
+  %figure
+  %spy(augA)
+
+  %eigenvalues=study_eigenvalues(full(augA),'augA',1);%controls.logID);
+  %eigenvalues(Np-8:Np-1)
+  %eigenvalues(Np)
+  %eigenvalues(1)
+
+  %figure
+  %plot(eigenvalues,'o')
+
+  %return
   augB1T=B1T*(speye(Nr,Nr)-gamma*invW*C);
   %norm(nonzeros(augB1T))
   aug_f=rhs(1:Np)+gamma*B1T*invW*rhs(Np+1:Np+Nr);
@@ -2154,28 +2187,66 @@ elseif sol==14
   augrhs(1+Np:Np+Nr)=rhs(Np+1:Np+Nr); %g
 
   % init inverse of augA
-
-  tA=tic;
-  ctrl_loc=ctrl_solver;
-  index_agmg=0;
-  index_agmg=index_agmg+1;
-  ctrl_loc.init(ctrl_inner11.approach,...
-		ctrl_inner11.tolerance,...
-		ctrl_inner11.itermax,...
-		ctrl_inner11.omega,...
-		ctrl_inner11.verbose,...
-		'augA',index_agmg);
-
-  inv_augA=sparse_inverse;
-  inv_augA.init(augA,ctrl_loc);
-  inv_augA.cumulative_iter=0;
-  inv_augA.cumulative_cpu=0;
-  inv_augA.dimblock=ncellphi;
-				%inv_S.info();
   
-  inverse11 = @(x) inv_augA.apply(x);
+  tA=tic;
 
-  inner_nequ=Np;
+  approach_inverse_A=controls.approach_inverse_A;
+  if ( strcmp(approach_inverse_A,'full'))
+    ctrl_loc=ctrl_solver;
+    index_agmg=0;
+    index_agmg=index_agmg+1;
+    ctrl_loc.init(controls.ctrl_inner11.approach,...
+		  controls.ctrl_inner11.tolerance,...
+		  controls.ctrl_inner11.itermax,...
+		  controls.ctrl_inner11.omega,...
+		  controls.ctrl_inner11.verbose,...
+		  'augA',index_agmg);
+
+    inv_augA=sparse_inverse;
+    inv_augA.init(augA,ctrl_loc);
+    inv_augA.cumulative_iter=0;
+    inv_augA.cumulative_cpu=0;
+    inv_augA.dimblock=ncellphi;
+				%inv_S.info();
+    
+    inverse11 = @(x) inv_augA.apply(x);
+
+    inner_nequ=Np;
+    
+  elseif( strcmp(approach_inverse_A,'block'))
+    index_agmg=0;
+    index_agmg=index_agmg+1;
+    
+    % define array of sparse inverse
+    diag_block_invaugA(Nt,1)=sparse_inverse;
+
+    % create blocks
+    nAi=ncellphi;
+    ctrl_loc=ctrl_solver;
+    for i=1:Nt
+      index_agmg=index_agmg+1;
+      ctrl_loc=ctrl_solver;
+      ctrl_loc.init(controls.ctrl_inner11.approach,...
+		    controls.ctrl_inner11.tolerance,...
+		    controls.ctrl_inner11.itermax,...
+		    controls.ctrl_inner11.omega,...
+		    controls.ctrl_inner11.verbose,...
+		    sprintf('%s Aaug%d',controls.ctrl_inner11.label,i),...
+		    index_agmg);
+      diag_block_invA(i).name=sprintf('inverse A%d',i);
+      
+      % get block add relaxation
+      matrixaugAi=augA((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
+      
+      % define inverse
+      diag_block_invaugA(i).init( matrixaugAi,ctrl_loc);     
+
+    end
+    % define function
+    inverse11  = @(x) apply_block_diag_inverse(diag_block_invaugA,x);
+  end
+  
+
   
   cpu_augA=toc(tA);
 
@@ -2238,17 +2309,22 @@ elseif sol==14
       inv_S.init(C,ctrl_loc);
       inverse22 = @(x) -inv_S.apply(x);
   elseif( strcmp(S_approach,'Adiag'))
-    % define explicitely inverse of diag(A)
+			       % define explicitely inverse of diag(A)
     invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(augA,0))',Np,Np);
 
+    
     % assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
-    approx_SCA = (C+B2*invDiagA*augB1T);
-
+    if (    strcmp(W_approach,'rank'))
+      approx_SCA = sparse(C+B2*invDiagA*B1T);
+    else
+      approx_SCA = sparse(C+B2*invDiagA*augB1T);
+    end
+    
     % assembly approximate inverse
     inv_S=sparse_inverse;
 
 
-    % we need a new seed for agmg, in case is used
+    % invDiagA)we need a new seed for agmg, in case is used
     index_agmg=index_agmg+1;
     ctrl_loc=ctrl_solver;
     % passing index_agmg+1 we will use one copy of agmg, allowing preprocess 
@@ -2274,7 +2350,7 @@ elseif sol==14
 
   prec_cpu=cpu_augA+ cpu_S;
 
-  
+ 
   
   
   %
@@ -2296,6 +2372,43 @@ elseif sol==14
   % solve with fgmres 
   outer_timing=tic;
   augjacobian = [augA augB1T; B2 -C];
+
+  
+  if (0)
+    % prec_ex=[augA augB1T; sparse(Nr,Np) -approx_SCA];
+    % inv_P=sparse_inverse;
+    % ctrl_loc.init('direct',...
+    % 		  ctrl_inner22.tolerance,...
+    % 		  ctrl_inner22.itermax,...
+    % 		  ctrl_inner22.omega,...
+    % 		  ctrl_inner22.verbose,...
+    % 		  'P^-1',...
+    % 		  index_agmg);
+    
+    % inv_P.init(prec_ex,ctrl_loc);
+    % prec_ex=@(x) inv_P.apply(x);
+    %eigenvalues=study_eigenvalues(full(augjacobian), '(prec)^{-1}J',1);
+    %eig6=eigs(@(x) jacobian*x,Nr+Np,40)
+    
+    %figure
+    %plot(eigenvalues,'o')
+
+    
+
+    out=prec_times_matrix(prec,augjacobian);
+
+    
+    
+    eigenvalues=study_eigenvalues(out, '(prec)^{-1}J',1);
+    %eig6=eigs(@(x) jacobian*x,Nr+Np,40)
+    
+    figure
+    plot(eigenvalues,'o')
+
+    return
+  end
+
+  
   if ( verbose >= 2)
     fprintf('START SOLVER \n')
   end
@@ -2307,9 +2420,15 @@ elseif sol==14
   outer_iter=uint64(info_J.iter);
   outer_cpu=toc(outer_timing);
 
-  inner_iter=inv_augA.cumulative_iter;
-
-  
+  if ( strcmp(approach_inverse_A,'full'))
+    inner_iter=inv_augA.cumulative_iter;
+  elseif( strcmp(approach_inverse_A,'block'))
+    inner_iter=0;
+    for i=1:Nt
+      inner_iter=inner_iter+diag_block_invaugA(i).cumulative_iter;
+    end
+      
+  end
   
   
   % store info
@@ -2352,7 +2471,13 @@ elseif sol==14
 
 
   % free memory (mandatory for agmg)
-  inv_augA.kill();
+  if ( strcmp(approach_inverse_A,'full'))
+    inv_augA.kill();
+  elseif( strcmp(approach_inverse_A,'block'))
+    for i=1:Nt
+      diag_block_invaugA(i).kill();
+    end
+  end
   inv_S.kill();
 
 elseif (sol==15)
