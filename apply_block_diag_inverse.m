@@ -7,7 +7,8 @@ function [sol]=apply_block_diag_inverse(array_sparse_inverse,rhs)
     %start
     nrow_block=size(array_sparse_inverse(i).matrix,1);
 				%start+nrow_block-1
-    %disp(array_sparse_inverse(i).ctrl.label)
+    %fprintf('%s %d %d \n',array_sparse_inverse(i).ctrl.label,start,start+nrow_block-1)
     sol(start:start+nrow_block-1)=array_sparse_inverse(i).apply(rhs(start:start+nrow_block-1));
     start=start+nrow_block;
+    
   end

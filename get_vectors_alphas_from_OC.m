@@ -243,8 +243,12 @@ function [vectors,vectors_y,alphas] = get_vectors_alphas_from_OC(JOC,FOC,control
 				% compute imbalances given by rhs
    
     for i=1:N
-      vi=ones(m,1)/1e8;
-      vi=(sizecell)/deltat*m;
+
+      vi=(deltat)*ones(m,1)/sqrt(m);
+      vi=5*deltat./(sizecell);
+      vi=deltat.*(rho(1+(i-1)*m:i*m))./(sizecell);
+      %vi=100*1/deltat.*(rho(1+(i-1)*m:i*m));
+	      %vi=ones(m,1)*deltat*100;
       %vi=randn(m,1);
       %vi=CT(1+(i-1)*m:i*m,1+(i-1)*m:i*m)\(sizecell/deltat)/m;
       
