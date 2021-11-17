@@ -99,7 +99,7 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[14];
+      for sol=[13];
 
 	folder_run=sprintf('runs/sol%d',sol)
 	mkdir folder_run
@@ -667,22 +667,22 @@ for mesh_type = 5
 	  %W_approach='MassgammaC';
           %W_approach='cutC';
 	  %W_approach='select'	  
-	  %W_approach='C';
+	  W_approach='C';
 	  %W_approach='rho';
-	  W_approach='rank';
+	  %W_approach='rank';
 
-	  gamma=0e2;
+	  gamma=1e0;
 	  gamma='auto';
 	  %gamma=1e2;
 	  lower_bound=1e-9;
 	  upper_bound=1e6;
 
 	  % set here other approximate inverse of block22
-	  %S_approach='C';
+	  S_approach='C';
 	  %S_approach='GammaMassC';
 	  %S_approach='Mass';
 	  %S_approach='W';
-	  S_approach='Adiag'; % form C+B2 diag(augA)^{-1} augB1T and approximate
+	  %S_approach='Adiag'; % form C+B2 diag(augA)^{-1} augB1T and approximate
 
 	  if ( strcmp(W_approach,'select'))
 				% only approach possible
@@ -703,7 +703,7 @@ for mesh_type = 5
 	  %approach_inverse_A='block'
 	  
 	  % set here 
-	  for j=[1]%length(invS_approach)
+	  for j=[3]%length(invS_approach)
 
 	    % set solver for block 11 (schurAC)
 	    solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov','diag'  };
@@ -715,8 +715,8 @@ for mesh_type = 5
    	    % set here from solvers
 	    for i=[1];%length(solvers)
 	      ctrl_inner11.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
-	      
-	      
+
+	     	      
 	      % store all controls
 	      controls = struct('save_data',save_data,...
 				'indc',grounded_node,...
@@ -737,7 +737,7 @@ for mesh_type = 5
 				'ctrl_outer',ctrl_outer,...
 				'compute_eigen',compute_eigen,...
 				'verbose',verbose,...
-				'extra_info',invS_approach{j},...
+				'extra_info',invS_approach{1},...
 				'relax4inv11',relax4inv11,...
 				'relax4inv22',relax4inv22);
 	      
