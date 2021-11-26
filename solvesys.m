@@ -744,8 +744,44 @@ elseif sol==10
    
     % assembly schur AC S=A+B1
     % reduced to system only in phi
+    if ( strcmp(controls.assembly_S,'full') )
+				%S = A+B1T*(invdiagC*B2);
+      S = A+...
+	  JF.B1T_time* (invdiagC*JF.B1T_time' )+...
+	  JF.B1T_space*(invdiagC*JF.B1T_space')+...	 
+	  JF.B1T_time* (invdiagC*JF.B1T_space')+...
+	  JF.B1T_space*(invdiagC*JF.B1T_time');
+
+    elseif ( strcmp(controls.assembly_S,'A_Mtt') ) 
+      S = A+JF.B1T_time*(invdiagC*JF.B1T_time');
+    elseif ( strcmp(controls.assembly_S,'A_Mtt_Mxx') ) 
+      S = A+...
+	  JF.B1T_time* (invdiagC*JF.B1T_time' )+...
+	  JF.B1T_space*(invdiagC*JF.B1T_space');
+    elseif ( strcmp(controls.assembly_S,'A_Mtx_Mxt') )
+      S = A+...
+	  JF.B1T_time* (invdiagC*JF.B1T_space')+...
+	  JF.B1T_space*(invdiagC*JF.B1T_time');
+    elseif ( strcmp(controls.assembly_S,'A_Mtt_Mtx_Mxt') )
+      S = A+...
+	  JF.B1T_time* (invdiagC*JF.B1T_time' )+...	  
+	  JF.B1T_time* (invdiagC*JF.B1T_space')+...
+	  JF.B1T_space*(invdiagC*JF.B1T_time');
+    elseif ( strcmp(controls.assembly_S,'A_Mtt_Mtx_Mxt_blockdiagMxx') )
+      block=sparse(Np,Np);
+      temp=JF.B1T_space*(invdiagC*JF.B1T_space');
+      for i=1:Nt
+	block(1+(i-1)*ncellphi:i*ncellphi,1+(i-1)*ncellphi:i*ncellphi)=...
+	temp(1+(i-1)*ncellphi:i*ncellphi,1+(i-1)*ncellphi:i*ncellphi);
+      end
+      S = A+...
+	  JF.B1T_time* (invdiagC*JF.B1T_time' )+...	  
+	  JF.B1T_time* (invdiagC*JF.B1T_space')+...
+	  JF.B1T_space*(invdiagC*JF.B1T_time')+...
+	  block;
+    end 
+
     
-    S = A+B1T*(invdiagC*B2);  
     fp = rhs(1:Np)+B1T*(inverseC(rhs(Np+1:Np+Nr)));
     
   elseif ( inverseC_approach==2)
@@ -786,6 +822,15 @@ elseif sol==10
 
   cpu_invC_builS=toc(time_invC_builS);
 
+
+  if ( strcmp(controls.cutS,'lower'))
+    temp=JF.B1T_space*(invdiagC*JF.B1T_space');
+    for i=1:N
+      S(1+(i)*ncellphi:(i+1)*ncellphi,1+(i-1)*ncellphi:i*ncellphi)=...
+      sparse(ncellphi,ncellphi);
+    end
+  end
+    
   
   
   %figure
@@ -827,7 +872,6 @@ elseif sol==10
   % assembly (approcimate) inverse of SAC=A+B1T diag(C)^{-1} B2 
   approach=controls.extra_info;  
   relax4prec=controls.relax4inv11;
-  relax4prec=0.0;
   debug=0;
 
   timeS=tic;

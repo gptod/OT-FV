@@ -63,11 +63,13 @@ if (0)
 				%
   JOC.ss=sparse(ncell,ncell2h);
 
-  % G_k=phi_k^T * Fphi_k + rho_k^T * Frho_k
+% G_k(phi_k,phi_k+1,rho_k-1,rho_k,rho_k+1,s^k)=phi_k^T * Fphi_k(phi_k,rho_k-1,rho_k) +
+  %                                            rho_k^T * Frho_k(phi_k,phi_k+1,rho_k-1,rho_k,rho_k+1,s_k)
   % G_{k+1} = deltat * phi^{k+1} I rho^{k}  
   
   % d G / phi
   for i=1:N
+    % copy vectors
     phik = phi(1+i*ncell  :(i+1)*ncell);
     rhok = rho(1+i*ncell2h:(i+1)*ncell2h);
 
@@ -184,6 +186,10 @@ if (0)
   irow = N+1
   icol = N
   JOC.pr(ncell+(irow-1)*ncell,1+(icol-1)*ncell:icol*ncell)=(N+1)*phi(1+N*ncell:(N+1)*ncell)*It(1:ncell,1:ncell2h);
+
+
+  % d G / s
+  
   
 end
   

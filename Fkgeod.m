@@ -30,9 +30,11 @@ if (0)
     %G^k=(phi_k)^T *(F^phi_k ) + (rho_k)^T*(F^rho_k)
     pi=phi(1+(i-1)*ncell  :i*ncell  )'*OCp(1+(i-1)*ncell  :i*ncell  )+...
        rho(1+(i-1)*ncell2h:i*ncell2h)'*OCr(1+(i-1)*ncell2h:i*ncell2h);
-
-    % 
-    OCp((i+1)*ncell)=pi;    
+    
+    
+    % p1=phi1^T Fp1 + rho1^T Fr1 -> last row first block
+    % p1=phi2^T Fp1 + rho2^T Fr2 -> last row second block 
+    OCp(i*ncell)=pi;    
   end
 
   % 1/Deltat* phi_{N+1} ^T * I * rho_N

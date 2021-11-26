@@ -99,7 +99,7 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[13];
+      for sol=[10];
 
 	folder_run=sprintf('runs/sol%d',sol)
 	mkdir folder_run
@@ -228,8 +228,16 @@ for mesh_type = 5
 	 
 	  
 	  for kk=1
-	  inverseC_approach=1;
-	  
+	    inverseC_approach=1;
+	    % select assembly of S=A+Mtt+(Mtx+Mtx')+Mxx
+	    assembly_S='full'
+	    %assembly_S='A_Mtt'
+	    %assembly_S='A_Mtt_Mxx'
+	    %assembly_S='A_Mtx_Mxt'
+	    %assembly_S='A_Mtt_Mtx_Mxt'
+	    %assembly_S='A_Mtt_Mtx_Mxt_blockdiagMxx'
+	    
+	    cutS='lower'
 	  % cycle approach for S inversion
 	  % full:        :~S=S
 	  % block_triang :~S=upper block triangular of S
@@ -245,7 +253,7 @@ for mesh_type = 5
 	  diagonal_scaling=iii;
 
 	  
-	  relax4inv11=0;
+	  relax4inv11=1e-8;
 
 	  
 	  % set here 
@@ -257,7 +265,7 @@ for mesh_type = 5
 	    label  ={'direct','agmg1e-1','agmg10','agmg1','incomplete','krylov10','krylov10'};
 
    	    % set here from solvers
-	    for i=[2];%length(solvers)
+	    for i=[1];%length(solvers)
 	      ctrl_inner11.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
 
 	      ctrl_inner22.init('diag',... %approach
@@ -275,6 +283,8 @@ for mesh_type = 5
 				'outer_prec',outer_prec,...
 				'diagonal_scaling',diagonal_scaling,...
 				'inverseC_approach',inverseC_approach,...
+				'assembly_S',assembly_S,...
+				'cutS',cutS,...
 				'ctrl_inner11',ctrl_inner11,...
 				'ctrl_inner22',ctrl_inner22,...
 				'ctrl_outer',ctrl_outer,...
