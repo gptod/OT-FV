@@ -48,8 +48,9 @@ A = sparse(JF.pp); B1T = sparse(JF.pr); B2 = sparse(JF.rp);
 R = sparse(JF.rr); M   = sparse(JF.rs);
 Ds = sparse(JF.sr); Dr = sparse(JF.ss);
 C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
-f1 = f;
-f2 = g-JF.rs*(JF.ss\h);
+temp=(JF.ss\h);
+f1 = f-JF.ps*temp;
+f2 = g-JF.rs*temp;
 
 % swap C sign for having standard saddle point notation 
 C = -C;

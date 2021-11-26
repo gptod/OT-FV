@@ -27,7 +27,7 @@ alfamin = 0.1; % minimal step length accepted
 mu0_up = 0;
 
 
-verb = 1; % verbosity level: {0,1,2}
+verb = 2; % verbosity level: {0,1,2}
 eps_lin = 1e-5; % tolerance for the solution of the linear systems
 kel = 0; % set 1 for adaptive tolerance for the Newton scheme
 % eps_lin = eps_0;
@@ -39,7 +39,7 @@ plot_figures=0
 
 
 save_data=1;
-read_from_file=5;
+read_from_file=0;
 %h5_file2read='runs/sol10/PhiRhoSMuThetasin_h1_rec1_N00032__schurACwithdiagC_fgmres_full_invSACfullagmg1e-1_invC1_diag.h5';
 
 compute_eigen=0;
@@ -237,7 +237,7 @@ for mesh_type = 5
 	    %assembly_S='A_Mtt_Mtx_Mxt'
 	    %assembly_S='A_Mtt_Mtx_Mxt_blockdiagMxx'
 	    
-	    cutS='lower'
+	    cutS='full'
 	  % cycle approach for S inversion
 	  % full:        :~S=S
 	  % block_triang :~S=upper block triangular of S

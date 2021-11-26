@@ -1,7 +1,10 @@
-function OC = Fkgeod(N,rho_f,rho_in,Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu)
+function OC = Fkgeod(N,rho_f,rho_in,Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu,augmented)
 
+  if ~exist('augmented', 'var') || isempty(augmented)
+    augmented=0;
+  end
+  
 % Compute the system of first-order optimality conditions
-
 Nt = N+1;
 ncell2h = size(Mxt2h,1)/Nt;
 ncell = size(Mxt,1)/Nt;
@@ -25,6 +28,7 @@ OCr = (Nt*Mxt*Dt*It*I_all)'*phi - (0.5*drhosk'*Mst*(gradphi).^2) - Mxt2h(1:tnr2h
 OCs = (-rho.*s+mu);
 
 
+
 if (0)
   for i=1:N
     %G^k=(phi_k)^T *(F^phi_k ) + (rho_k)^T*(F^rho_k)
@@ -37,7 +41,7 @@ if (0)
     OCp(i*ncell)=pi;    
   end
 
-  % 1/Deltat* phi_{N+1} ^T * I * rho_N
+  % G_N+1=1/Deltat* phi_{N+1} ^T * I * rho_N
   OCp(Np)= Nt* phi(1+N*ncell  :(N+1)*ncell  )'* ...
 	      ( Mxt(1:ncell,1:ncell) * It(1:ncell,1:ncell2h)*rho(1+(N-1)*ncell2h:N*ncell2h))
   
@@ -47,7 +51,6 @@ end
 OC.p = OCp;
 OC.r = OCr;
 OC.s = OCs;
-
 
 end
 

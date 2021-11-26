@@ -54,6 +54,8 @@ end
 
 controls.swap_sign=1;
 
+augmented=0;
+
 solver_approach=controls.sol
 folder_approach=sprintf('sol%d/',solver_approach);
 filename=strcat('runs/',folder_approach,str_test,approach_string);%,controls_string);
@@ -240,7 +242,7 @@ while true
       [drhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
 
       ctime=tic;
-      OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu);
+      OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu,augmented);
       FOCtime=toc(ctime);
       delta_mu = norm([OC.p;OC.r;OC.s]);
 
@@ -331,7 +333,7 @@ while true
 	ctime=tic;
        % Compute the jacobian of the system of equations
         [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
-        JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk);
+        JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk,OC,augmented);
         
 	sum_assembly=sum_assembly+toc(assembly);
 	JFOCtime=toc(ctime);
@@ -416,6 +418,9 @@ while true
     end
     
     phimu = uk(1:tnp);
+    for i=1:N+1
+      fprintf('last phi %1.4e\n', phimu(1+(i-1)*ncell))
+    end
     rhomu = uk(tnp+1:tnp+tnr2h);
     smu = uk(tnp+tnr2h+1:end);
 
