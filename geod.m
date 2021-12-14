@@ -54,7 +54,7 @@ end
 
 controls.swap_sign=1;
 
-augmented=1;
+augmented=0;
 
 solver_approach=controls.sol
 folder_approach=sprintf('sol%d/',solver_approach);
