@@ -1,8 +1,4 @@
-function OC = Fkgeod(N,rho_f,rho_in,Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu,augmented)
-
-  if ~exist('augmented', 'var') || isempty(augmented)
-    augmented=0;
-  end
+function OC = Fkgeod(N,rho_f,rho_in,Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu)
   
 % Compute the system of first-order optimality conditions
 Nt = N+1;
@@ -27,30 +23,15 @@ OCr = (Nt*Mxt*Dt*It*I_all)'*phi - (0.5*drhosk'*Mst*(gradphi).^2) - Mxt2h(1:tnr2h
 % optimality conditions in s
 OCs = (-rho.*s+mu);
 
-
-
-if (0)
-  for i=1:N
-    %G^k=(phi_k)^T *(F^phi_k ) + (rho_k)^T*(F^rho_k)
-    pi=phi(1+(i-1)*ncell  :i*ncell  )'*OCp(1+(i-1)*ncell  :i*ncell  )+...
-       rho(1+(i-1)*ncell2h:i*ncell2h)'*OCr(1+(i-1)*ncell2h:i*ncell2h);
-    
-    
-    % p1=phi1^T Fp1 + rho1^T Fr1 -> last row first block
-    % p1=phi2^T Fp1 + rho2^T Fr2 -> last row second block 
-    OCp(i*ncell)=pi;    
-  end
-
-  % G_N+1=1/Deltat* phi_{N+1} ^T * I * rho_N
-  OCp(Np)= Nt* phi(1+N*ncell  :(N+1)*ncell  )'* ...
-	      ( Mxt(1:ncell,1:ncell) * It(1:ncell,1:ncell2h)*rho(1+(N-1)*ncell2h:N*ncell2h))
-  
-end
-
-
+% create data structure
 OC.p = OCp;
 OC.r = OCr;
 OC.s = OCs;
+
+% copy sizes
+OC.N = N;
+OC.ncell2h=ncell2h;
+OC.ncell=ncell;
 
 end
 
