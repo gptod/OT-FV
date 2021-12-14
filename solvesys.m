@@ -93,13 +93,24 @@ if sol==1
     f1 = F.p; f1(indc) = 0;
     f2 = F.r-JF.rs*(JF.ss\F.s);
     d = Sys\[-f1;-f2];
+    res=norm(Sys*d-[-f1;-f2])/norm([-f1;-f2]);
     dp = d(1:Np); dr = d(Np+1:end);
     ds = JF.ss\(-F.s-JF.sr*dr);
     d = [dp; dr; ds];
     
     normd = norm(d);
-    
-    sol_stat = struct('flag',0,'relres',[],'iter',[]);
+
+    resume_msg=sprintf('direct solver res=%2e',res);
+
+    inner_nequ=0;
+    inner_iter=0;
+    outer_iter=0;
+    outer_cpu=0;
+    prec_cpu=0;
+    inner_nequ2;
+    inner_iter2=0;
+    inner_nequ3=0;
+    inner_iter3=0;
     
 elseif sol==2
     

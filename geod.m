@@ -54,7 +54,7 @@ end
 
 controls.swap_sign=1;
 
-augmented=0;
+augmented=1;
 
 solver_approach=controls.sol
 folder_approach=sprintf('sol%d/',solver_approach);
@@ -96,6 +96,7 @@ fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  in
 % alfamin = 0.1; % minimal step length accepted
 % mu0_up = 0;
 flag_theta = 0;
+
 
 tnp = (N+1)*ncell; % total number of dofs for the potential
 tnr2h = N*ncell2h; % total number of dofs for the density
@@ -180,25 +181,26 @@ Nr = ncell2h*N;
 while true
   assembly=tic;
   total=tic;
-    if delta_0 < eps_0
-        break
+  if delta_0 < eps_0
+    break
+  end
+  itk1 = itk1+1;
+  if itk1>k1max
+    if mu0_up==1
+      mu0 = 5*mu0;
+      theta = theta0;
+      s0 = mu0./rho0;
+      mu = mu0/theta;
+      itk1 = 0;
+      tit = 0;
+      uk = [phi0;rho0;s0];
+      delta_0 = 2*eps_0;
+      continue
+    else
+      disp(mu0_up)
+      break
     end
-    itk1 = itk1+1;
-    if itk1>k1max
-        if mu0_up==1
-            mu0 = 5*mu0;
-            theta = theta0;
-            s0 = mu0./rho0;
-            mu = mu0/theta;
-            itk1 = 0;
-            tit = 0;
-            uk = [phi0;rho0;s0];
-            delta_0 = 2*eps_0;
-            continue
-        else
-            break
-        end
-    end
+  end
     
     mu = theta*mu;
     eps_mu = eps_0;
@@ -242,7 +244,7 @@ while true
       [drhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
 
       ctime=tic;
-      OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu,augmented);
+      OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu);
       FOCtime=toc(ctime);
       delta_mu = norm([OC.p;OC.r;OC.s]);
 
@@ -288,55 +290,61 @@ while true
         %    fprintf('%11s %3i %7s %1.4e \n','Inner step:',itk2,' Error:',delta_mu)
         %end
 
-        if delta_mu < eps_mu  
-            if itk2<4
-                if 0.8*theta>=theta_min
-                    theta = 0.8*theta;
-                else 
-                    theta = theta_min;
-                end
-            end
-            tit = tit+itk2;
-            break
+      if delta_mu < eps_mu	
+        if itk2<4
+          if 0.8*theta>=theta_min
+            theta = 0.8*theta;
+          else 
+            theta = theta_min;
+          end
         end
-        itk2 = itk2+1;
-        if itk2 > k2max || flag2==1
-            % if the step length is too small, or the number of Newton iterations 
-            % exceeds the maximum, repeat the iteration with a bigger mu
-            if itk1==1
-                itk1 = k1max;
-                break
-            end
-            if theta+0.2*(1-theta)<=theta_max
-                mu = mu/theta;
-                theta = theta+0.2*(1-theta);
-                mu = theta*mu;
-            else
-                flag_theta = 1;
-                break
-            end
-            uk = [phimu;rhomu;smu];
-            tit = tit+itk2;
-            itk2 = 0;
-            flag2 = 0;
-            continue
+        tit = tit+itk2;
+        break
+      end
+      itk2 = itk2+1;
+      if itk2 > k2max || flag2==1
+% if the step length is too small, or the number of Newton iterations 
+% exceeds the maximum, repeat the iteration with a bigger mu
+        if itk1==1
+          itk1 = k1max;
+          break
         end
-
-	sys_name=sprintf('out%02d_in%02d',itk1+1,itk2+1);
-	controls.sys_name=sys_name;
-
-	% Compute the jacobian of the system of equations
-	message="BEGIN ASSEMBLY JFOC";
-	if verb>1
-          fprintf('%s \n',message)
+        if theta+0.2*(1-theta)<=theta_max
+          mu = mu/theta;
+          theta = theta+0.2*(1-theta);
+          mu = theta*mu;
+        else
+          flag_theta = 1;
+          break
         end
-	ctime=tic;
-       % Compute the jacobian of the system of equations
-        [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
-        JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk,OC,augmented);
-        
-	sum_assembly=sum_assembly+toc(assembly);
-	JFOCtime=toc(ctime);
+        uk = [phimu;rhomu;smu];
+        tit = tit+itk2;
+        itk2 = 0;
+        flag2 = 0;
+        continue
+      end
+      
+      sys_name=sprintf('out%02d_in%02d',itk1+1,itk2+1);
+      controls.sys_name=sys_name;
+      
+		     % Compute the jacobian of the system of equations
+      message="BEGIN ASSEMBLY JFOC";
+      if verb>1
+        fprintf('%s \n',message)
+      end
+      ctime=tic;
+		     % Compute the jacobian of the system of equations
+      [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
+      
+      JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk);
+      if (augmented)
+        % aug. Jacobian need the original OC
+	JOC = augmented_JFkgeod (JOC,OC,uk,1);
+        % now we can aug. OC
+	OC = augmented_FKgeod(OC,uk,1);
+      end
+      sum_assembly=sum_assembly+toc(assembly);
+      JFOCtime=toc(ctime);
 	
 	if verb>1
           fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
@@ -403,6 +411,7 @@ while true
 	
        
         if alfak==alfamin
+	  disp('Step too small')
             flag2 = 1;
         end
 
@@ -418,8 +427,10 @@ while true
     end
     
     phimu = uk(1:tnp);
-    for i=1:N+1
-      fprintf('last phi %1.4e\n', phimu(1+(i-1)*ncell))
+    if (0)
+      for i=1:N+1
+	fprintf('last phi %1.4e\n', phimu(1+(i-1)*ncell))
+      end
     end
     rhomu = uk(tnp+1:tnp+tnr2h);
     smu = uk(tnp+tnr2h+1:end);

@@ -27,7 +27,7 @@ alfamin = 0.1; % minimal step length accepted
 mu0_up = 0;
 
 
-verb = 2; % verbosity level: {0,1,2}
+verb = 1; % verbosity level: {0,1,2}
 eps_lin = 1e-5; % tolerance for the solution of the linear systems
 kel = 0; % set 1 for adaptive tolerance for the Newton scheme
 % eps_lin = eps_0;
@@ -99,10 +99,10 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[10];
+      for sol=[1];
 
-	folder_run=sprintf('runs/sol%d',sol)
-	mkdir folder_run
+	%folder_run=sprintf('runs/sol%d',sol)
+	%mkdir folder_run
 	% Mesh structure:
 	% nodutees -> array of nodes coordinates [x y]
 	% cells -> array of cells nodes [#nodes node1 node2 node3 ...]
@@ -113,6 +113,15 @@ for mesh_type = 5
 	ctrl_inner22=ctrl_solver;
 	ctrl_outer=ctrl_solver;
 
+	if (sol==1)
+	  grounded_node=1;
+	  controls = struct('save_data',save_data,...
+			    'indc',grounded_node,...
+			    'sol',solver_approach)
+	  approach_string='direct'
+	  geod
+	end
+	
 	if (sol==8)
 	  ctrl_outer.init('stationary_iterative_methods',1e-9,1000);
 
