@@ -1,6 +1,7 @@
 function [sol]=apply_block_triangular_inverse(diagonal_inverse,extra_diagonal_matrices,L_or_U,rhs)
   nblocks=size(diagonal_inverse,1);
   nrow=size(rhs,1);
+  nrow_block=size(diagonal_inverse(nblocks).matrix,1);
   %fprintf('%d %d \n', nblocks, nrow)
   sol=zeros(nrow,1);
   %for i=1,nblocks
@@ -29,10 +30,10 @@ function [sol]=apply_block_triangular_inverse(diagonal_inverse,extra_diagonal_ma
     
   elseif  ( strcmp(L_or_U,'U') )
     temp=rhs;
-    
-    start=nrow-size(diagonal_inverse(nblocks).matrix,1)+1;
     nrow_block=size(diagonal_inverse(nblocks).matrix,1);
-    ibegin= start;
+
+    
+    ibegin= nrow-nrow_block+1;
     iend  = nrow;
     ibegin_before = ibegin;
     iend_before   = iend;
