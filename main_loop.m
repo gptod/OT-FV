@@ -39,13 +39,16 @@ plot_figures=0
 
 
 save_data=1;
-read_from_file=0;
+read_from_file=3;
 %h5_file2read='runs/sol10/PhiRhoSMuThetasin_h1_rec1_N00032__schurACwithdiagC_fgmres_full_invSACfullagmg1e-1_invC1_diag.h5';
 
 compute_eigen=0;
 verbose=0;
 
-%mkdir 'runs'
+				%mkdir 'runs'
+
+
+
 
      
     % Space discretization. Three types of mesh families available:
@@ -64,7 +67,7 @@ for mesh_type = 5
   for h_i = 1
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=2
+    for i=3
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -99,7 +102,7 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[1];
+      for sol=[11];
 
 	%folder_run=sprintf('runs/sol%d',sol)
 	%mkdir folder_run
@@ -114,7 +117,7 @@ for mesh_type = 5
 	ctrl_outer=ctrl_solver;
 
 	if (sol==1)
-	  grounded_node=1;
+	  grounded_node=400;
 	  controls = struct('save_data',save_data,...
 			    'indc',grounded_node,...
 			    'sol',solver_approach)
@@ -358,14 +361,14 @@ for mesh_type = 5
 	    outer_prec=outer_precs{iprec};
 	  
 	  % set here other approximate inverse of block11
-	  ctrl_inner11.init('diag',... %approach
-			    1e-12,... %tolerance
+	  ctrl_inner11.init('direct',... %approach
+			    1e-4,... %tolerance
 			    10,...% itermax
 			    0.0,... %omega
 			    0,... %verbose
-			    'diag'); %label
-	  %extra_info='full';
-	  extra_info='block';
+			    'direct'); %label
+	  %inverse11='full';
+	  inverse11='block';
 	  relax4_inv11=0e-12;
 	  
 	  % set grounded_node>0 to gorund the potential in grounded node
@@ -399,7 +402,7 @@ for mesh_type = 5
 			      'ctrl_outer',ctrl_outer,...
 			      'compute_eigen',compute_eigen,...
 			      'verbose',verbose,...
-			      'extra_info',extra_info,...
+			      'inverse11',inverse11,...
 			      'relax4inv11',relax4_inv11,...
 			      'relax4inv22',relax4_inv22);
 	   
