@@ -54,7 +54,15 @@ end
 
 controls.swap_sign=1;
 
-augmented=0;
+augmented=1; % on/off
+Number_of_rows=N; % equation to add
+line=ncell;           % local line to modify
+integral_constrain=0; % add intregral constrain to remove kernel
+verbose_aug=1;       % print info
+sign_aug=-1;
+
+controls.indc=(N+1)*ncell;
+
 
 solver_approach=controls.sol
 folder_approach=sprintf('sol%d/',solver_approach);
@@ -112,10 +120,11 @@ if ( read_from_file>0)
   s0   = data(1+tnp+tnr2h:tnp+2*tnr2h);
   mu0  = data(tnp+2*tnr2h+1);
   theta0 = data(tnp+2*tnr2h+2);
+  fprintf('norm initial %1.2e\n',norm(get_slice(phi0,1,ncell,N+1)))
   uk = [phi0;rho0;s0];
 else
   mu0 = 1;
-  phi0 = zeros(tnp,1);
+  phi0 = ones(tnp,1);%zeros(tnp,1);
   rho0 = (mass/sum(area))*ones(tnr2h,1);
   s0 = mu0./rho0;
   uk = [phi0;rho0;s0]; % initial condition of the barrier method
@@ -247,7 +256,7 @@ while true
       OC = Fkgeod(N,(rho_f+mu)/(1+mu),(rho_in+mu)/(1+mu),Dt,divt,Mxt,Mxt2h,Mst,gradt,It,rhosk,drhosk,uk,mu);
       FOCtime=toc(ctime);
       delta_mu = norm([OC.p;OC.r;OC.s]);
-
+      
       state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e - CPU %1.4e' ,...
 			    itk2+1, norm(OC.p),norm(OC.r),norm(OC.s),FOCtime);
       fprintf(logID,'%s \n',state_message);
@@ -255,40 +264,6 @@ while true
 	fprintf('%s \n',state_message);
       end
 
-
-
-	% for i = 1:N
-	%   masses(i)=uk(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
-	% end
-	% state_message=sprintf('%1.4e<=masses rho[:]<= %1.4e',min(masses),max( masses));
-	% fprintf('%s \n',state_message);
-	% fprintf(logID,'%s \n',state_message);
-
-	
-	
-
-	% current_res_phi = OC.p;
-	% for i = 1:Nt
-	%   imbalance_res_phi(i)=sum(current_res_phi((i-1)*ncell+1:i*ncell));%/norm(current_res_phi((i-1)*ncell+1:i*ncell));
-	% end
-	% state_message=sprintf('%1.4e<=sum(F_phi[:])/norm(F_phi[:])<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
-	% fprintf('%s \n',state_message);
-	% fprintf(logID,'%s \n',state_message);
-
-
-	% current_res_phi = OC.r;
-	% for i = 1:N
-	%   imbalance_res_phi(i)=current_res_phi((i-1)*ncell2h+1:i*ncell2h)'*area2h;
-	% end
-	% state_message=sprintf('%1.4e<=integral_F_rho[:]<= %1.4e',min(imbalance_res_phi),max(imbalance_res_phi));
-	% fprintf('%s \n',state_message);
-	% fprintf(logID,'%s \n',state_message);
-
-	
-
-        %if verb>1
-        %    fprintf('%11s %3i %7s %1.4e \n','Inner step:',itk2,' Error:',delta_mu)
-        %end
 
       if delta_mu < eps_mu	
         if itk2<4
@@ -333,33 +308,39 @@ while true
         fprintf('%s \n',message)
       end
       ctime=tic;
-		     % Compute the jacobian of the system of equations
+      % Compute the jacobian of the system of equations
       [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
       
       JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk);
+
       if (augmented)
         % aug. Jacobian need the original OC
-	JOC = augmented_JFkgeod (JOC,OC,uk,1);
-        % now we can aug. OC
-	OC = augmented_FKgeod(OC,uk,1);
+	[OC,JOC] = newton_augmentation(uk,OC,JOC,2,line);
       end
       sum_assembly=sum_assembly+toc(assembly);
       JFOCtime=toc(ctime);
 	
-	if verb>1
-          fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
-        end
+      if verb>1
+        fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
+      end
 
 	resvar.set(kel,eps_lin,delta_mu,tnr2h+tnp);
 			   %resvar.set(kel,0.5*mu,delta_mu,tnr2h+tnp);
 	%ctrl_outer.tolerance = resvar.etak;
 	% Solve the linear system
 	timelinsys=tic;
-	%try
-          [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls);
-
-
-	  
+				%try
+	
+        [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls);
+	
+	%[res,resp,resr,ress]=compute_linear_system_residuum(JOC,OC,omegak);
+	
+	
+	%state_message=sprintf('%d - | res p|=%1.4e |res r|=%1.4e |res s|=%1.4e |res|=%1.2e' ,...
+	%			itk2+1, resp,resr,ress,res);
+	%fprintf('%s \n',state_message);
+	
+	
 	sum_linsys= sum_linsys+toc(timelinsys);
         sum_total = sum_total+toc(total);
 	sum_prec  = sum_prec+info_solver_newton.prec_cpu;
@@ -375,7 +356,7 @@ while true
 	  disp('ERROR')
 				%return	
 	end
-
+	
 	% deltat=1/(N+1);
 	% masses=zeros(N,1);
 	% for i = 1:N
@@ -409,7 +390,7 @@ while true
 
         uk = uk + alfak*omegak;
 	
-       
+	%fprintf('Step=%1.2e\n',alfak)
         if alfak==alfamin
 	  disp('Step too small')
             flag2 = 1;
@@ -427,11 +408,6 @@ while true
     end
     
     phimu = uk(1:tnp);
-    if (0)
-      for i=1:N+1
-	fprintf('last phi %1.4e\n', phimu(1+(i-1)*ncell))
-      end
-    end
     rhomu = uk(tnp+1:tnp+tnr2h);
     smu = uk(tnp+tnr2h+1:end);
 

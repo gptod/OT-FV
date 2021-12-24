@@ -18,7 +18,7 @@ function [A,B1T,rhs,B1T_perturbation]= manipulate_AB1Trhs(A,B1T,rhs,indeces_glob
     end
     if (just_replace)
         A(irow,1+(jblock-2)*ncellphi:(jblock-1)*ncellphi) =sparse(1,ncellphi);
-	A(irow,1+(jblock-1)*ncellphi:jblock    *ncellphi) ==sparse(1,ncellphi);
+	A(irow,1+(jblock-1)*ncellphi:jblock    *ncellphi) =sparse(1,ncellphi);
 	B1T(irow,:)=sparse(1,size(B1T,2));
 	rhs(irow)=0;
     end
