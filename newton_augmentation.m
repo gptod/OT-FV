@@ -86,8 +86,7 @@ function [OC,JOC] = newton_augmentation(uk,OC,JOC,option,line)
       tensor_times_OC(row,lcol:rcol)=-deltat*speye(ncell2h)*get_slice(OC.r,k,ncell2h,N);
     end
     
-    
-  end
+      end
     
   % augemented non-linear funciton
   OCvector=[OC.p;OC.r;OC.s];

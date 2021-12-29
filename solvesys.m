@@ -1324,9 +1324,26 @@ elseif sol==11
 					   Np,Nr,...
 					   controls.outer_prec,ncellphi);
   
- 
+
+
+  
  % solve
-  jacobian = [A B1T; B2 -C];
+  if (1)
+    % assembly full system
+    jacobian = [A B1T; B2 -C];
+
+    
+    out=prec_times_matrix(prec,jacobian);
+    norm(jacobian*[ones(Np,1);zeros(Nr,1)])
+    
+    eigenvalues=study_eigenvalues(out, '(prec)^{-1}J',1);
+    %eig6=eigs(@(x) jacobian*x,Nr+Np,40)
+    
+    figure
+    plot(eigenvalues,'o')
+
+    return
+  end
   
   outer_timing=tic;
   [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(x,A,B1T,B2,C,ncellphi,kernel,rhs), ...
@@ -1350,8 +1367,6 @@ elseif sol==11
 
 
   % assembly full system
-  jacobian = [A B1T; B2 -C];
-
   dp = d(1:Np); dr = d(Np+1:end);
   ds = JF.ss\(-F.s-JF.sr*dr);
   d = [dp; dr; ds];
@@ -1362,22 +1377,7 @@ elseif sol==11
   
  
 
-  if (1)
-    % assembly full system
-    jacobian = [A B1T; B2 -C];
-
-    
-    out=prec_times_matrix(prec,jacobian);
-    norm(jacobian*[ones(Np,1);zeros(Nr,1)])
-    
-    eigenvalues=study_eigenvalues(out, '(prec)^{-1}J',1);
-    %eig6=eigs(@(x) jacobian*x,Nr+Np,40)
-    
-    figure
-    plot(eigenvalues,'o')
-
-    return
-  end
+ 
 
   
   normd = norm(d);

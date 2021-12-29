@@ -47,7 +47,9 @@ verbose=0;
 
 				%mkdir 'runs'
 
-
+augmented=1; % on/off
+line=1;  % local line to modify
+option=1; % 1=first augmentation 2=augmentation (see newton_augementation)
 
 
      
@@ -67,7 +69,7 @@ for mesh_type = 5
   for h_i = 1
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=3
+    for i=2
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -361,7 +363,7 @@ for mesh_type = 5
 	    outer_prec=outer_precs{iprec};
 	  
 	  % set here other approximate inverse of block11
-	  ctrl_inner11.init('agmg',... %approach
+	  ctrl_inner11.init('direct',... %approach
 			    1e-4,... %tolerance
 			    10,...% itermax
 			    0.0,... %omega
