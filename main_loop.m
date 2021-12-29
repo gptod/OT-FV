@@ -338,7 +338,7 @@ for mesh_type = 5
 	  % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 	  for isolver=[3]%1:length(outer_solvers)
 	    ctrl_outer=ctrl_solver;
-	    ctrl_outer.init(outer_solvers{isolver},1e-5,4000,0.0,0); % verbose=[1,2] works only for fgmres
+	    ctrl_outer.init(outer_solvers{isolver},1e-5,4000,0.0,0);
 	  
 	  
 	  % external prec appraoch
@@ -361,7 +361,7 @@ for mesh_type = 5
 	    outer_prec=outer_precs{iprec};
 	  
 	  % set here other approximate inverse of block11
-	  ctrl_inner11.init('direct',... %approach
+	  ctrl_inner11.init('agmg',... %approach
 			    1e-4,... %tolerance
 			    10,...% itermax
 			    0.0,... %omega

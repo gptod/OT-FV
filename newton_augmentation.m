@@ -47,6 +47,7 @@ function [OC,JOC] = newton_augmentation(uk,OC,JOC,option,line)
 
 
   if (option==2)
+    deltat=1/N;
     % M^k = ( 1                  )         ( 1                  )       
     %       (  1                 )         (  1                 )
     %  line (phi_k^1 .... phi_k^N)   ..... (rho_k^1 .... rho_k^N 
@@ -66,9 +67,9 @@ function [OC,JOC] = newton_augmentation(uk,OC,JOC,option,line)
 	aug_matrix(row,lcol:rcol)=sparse(1:ncell);
       end
       aug_matrix(row,lcol:rcol) =aug_matrix(row,lcol:rcol)+...
-				 get_slice(phi,k,ncell,N+1)'; %v()=phi_k  vector depends on phi
+				 deltat*get_slice(phi,k,ncell,N+1)'; %v()=phi_k  vector depends on phi
       % d vector/ d phi_k * Fphi_k
-      tensor_times_OC(row,lcol:rcol)=speye(ncell)*get_slice(OC.p,k,ncell,N+1);
+      tensor_times_OC(row,lcol:rcol)=deltat*speye(ncell)*get_slice(OC.p,k,ncell,N+1);
     end
 
     for k=1:N
@@ -80,9 +81,9 @@ function [OC,JOC] = newton_augmentation(uk,OC,JOC,option,line)
 	aug_matrix(row,lcol:rcol)=sparse(1:ncell2h);
       end
       aug_matrix(row,lcol:rcol) = aug_matrix(row,lcol:rcol) + ...
-				  (-1.0)*get_slice(rho,k,ncell2h,N)'; %v()=rho_k  vector depends on phi
+				  deltat*(-1.0)*get_slice(rho,k,ncell2h,N)'; %v()=rho_k  vector depends on phi
       % d vector/ d rho_k * Frho_k
-      tensor_times_OC(row,lcol:rcol)=-speye(ncell2h)*get_slice(OC.r,k,ncell2h,N);
+      tensor_times_OC(row,lcol:rcol)=-deltat*speye(ncell2h)*get_slice(OC.r,k,ncell2h,N);
     end
     
     

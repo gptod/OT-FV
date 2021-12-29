@@ -55,7 +55,7 @@ end
 controls.swap_sign=1;
 
 augmented=1; % on/off
-Number_of_rows=N; % equation to add
+Number_of_rows=N; % equation to aedd
 line=ncell;           % local line to modify
 integral_constrain=0; % add intregral constrain to remove kernel
 verbose_aug=1;       % print info
