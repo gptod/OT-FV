@@ -43,6 +43,12 @@ h=-F.s;
 % Solve with the Schur complement A|C, using Matlab's backslash (or agmg)
 swap_sign=controls.swap_sign;
 
+if (controls.swap_sign)
+  sign=-1;
+else
+  sign=1;
+end
+
 				% reduced system to phi rho variables
 A = sparse(JF.pp);
 B1T = sparse(JF.pr-JF.ps*(JF.ss\JF.sr));
@@ -85,6 +91,21 @@ rhs_full=[f;g;h];
 kernel=ones(ncellphi,1);
 kernel=kernel/norm(kernel);
 
+
+area2h=diag(JF.rs(1:ncellrho,1:ncellrho));
+
+% e=zeros(Np,1);
+% e(1:ncellphi)=1;
+% temp=(B1T)'*e;
+% % I/delta=I*Nt
+% area2h=temp(1:ncellrho)*(1/Nt);
+% figure
+% plot(area2h)
+% hold on
+% plot(area2h1-area2h)
+% hold off
+% return
+
 if sol==1
     
     % Solve using Matlab's backslash
@@ -93,18 +114,19 @@ if sol==1
     %eId = eps*speye(size(JF.pp));
   if (1)
     Sys = [A B1T; B2 -C];
-    Sys(indc,:) = sparse(1,Np+Nr); Sys(:,indc) = sparse(Np+Nr,1); Sys(indc,indc) = 1;
-    d = Sys\[f1;f2];
+    fp=f1;
+    Sys(indc,:) = sparse(1,Np+Nr); Sys(:,indc) = sparse(Np+Nr,1); Sys(indc,indc) = 1; fp(indc)=0; 
+    d = Sys\[fp;f2];
+
     res=norm(Sys*d-[f1;f2])/norm([f1;f2]);
     dp = d(1:Np); dr = d(Np+1:end);
     ds = Dr\(h-Ds*dr);
     d = [dp; dr; ds];
 
- 
-    
     normd = norm(d);
-
-    resume_msg=sprintf('direct solver res=%2e',res);
+    resume_msg=sprintf('direct solver res=%1.2e',norm(res));
+    
+    
   else
     Sys = sparse(...
 		  [JF.pp,        JF.pr, JF.ps;
@@ -122,14 +144,73 @@ if sol==1
     %figure
     %plot(eigenvalues,'o')
     %return
-    
-    normd = norm(d);
-    resume_msg=sprintf('direct solver res=%2e',res);
-    %dp = d(1:Np); dr = d(Np+1:end);
+
+				%dp = d(1:Np); dr = d(Np+1:end);
     %ds = Dr\(h-Ds*dr);
     %d = [dp; dr; ds];
 
   end
+
+  if (0)
+    % we enforse the rho increment to have zero mass
+
+    
+    % P=  (I_{m-1}
+    %    -(a1 -a2 -a_{m-1})/a_m 
+    mat_P=speye(ncellrho,ncellrho-1);   
+    mat_P(ncellrho,1:ncellrho-1)=-area2h(1:ncellrho-1)'/area2h(ncellrho);
+
+    % H=block diagonal (P) 
+    mat_H = repmat({mat_P},1,N);
+    mat_H = blkdiag(mat_H{:});
+
+
+    s_B1T = B1T * mat_H;
+    s_B2 = mat_H' * B2;
+    s_C  = mat_H' * C * mat_H;
+
+    s_rhs = [f1; mat_H' * f2];
+
+    
+    J_short=[A, s_B1T; s_B2, -s_C];
+
+    d_short = J_short\s_rhs;
+
+    dp = d_short(1:Np);
+    dr = mat_H*d_short(Np+1:size(d_short,1));    
+    ds = Dr\(h-Ds*dr);
+
+
+
+    res_r=-(JF.rp * dp + JF.rr * dr + JF.rs * ds + F.r);
+    dl=zeros(N,1);
+
+    deltat=1/(N+1);
+    factor=1/(deltat*norm(area2h))^2;
+    for i = 1:N    
+      dl(i)= factor * (area2h'* (res_r(1+(i-1)*ncellrho:i*ncellrho))) ;
+      fprintf('dlambda(%d)=%1.2e\n',i,dl(i)) 
+    end
+    
+    sum_dl=0;
+    for i = 1:N
+      sum_dl=sum_dl+dl(i);
+      dp(1+(i-1)*ncellphi:i*ncellphi)=dp(1+(i-1)*ncellphi:i*ncellphi)+deltat*sum_dl;
+    end
+    
+    d = [dp; dr; ds];
+
+    [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
+      
+    
+				% redefine rho dimension 
+
+  end
+
+
+  [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
+  normd = norm(d);
+  resume_msg = sprintf('direct solver res=%1.2e',resnorm);
 
   %figure
   %spy(Sys)
@@ -513,19 +594,25 @@ elseif sol==9
   
 % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
 
-  if ( controls.permute)
-    permutation = symrcm(A(1:ncellphi,1:ncellphi));
-    p=permutation;
+  if ( controls.permute == 1)
+    % define permutation
+    perm_loc = symrcm(A(1:ncellphi,1:ncellphi));
+    perm=(1:Np)';
+    
     for i=1:Nt
-      range=[(i-1)*ncellphi+1:i*ncellphi];
-      A(range,range) = A((i-1)*(ncellphi)+p,(i-1)*ncellphi+p);
-      B1T(range,:)   = B1T((i-1)*(ncellphi)+p,:);
-      B2(:,range)    = B2(:,(i-1)*(ncellphi)+p);
-      rhs(range)     = rhs((i-1)*(ncellphi)+p);
+      perm((i-1)*ncellphi+1:i*ncellphi)=(i-1)*(ncellphi)+perm_loc;
     end
+    iperm(perm)=(1:Np)';
+    
+    % apply   fprintf('res=%1.2e\n',norm(S_old*x-b))
+
+    A=A(perm,perm);
+    B1T=B1T(perm,:);
+    B2=B2(:,perm);
+    rhs(1:N)=rhs(perm);
   end
 
-
+  
   if (controls.diagonal_scaling)
     [A,B1T,B2,C,rhs,diagA_scaling,diagC_scaling]=scaling_system(A,B1T,B2,C,rhs);
   end
@@ -563,17 +650,17 @@ elseif sol==9
 
     diagC = spdiags(C,0);
     %if ( verbose >= 1)
-    fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
+    %fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
     %end
     invdiagC = sparse(1:Nr,1:Nr,(1.0./diagC)',Nr,Nr);
 
     
 				% assembly schur AC S=A+B1
 				% reduced to system only in phi
+
     
     S = A+B1T*(invdiagC*B2);  
-    fp = rhs(1:Np)+B1T*(inverseC(rhs(Np+1:Np+Nr)));
-    
+    fp = rhs(1:Np)+B1T*(inverseC(rhs(Np+1:Np+Nr)));  
   elseif ( inverseC_approach==2)
 				%  C=-(R-Dr^{-1}M) Ds
 				% ~C=-(D(rho)R - MD(S))
@@ -609,7 +696,26 @@ elseif sol==9
 
     S = A+B1T*((inv_diag_tildeC*Dr)*B2);     
   end
+  S_old= S;
 
+  
+  figure
+  spy(S)
+  
+  if ( controls.permute == 2)
+    perm = symrcm(S);
+    iperm(perm)=(1:Np)';
+    % permute row and column
+    S   = S(perm,perm);
+    % permute row
+    B1T = B1T(perm,:);
+    % permute column
+    B2 = B2(:,perm);
+    % permute row
+    rhs(1:Np) = rhs(perm);
+  end
+    
+  
   cpu_invC_builS=toc(time_invC_builS);
   msg=sprintf('invC + BUILD S=%1.4e',cpu_invC_builS);
   if ( verbose >= 2)
@@ -655,37 +761,56 @@ elseif sol==9
 
   preprocess_cpu=toc(prep);
   
- % build rhs reduced
+  % build rhs reduced
   fp = rhs(1:Np)+B1T*(inverseC(rhs(Np+1:Np+Nr)));
 
 
+  
   % apply inverse S
   linsys=tic;
   dp=inv_S.apply(fp);
 
+  t=S_old*dp(iperm)-fp(iperm);
+  fprintf('res=%1.2e\n',norm(t(iperm)))
+
+  figure
+  spy(S(iperm,iperm))
+
   
-  % get y=C^{-1}(B2*x-g)
-  dr=inverseC(B2*dp-rhs(Np+1:Np+Nr));
-  d=[dp;dr];
-  
+
+  b=fp(iperm);
+  A = sign*sparse(JF.pp);
+  B1T = sign*sparse(JF.pr-JF.ps*(JF.ss\JF.sr));
+  B2 = sign*sparse(JF.rp);
+  %S_old= A + B1T*(invdiagC*B2);
+  norm(full(S_old-S(iperm,iperm)))
+  x=dp(iperm);
+  fprintf('res=%1.2e\n',norm(S_old*x-b))
+  return
   
 
   if (controls.diagonal_scaling)
-    d(1:Np)      =diagA_scaling*d(1:Np);
-    d(1+Np:Np+Nr)=diagC_scaling*d(1+Np:Np+Nr);
+    dp = diagA_scaling*dp;
+  end
+
+  if (controls.diagonal_scaling)
+    dr=diagC_scaling*dr;
   end
 
 
-  if (controls.permute)
-    for i=1:Nt
-      range=[(i-1)*ncellphi+1:i*ncellphi];
-      d((i-1)*(ncellphi)+p) = d(range);
-    end
+  % get y=C^{-1}(B2*x-g)
+  dr = inverseC(B2*dp-rhs(Np+1:Np+Nr));
+
+  
+  if (controls.permute==1)
+    dp = dp(perm);
+  elseif (controls.permute==2)
+    dp = dp(perm);
   end
+
 
   
   
-  dp = d(1:Np); dr = d(Np+1:end);
   ds = JF.ss\(-F.s-JF.sr*dr);
   d = [dp; dr; ds];
 
@@ -1176,6 +1301,7 @@ elseif sol==11
   ctrl_outer=controls.ctrl_outer;
   compute_eigen=controls.compute_eigen;
 
+
   verbose=controls.verbose;
   % Krylov method for full system
   % + 
@@ -1207,7 +1333,7 @@ elseif sol==11
     end
   end
 
-  [A,B1T,B2,rhs]=grounding(A,B1T,B2,rhs,controls.indc,0);
+  %[A,B1T,B2,rhs]=grounding(A,B1T,B2,rhs,controls.indc,0);
   
 % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
   if (controls.diagonal_scaling)
@@ -1260,31 +1386,83 @@ elseif sol==11
 
 				% define function
     inv_A = @(x) apply_block_triangular_inverse(diag_block_invA,above_diag_block_A,'U',x);
-    inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+    %inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+  elseif( strcmp(inverseA_approach,'diag'))
+    % partion matrix 
+    nAi=ncellphi;
+   
+    % use block inverse
+    diag_block_invA(Nt,1)=sparse_inverse;
+    ctrl_loc=ctrl_solver;
+
+   
+    for i=1:Nt
+      ctrl_loc=ctrl_solver;
+      ctrl_loc.init(ctrl_inner11.approach,...
+    		    ctrl_inner11.tolerance,...
+    		    ctrl_inner11.itermax,...
+    		    ctrl_inner11.omega,...
+    		    ctrl_inner11.verbose,...
+    		    sprintf('BD%sA%d',ctrl_inner11.label,i));
+      diag_block_invA(i).name=sprintf('inverse A%d',i);
+      matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi) + controls.relax4inv11*speye(nAi,nAi) ;
+      diag_block_invA(i).init(matrixAi,ctrl_loc);     
+    end
+
+    % define function
+    inv_A  = @(x) projector(apply_block_diag_inverse(diag_block_invA,x),kernel);
   end
 
+  
+  
   % define explicitely inverse of diag(A)
-  invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
+  % invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
+  invDiagA = sign*JF.diagA;
 
+
+  if (controls.remove_imbalance)
+    % we enforse the rho increment to have zero mass
+
+    
+    % P=  (I_{m-1}
+    %    -(a1 -a2 -a_{m-1})/a_m 
+    mat_P=speye(ncellrho,ncellrho-1);   
+    mat_P(ncellrho,1:ncellrho-1)=-area2h(1:ncellrho-1)'/area2h(ncellrho);
+
+    % H=block diagonal (P) 
+    mat_H = repmat({mat_P},1,N);
+    mat_H = blkdiag(mat_H{:});
+
+    norm(mat_P'*area2h)
+    figure
+
+    B1T = B1T * mat_H;
+    B2 = mat_H' * B2;
+    C  = mat_H' * C * mat_H;
+
+    % for i=1:Nt
+    %   e=zeros(Np,1);
+    %   e(1+(i-1)*ncellphi:i*ncellphi)=1;
+    %   temp=B2*e;
+    %   figure
+    %   plot(temp)
+    %   norm(temp)
+    % end
+    
+    rhs = [rhs(1:Np); mat_H' * rhs(Np+1:Np+Nr)];
+
+    % redefine rho dimension 
+    Nr = (ncellrho-1)*N;
+  end
   
   % assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
   % reduced to system only in rho
   SCA = (C+B2*invDiagA*B1T);
-  fr = rhs(1+Np:Np+Nr)-B2*(invDiagA*rhs(1:Np));
-
 
   % preprocess of precondtioner defienition
   preprocess_cpu=toc;
-
   
-  
-  approach='full';  
-  relax4prec=0e-5;
-  debug=0;
-  if ( verbose >= 2)
-    fprintf('APPROACH %s \n',approach)
-  end
-  
+  debug=0;  
   build_S=tic;
   % init inverse of full S
   if ( verbose >= 2)
@@ -1295,8 +1473,6 @@ elseif sol==11
   inv_SCA.info_inverse.label='schur_ca';
   inv_SCA.cumulative_iter=0;
   inv_SCA.cumulative_cpu=0;
-  
-  inverse_cpu=inv_SCA.init_cpu;
   if ( verbose >= 2)
     fprintf('DONE inverse S\n') 
   end 
@@ -1304,19 +1480,24 @@ elseif sol==11
 
   cpu_assembly_inverseS=toc(build_S);
 
-  prec_cpu=toc(time_prec);
-
-  
-  %fprintf(' %1.4e <=diag(S)< %1.4e\n ', min(inv_SCA.inverse_matrix_diagonal),max(inv_SCA.inverse_matrix_diagonal));
-
   %SCA = @(x) (C*x + B2*(invA(B1T*x)));
   %assembly inverse of  SAC iterative solver with no precodnitioner
   %inverse_block22 = @(y) -apply_iterative_solver( SCA, y, ctrl_inner22, @(z) z);
+  
+
+  % store time required to build prec
+  prec_cpu=toc(time_prec);
+
+  % set dimension of inner solver
   inner_nequ=Nr;
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  % END DUAL SCHUR COMPLEMENT
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 
   
-				% Define action of preconditoner
-  
+  % Define action of block preconditoner 
   prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
 					   inverse_block22,...
 					   @(y) B1T*y,...
@@ -1324,11 +1505,10 @@ elseif sol==11
 					   Np,Nr,...
 					   controls.outer_prec,ncellphi);
   
-
-
+  proj = @(z) [projector(z(1:Np),kernel);z(Np+1:Np+Nr)]; 
   
  % solve
-  if (1)
+  if (0)
     % assembly full system
     jacobian = [A B1T; B2 -C];
 
@@ -1347,7 +1527,18 @@ elseif sol==11
   
   outer_timing=tic;
   [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(x,A,B1T,B2,C,ncellphi,kernel,rhs), ...
-				    rhs, ctrl_outer, prec,[],controls.left_right );
+				    rhs, ctrl_outer, @(z) prec(z),[],controls.left_right );
+
+  if controls.remove_imbalance
+    % restore solution
+    increment=zeros(Np+Nr+N,1);
+    increment(1:Np)        = d(1:Np);
+    increment(Np+1:Np+Nr+N)= mat_H*d(Np+1:Np+Nr);
+    d=increment;
+    Nr=Nr+N;
+
+  end
+  
   if (controls.diagonal_scaling)
     d(1:Np)      =diagA_scaling*d(1:Np);
     d(1+Np:Np+Nr)=diagC_scaling*d(1+Np:Np+Nr);  
@@ -1734,7 +1925,6 @@ elseif sol==12
       figure
       plot(eigenvalues,'o')
       
-      disp('here')
       
       %saveas(gcf,strcat(controls.basename,controls.sys_name,'denseS.png'));
       saveas(gcf,'denseS.png');
@@ -2831,6 +3021,98 @@ elseif (sol==16)
     end
   end
   
+elseif (sol == 17)
+  % get variable for assembling system
+  rho=-spdiags(JF.ss);
+  deltat=1/(N+1);
+  
+  % build matrix W
+  W_mat=zeros(N,Nr);
+  for i = 1:N
+    W_mat(i,1+(i-1)*ncellrho:i*ncellrho)=deltat*area2h';
+  end
+
+  P=speye(Nr,Nr)-W_mat'*W_mat;
+  
+  
+  % assembly lambda residuum
+  
+  f_lambda=zeros(N,1);
+  for i = 1:N
+    f_lambda(i)=deltat*(area2h' * rho(1+(i-1)*ncellrho:i*ncellrho)-1);
+  end
+  rhs = -[F.p; F.r; F.s; f_lambda];
+
+  % hessian + sostituion for slack varaible
+  Sys = sparse([...
+		 JF.pp,         JF.pr,  JF.ps,        sparse(Np,N) ;
+		 JF.rp,         JF.rr,  JF.rs,        W_mat'        ;
+		 sparse(Nr,Np), JF.sr,  JF.ss,        sparse(Nr,N);
+		 sparse(N, Np), W_mat,  sparse(N,Nr), sparse(N, N) ...
+	       ]);
+
+  % solve
+  dim=Np+Nr+Nr+N;
+  if (0)
+    Sys(indc,:) = sparse(1,dim); Sys(:,indc) = sparse(dim,1); Sys(indc,indc) = 1; rhs(indc)=0; 
+    increment = (Sys+0e-10*speye(dim))\rhs;
+    
+    res=norm(Sys*increment - rhs);
+    fprintf('res aug=%1.2e\n',res)
+    
+    
+				% get phi,rho,s increment and lambda
+    d=increment(1:Np+Nr+Nr);
+    dl=increment(1+Np+Nr+Nr: Np+Nr+Nr+N);
+  else
+			     % hessian + sostituion for slack varaible
+    rhsR = -[F.p; P*F.r; F.s];
+    SysR = sparse([...
+		    JF.pp,         JF.pr,   JF.ps, ;
+		    P*JF.rp,       P*JF.rr, P*JF.rs;
+		    sparse(Nr,Np), JF.sr,  JF.ss   ...
+		  ]);
+
+
+    d = SysR\rhsR;
+    res=norm(SysR*d - rhsR);
+    fprintf('res aug=%1.2e\n',res)
+    
+    
+    res_r=-([JF.rp JF.rr JF.rs]*d + F.r);
+    factor=1/(deltat*norm(area2h))^2;
+    dl=factor* W_mat*(res_r);
+    for i = 1:N    
+      fprintf('dlambda(%d)=%1.2e\n',i,dl(i)) 
+    end
+  end
+    
+  % correction of phi increment 
+  sum_dl=0;
+  for i = 1:N
+    sum_dl=sum_dl+dl(i);
+    d(1+(i-1)*ncellphi:i*ncellphi)=d(1+(i-1)*ncellphi:i*ncellphi)+deltat*sum_dl;
+  end
+  
+  
+  [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d)
+  
+  resume_msg=sprintf('direct solver res=%1.2e',norm(resnorm));
+  normd = norm(d);
+ 
+ 
+    
+  inner_nequ=0;
+  inner_iter=0;
+  outer_iter=0;
+  outer_cpu=0;
+  prec_cpu=0;
+  inner_nequ2;
+  inner_iter2=0;
+  inner_nequ3=0;
+  inner_iter3=0;
+
+
 end
 
 realres=compute_linear_system_residuum(JF,F,d);
