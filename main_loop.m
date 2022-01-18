@@ -27,7 +27,7 @@ alfamin = 0.1; % minimal step length accepted
 mu0_up = 0;
 
 
-verb = 1; % verbosity level: {0,1,2}
+verb = 2; % verbosity level: {0,1,2}
 eps_lin = 1e-5; % tolerance for the solution of the linear systems
 kel = 0; % set 1 for adaptive tolerance for the Newton scheme
 % eps_lin = eps_0;
@@ -39,7 +39,7 @@ plot_figures=0
 
 
 save_data=1;
-read_from_file=3;
+read_from_file=0;
 %h5_file2read='runs/sol10/PhiRhoSMuThetasin_h1_rec1_N00032__schurACwithdiagC_fgmres_full_invSACfullagmg1e-1_invC1_diag.h5';
 
 compute_eigen=0;
@@ -47,7 +47,7 @@ verbose=0;
 
 				%mkdir 'runs'
 
-augmented=1; % on/off
+augmented=0; % on/off
 line=1;  % local line to modify
 option=1; % 1=first augmentation 2=augmentation (see newton_augementation)
 
@@ -69,7 +69,7 @@ for mesh_type = 5
   for h_i = 1
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=2
+    for i=1
       N=4*(2^(i-1))
       Nt = N+1;
 
@@ -104,7 +104,7 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[11];
+      for sol=[17];
 
 	%folder_run=sprintf('runs/sol%d',sol)
 	%mkdir folder_run
@@ -163,7 +163,7 @@ for mesh_type = 5
 	  for kk=1
 	    inverseC_approach=1;
 
-	    permute=1;
+	    permute=2;
 	    
 	    for kkk=[0]
 	      for jj=[0]
@@ -180,12 +180,12 @@ for mesh_type = 5
 		  
 				% set solver for block 11 (schurAC)
 		  solvers={'direct','agmg'   ,'agmg'  ,'agmg' ,'incomplete','krylov'  ,'krylov'  };
-		  iters  ={1       ,400     ,10      ,1      ,1           ,100       ,1         };
-		  label  ={'direct','agmg1e-5','agmg10','agmg1','incomplete','krylov10','krylov10'};
+		  iters  ={1       ,400     ,10      ,1      ,1           ,200       ,1         };
+		  label  ={'direct','agmg1e-5','agmg10','agmg1','incomplete','krylov200','krylov10'};
 		  
    				% set here from solvers
-		  for i=[2];%length(solvers)
-		    ctrl_inner11.init(solvers{i},1e-5,iters{i},1.0,0,label{i});
+		  for i=[6];%length(solvers)
+		    ctrl_inner11.init(solvers{i},1e-8,iters{i},1.0,1,label{i});
 		    
 		    ctrl_inner22.init('diag',... %approach
 				      1e-6,... %tolerance
@@ -334,13 +334,17 @@ for mesh_type = 5
 	elseif (sol==11)
 	  % krylov based solvers for M [x;y] = [f;g]
 	  % pcg works only with full
+
+	  % tranform system to enforce the mass increment ha zero mean
+	  remove_imbalance=1
+
 	  
 	  outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
 
 	  % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 	  for isolver=[3]%1:length(outer_solvers)
 	    ctrl_outer=ctrl_solver;
-	    ctrl_outer.init(outer_solvers{isolver},1e-5,4000,0.0,0);
+	    ctrl_outer.init(outer_solvers{isolver},1e-5,400,0.0,1);
 	  
 	  
 	  % external prec appraoch
@@ -363,24 +367,22 @@ for mesh_type = 5
 	    outer_prec=outer_precs{iprec};
 	  
 	  % set here other approximate inverse of block11
-	  ctrl_inner11.init('direct',... %approach
-			    1e-4,... %tolerance
+	  ctrl_inner11.init('agmg',... %approach
+			    1e-1,... %tolerance
 			    10,...% itermax
 			    0.0,... %omega
 			    0,... %verbose
-			    'direct'); %label
+			    'agmg1e-4'); %label
 	  %inverse11='full';
-	  inverse11='block';
-	  relax4_inv11=0e-12;
+	  inverse11='diag';
+	  %inverse11='block';
+	  relax4_inv11=1e-12;
 	  
 	  % set grounded_node>0 to gorund the potential in grounded node
 	  grounded_node=0;
 	  diagonal_scaling=0;
 	  manipulate=0;
 	  manipulation_approach=4;
-
-	  
-
 	  
 
 	  % set here list of solvers for block 22 
@@ -406,7 +408,8 @@ for mesh_type = 5
 			      'verbose',verbose,...
 			      'inverse11',inverse11,...
 			      'relax4inv11',relax4_inv11,...
-			      'relax4inv22',relax4_inv22);
+			      'relax4inv22',relax4_inv22,...
+			      'remove_imbalance',remove_imbalance			     );
 	   
 
 	    approach_string=strcat('grounded',num2str(grounded_node),...
@@ -943,6 +946,14 @@ for mesh_type = 5
 	      end
 	    end
 	  end
+	elseif (sol ==17)
+	  grounded_node=-1;
+	  controls = struct('save_data',save_data,...
+			    'indc',grounded_node,...
+			    'sol',sol);
+
+	  approach_string=('augmented');
+	  geod
 	end
       end
     end
