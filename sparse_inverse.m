@@ -205,6 +205,7 @@ classdef sparse_inverse <handle
        obj.cumulative_cpu=obj.cumulative_cpu+cpu;
 
        obj.info_inverse.label=obj.ctrl.label;
+       obj.info_inverse.sumsol=sum(sol);
        if (obj.ctrl.verbose)
 	 obj.info_inverse.print(obj.ctrl.unit_out);
        end
