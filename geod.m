@@ -235,13 +235,13 @@ while true
       total=tic;
       assembly=tic;
       
-      message="BEGIN ASSEMBLY FOC";
-      if verb>1
-	if (  itk2 == 0)
-	  state_message=sprintf(' \n')	;		
-	end	
-	fprintf('%s \n',message);
-      end
+      % message="BEGIN ASSEMBLY FOC";
+      % if verb>1
+      % 	if (  itk2 == 0)
+      % 	  state_message=sprintf(' \n')	;		
+      % 	end	
+      % 	fprintf('%s \n',message);
+      % end
 
       [rhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
       [drhosk]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
@@ -257,6 +257,7 @@ while true
       if verb>1
 	fprintf('%s \n',state_message);
       end
+      %fprintf(2,'%s \n',state_message);
 
 
       if delta_mu < eps_mu	
@@ -297,10 +298,10 @@ while true
       controls.sys_name=sys_name;
       
 		     % Compute the jacobian of the system of equations
-      message="BEGIN ASSEMBLY JFOC";
-      if verb>1
-        fprintf('%s \n',message)
-      end
+      % message="BEGIN ASSEMBLY JFOC";
+      % if verb>1
+      %   fprintf('%s \n',message)
+      % end
       ctime=tic;
       % Compute the jacobian of the system of equations
       [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
@@ -314,7 +315,7 @@ while true
       sum_assembly=sum_assembly+toc(assembly);
       JFOCtime=toc(ctime);
 	
-      if verb>1
+      if verb>2
         fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
       end
 
@@ -324,9 +325,14 @@ while true
 	% Solve the linear system
 	timelinsys=tic;
 				%try
+
+	% for i = 1: Nt
+	%   fprintf('%d <1,f^i>=%1.2e\n',i,...
+	%  	  sum(OC.p(1+(i-1)*ncell:i*ncell)))
+	% end
 	
         [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls);
-	
+	disp(resume_msg)
 	%[res,resp,resr,ress]=compute_linear_system_residuum(JOC,OC,omegak);
 	
 	
@@ -354,8 +360,8 @@ while true
 	% deltat=1/(N+1);
 	% masses=zeros(N,1);
 	% for i = 1:N
-	%   masses(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h/(deltat);
-	%   state_message=sprintf('y*area/deltat<= %1.4e',min(masses(i)));
+	%   masses(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
+	%   state_message=sprintf('y*area= %1.4e',min(masses(i)));
 	%   fprintf('%s \n',state_message);
 	%   fprintf(logID,'%s \n',state_message);
 	% end

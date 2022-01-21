@@ -10,6 +10,7 @@ function [y] = mxv_jacobian(x,A,B1T,B2,C,ncellphi,kernel,rhs)
   
   verbose=0;
   if (verbose)
+    disp('imbalance in')
     print_imbalance(x(1:n),ncellphi)
   end
   
@@ -21,6 +22,7 @@ function [y] = mxv_jacobian(x,A,B1T,B2,C,ncellphi,kernel,rhs)
   imbalance_v=0.0;
 
   if (verbose)
+    disp('imbalance out')
     print_imbalance(y(1:n),ncellphi)
   end
 

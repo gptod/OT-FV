@@ -13,6 +13,7 @@ function [OC,JOC] = newton_augmentation(uk,OC,JOC,option,line)
   rho = uk(Np+1   :Np+Nr  );
   s   = uk(Np+Nr+1:Np+2*Nr);
 
+  
   % define the aug_matrix M (called aug_matrix) multiplying the non-linear system
   % G=M * OC
   % Define also the aug_matrix P (called tensor_times_OC) such that
@@ -40,7 +41,7 @@ function [OC,JOC] = newton_augmentation(uk,OC,JOC,option,line)
       if (not(add))
 	aug_matrix(row,lcol:rcol)=sparse(1:ncell2h);
       end
-      aug_matrix(row,lcol:rcol)=aug_matrix(line,lcol:rcol)+1e-1*ones(1,ncell2h);
+      aug_matrix(row,lcol:rcol)=aug_matrix(line,lcol:rcol)+ones(1,ncell2h);
     end
     tensor_times_OC=sparse(nu,nu);
   end
@@ -116,6 +117,8 @@ function [OC,JOC] = newton_augmentation(uk,OC,JOC,option,line)
   JOC.sp=sparse(JOCaug_matrix(1+Np+Nr:Np+Nr+Nr,1      :Np));
   JOC.sr=sparse(JOCaug_matrix(1+Np+Nr:Np+Nr+Nr,1+Np   :Np+Nr));
   JOC.ss=sparse(JOCaug_matrix(1+Np+Nr:Np+Nr+Nr,1+Np+Nr:Np+Nr+Nr));
+
+  
 
   % size(JOC.pp)
   % size(JOC.pr)

@@ -12,7 +12,7 @@ resume_msg='';
 %ctrl_inner11=controls.ctrl_inner11;
 %ctrl_inner22=controls.ctrl_inner22;
 %ctrl_outer=controls.ctrl_outer;
-%compute_eigen=controls.compute_eigen;
+%compute_eigen=controls.compute_eigen; 
   
 Np = length(F.p);
 Nr = length(F.r);
@@ -53,9 +53,10 @@ end
 A = sparse(JF.pp);
 B1T = sparse(JF.pr-JF.ps*(JF.ss\JF.sr));
 B2 = sparse(JF.rp);
-
-R = sparse(JF.rr); M   = sparse(JF.rs);
-Ds = sparse(JF.sr); Dr = sparse(JF.ss);
+R = sparse(JF.rr);
+M   = sparse(JF.rs);
+Ds = sparse(JF.sr);
+Dr = sparse(JF.ss);
 C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
 temp=(JF.ss\h);
 f1 = f-JF.ps*temp;
@@ -92,7 +93,21 @@ kernel=ones(ncellphi,1);
 kernel=kernel/norm(kernel);
 
 
-area2h=diag(JF.rs(1:ncellrho,1:ncellrho));
+area2h=JF.area2h;
+
+deltat=1/(N+1);
+  
+% build matrix W
+W_mat=zeros(N,Nr);
+for i = 1:N
+  W_mat(i,1+(i-1)*ncellrho:i*ncellrho)=deltat*area2h';
+end
+
+%P=speye(Nr,Nr)-W_mat'*W_mat;
+
+% define implicetly projector
+factor=1/(deltat*norm(area2h))^2 
+proj=@(rho) rho - factor * W_mat'*(W_mat*rho);
 
 % e=zeros(Np,1);
 % e(1:ncellphi)=1;
@@ -1416,9 +1431,8 @@ elseif sol==11
   
   
   % define explicitely inverse of diag(A)
-  % invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
-  invDiagA = sign*JF.diagA;
-
+  invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
+  
 
   if (controls.remove_imbalance)
     % we enforse the rho increment to have zero mass
@@ -1500,12 +1514,12 @@ elseif sol==11
   % Define action of block preconditoner 
   prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
 					   inverse_block22,...
-					   @(y) B1T*y,...
+					   @(y) B1T*proj(y),...
 					   @(z) B2*z,...
 					   Np,Nr,...
 					   controls.outer_prec,ncellphi);
   
-  proj = @(z) [projector(z(1:Np),kernel);z(Np+1:Np+Nr)]; 
+  %proj = @(z) [projector(z(1:Np),kernel);z(Np+1:Np+Nr)]; 
   
  % solve
   if (0)
@@ -1526,9 +1540,25 @@ elseif sol==11
   end
   
   outer_timing=tic;
-  [d,info_J]=apply_iterative_solver(@(x) mxv_jacobian(x,A,B1T,B2,C,ncellphi,kernel,rhs), ...
-				    rhs, ctrl_outer, @(z) prec(z),[],controls.left_right );
+  [d,info_J]=apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,...
+																														@(y) B1T*proj(y),...
+																														@(z) B2*z,...
+																														@(z) C*z,...
+																														Np,Nr), ...
+																		rhs, ctrl_outer, @(z) prec(z),[],controls.left_right );
+	for i = 1:N
+		imb=d(Np+1+(i-1)*ncellrho:Np+i*ncellrho)'*area2h;
+		state_message=sprintf('y*area= %1.4e',imb);
+		fprintf('%s \n',state_message);
+	end
 
+	for i = 1:N+1
+		imb=sum(F.p(1+(i-1)*ncellphi:i*ncellphi));
+		state_message=sprintf('imb= %1.4e',imb);
+		fprintf('%s \n',state_message);
+	end
+
+	
   if controls.remove_imbalance
     % restore solution
     increment=zeros(Np+Nr+N,1);
@@ -1564,10 +1594,6 @@ elseif sol==11
   [res,resp,resr,ress]=compute_linear_system_residuum(JF,F,d)
 
   relres=res;
- 
-  
- 
-
  
 
   
@@ -3025,22 +3051,20 @@ elseif (sol == 17)
   % get variable for assembling system
   rho=-spdiags(JF.ss);
   deltat=1/(N+1);
-  
-  % build matrix W
-  W_mat=zeros(N,Nr);
-  for i = 1:N
-    W_mat(i,1+(i-1)*ncellrho:i*ncellrho)=deltat*area2h';
-  end
 
-  P=speye(Nr,Nr)-W_mat'*W_mat;
-  
-  
-  % assembly lambda residuum
-  
-  f_lambda=zeros(N,1);
-  for i = 1:N
-    f_lambda(i)=deltat*(area2h' * rho(1+(i-1)*ncellrho:i*ncellrho)-1);
+	% assembly lambda residuum
+	% f(k)=(area*rho_k-1)
+	v = JF.area2h;
+	f_lambda = zeros(N,1);
+	W_mat=zeros(N,Nr);
+	for k = 1:N
+		f_lambda(i) = v' * get_slice(rho,k, ncellrho, N) - 1; % F^k_lambda
+    W_mat(k,1+(k-1)*ncellrho:k*ncellrho) = v'; % d F^k_lambda drho_k 
   end
+  
+  % build projector matrix
+	factor=1/(norm(v))^2
+  P=speye(Nr,Nr)-factor*W_mat'*W_mat;
   rhs = -[F.p; F.r; F.s; f_lambda];
 
   % hessian + sostituion for slack varaible
@@ -3051,53 +3075,49 @@ elseif (sol == 17)
 		 sparse(N, Np), W_mat,  sparse(N,Nr), sparse(N, N) ...
 	       ]);
 
+	
+	
   % solve
   dim=Np+Nr+Nr+N;
-  if (0)
-    Sys(indc,:) = sparse(1,dim); Sys(:,indc) = sparse(dim,1); Sys(indc,indc) = 1; rhs(indc)=0; 
-    increment = (Sys+0e-10*speye(dim))\rhs;
-    
-    res=norm(Sys*increment - rhs);
-    fprintf('res aug=%1.2e\n',res)
-    
-    
-				% get phi,rho,s increment and lambda
-    d=increment(1:Np+Nr+Nr);
-    dl=increment(1+Np+Nr+Nr: Np+Nr+Nr+N);
-  else
-			     % hessian + sostituion for slack varaible
-    rhsR = -[F.p; P*F.r; F.s];
-    SysR = sparse([...
-		    JF.pp,         JF.pr,   JF.ps, ;
-		    P*JF.rp,       P*JF.rr, P*JF.rs;
-		    sparse(Nr,Np), JF.sr,  JF.ss   ...
-		  ]);
+	%Sys(indc,:) = sparse(1,dim); Sys(:,indc) = sparse(dim,1); Sys(indc,indc) = 1; rhs(indc)=0; 
+	increment=Sys\rhs;
+  
+  % get phi,rho,s increment and lambda
+  d=increment(1:Np+Nr+Nr);
+  dl=increment(1+Np+Nr+Nr: Np+Nr+Nr+N);
+	[resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
+	resume_msg=sprintf('res=%1.1e | p=%1.1e r=%1.1e s=%1.1e\n',resnorm,resp,resr,ress);
+	disp(resume_msg)
 
+	compare=0;
+	if (compare)
+		indc=1
+		SysR = sparse([...
+  									JF.pp,         JF.pr,   JF.ps, ;
+  									JF.rp,         JF.rr,   JF.rs;
+  									sparse(Nr,Np), JF.sr,  JF.ss   ...
+  								]);
+		rhs = -[F.p; F.r; F.s];
+		dim=Np+2*Nr;
+		%SysR(indc,:) = sparse(1,dim); SysR(:,indc) = sparse(dim,1); SysR(indc,indc) = 1; rhs(indc)=0; 
+		exact_d=SysR\rhs;
+		error=d-exact_d;
+		figure
+		plot(error(1:Np+Nr))
+	end
 
-    d = SysR\rhsR;
-    res=norm(SysR*d - rhsR);
-    fprintf('res aug=%1.2e\n',res)
-    
-    
-    res_r=-([JF.rp JF.rr JF.rs]*d + F.r);
-    factor=1/(deltat*norm(area2h))^2;
-    dl=factor* W_mat*(res_r);
-    for i = 1:N    
-      fprintf('dlambda(%d)=%1.2e\n',i,dl(i)) 
-    end
-  end
-    
-  % correction of phi increment 
-  sum_dl=0;
-  for i = 1:N
-    sum_dl=sum_dl+dl(i);
-    d(1+(i-1)*ncellphi:i*ncellphi)=d(1+(i-1)*ncellphi:i*ncellphi)+deltat*sum_dl;
-  end
-  
-  
-  [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d)
-  
-  resume_msg=sprintf('direct solver res=%1.2e',norm(resnorm));
+	
+	d(1:Np) = dp_correction(d(1:Np),JF,dl);
+
+	if (compare)
+		error=d-exact_d;
+		hold on
+		plot(error(1:Np+Nr))
+		hold off
+	end
+  [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
+	resume_msg=sprintf('res=%1.1e p=%1.1e r=%1.1e s=%1.1e\n',resnorm,resp,resr,ress);
+	
   normd = norm(d);
  
  
@@ -3112,6 +3132,366 @@ elseif (sol == 17)
   inner_nequ3=0;
   inner_iter3=0;
 
+
+elseif (sol==18)
+  % get variable for assembling system
+  rho=-spdiags(JF.ss);
+  deltat=1/(N+1);
+  
+  % build matrix W
+  W_mat=zeros(N,Nr);
+	v=deltat*area2h';
+  for i = 1:N
+    W_mat(i,1+(i-1)*ncellrho:i*ncellrho)=v';
+  end
+
+	
+	factor=1/(norm(v))^2
+  P=speye(Nr,Nr)-factor*W_mat'*W_mat;
+
+  % assembly lambda residuum
+  
+  f_lambda=zeros(N,1);
+  for i = 1:N
+    f_lambda(i)=deltat*(area2h' * rho(1+(i-1)*ncellrho:i*ncellrho)-1);
+		fprintf('flambda(%d)=%1.2e\n',i,f_lambda(i)) 
+  end
+
+	SysR = sparse([...
+  								JF.pp,         JF.pr,   JF.ps, ;
+  								JF.rp,         JF.rr,   JF.rs;
+  								sparse(Nr,Np), JF.sr,  JF.ss   ...
+  							]);
+	rhs = -[F.p; F.r; F.s];
+
+	exact_d=SysR\rhs;
+	res=norm(SysR*exact_d - rhs);
+	fprintf('res real=%1.2e\n',res)
+
+	print_imbalance(F.p,ncellphi)
+	norm(P'*exact_d(Np+1:Np+Nr)-exact_d(Np+1:Np+Nr))
+	disp('here')
+	for i = 1:N
+		imb=exact_d(Np+1+(i-1)*ncellrho:Np+i*ncellrho)'*area2h;
+		state_message=sprintf('y*area= %1.4e',imb);
+		fprintf('%s \n',state_message);
+	end
+	disp('here')
+	W_mat*exact_d(Np+1:Np+Nr)
+
+	disp('proj')
+	if (1)
+		rhsR = -[F.p; P*F.r; F.s];
+		SysR = sparse([...
+  									JF.pp,         JF.pr,   JF.ps, ;
+  									P*JF.rp,       P*JF.rr, P*JF.rs;
+  									sparse(Nr,Np), JF.sr,  JF.ss   ...
+  								]);
+		
+		
+		d = SysR\rhsR;
+		res=norm(SysR*d - rhsR);
+		fprintf('res aug=%1.2e\n',res)
+	else
+		rhsR = [f1; P*f2];
+		SysR = sparse([...
+										A,   B1T*P;
+										P*B2, -P*C*P;
+									]);
+		
+		d = SysR\rhsR;
+		res=norm(SysR*d - rhsR);
+		ds = Dr\(h-Ds*d(Np+1:Np+Nr));
+		d = [d; ds];
+		fprintf('res aug=%1.2e\n',res)
+	end
+
+	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
+  %dl=get_dl(JF,F,d);
+  
+  % correction of phi increment 
+	%d(1:Np) = dp_correction(d(1:Np),JF,dl);
+
+	%figure
+	%error=d(1:Np+Nr)-exact_d(1:Np+Nr);
+	%plot(error)
+  
+  % dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z-g)
+  res_r=-([JF.rp JF.rr JF.rs]*d + F.r);
+
+	disp(norm(res_r))
+  factor=1/((deltat*norm(area2h))^2);
+  dl=factor* W_mat*(res_r);
+  %dl=get_dl(JF,F,d)
+  for i = 1:N    
+    fprintf('dlambda(%d)=%1.2e\n',i,dl(i)) 
+  end
+
+	rhsP = -[F.p; F.r; F.s; f_lambda];
+
+  % hessian + sostituion for slack varaible
+  SysP = sparse([...
+		 JF.pp,         JF.pr,  JF.ps,        sparse(Np,N) ;
+		 JF.rp,         JF.rr,  JF.rs,        W_mat'        ;
+		 sparse(Nr,Np), JF.sr,  JF.ss,        sparse(Nr,N);
+		 sparse(N, Np), W_mat,  sparse(N,Nr), sparse(N, N) ...
+								]);
+
+	resP=SysP*[d;dl]-rhsP;
+	norm(SysP*[d;dl]-rhsP)
+	figure
+	plot(resP)
+
+	return
+  
+  %correction of phi increment 
+  sum_dl=0;
+  for i = 1:N
+    sum_dl=sum_dl+deltat*dl(i);
+		j=i;
+    d(1+(j-1)*ncellphi:j*ncellphi)=d(1+(j-1)*ncellphi:j*ncellphi)+sum_dl;
+  end
+
+	
+
+	hold on
+	error=d(1:Np+Nr)-exact_d(1:Np+Nr);
+	plot(error)
+  hold off
+  
+  [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
+
+	resume_msg=sprintf('res=%1.1e p=%1.1e r=%1.1e s=%1.1e\n',resnorm,resp,resr,ress);
+	disp(resume_msg)
+	
+  normd = norm(d);
+ 
+	return
+    
+  inner_nequ=0;
+  inner_iter=0;
+  outer_iter=0;
+  outer_cpu=0;
+  prec_cpu=0;
+  inner_nequ2;
+  inner_iter2=0;
+  inner_nequ3=0;
+  inner_iter3=0;
+
+elseif (sol == 19)
+  % get variable for assembling system
+  rho=-spdiags(JF.ss);
+  deltat=1/(N+1);
+  
+  % build matrix W
+  W_mat=zeros(N,Nr);
+  for i = 1:N
+    W_mat(i,1+(i-1)*ncellrho:i*ncellrho)=deltat*area2h';
+  end
+
+  %P=speye(Nr,Nr)-W_mat'*W_mat;
+
+	% define implicetly projector
+	factor=1/(deltat*norm(area2h))^2 
+	proj=@(rho) rho - factor * W_mat'*(W_mat*rho);
+  
+  % assembly lambda residuum
+  
+  f_lambda=zeros(N,1);
+  for i = 1:N
+    f_lambda(i)=deltat*(area2h' * rho(1+(i-1)*ncellrho:i*ncellrho)-1);
+		fprintf('flambda(%d)=%1.2e\n',i,f_lambda(i)) 
+
+  end
+  
+  rhsR = [f1; proj(f2)];
+ 
+	%
+	% PREPROCESS TIME
+	%
+  time_prec=tic;
+	time_A=tic;
+	
+  % define approxiamte inverse of (~A)^{-1}  
+  inverseA_approach=controls.inverse11;
+	ctrl_inner11 = controls.ctrl_inner11;
+
+	disp(inverseA_approach)
+  if ( strcmp(inverseA_approach,'full'))
+    % set inverse
+    invA=sparse_inverse;
+    invA.init(A+controls.relax4inv11*speye(Np,Np),controls.ctrl_inner11);
+    invA.cumulative_iter=0;
+    invA.cumulative_cpu=0;
+
+    % define function
+    inv_A = @(x) invA.apply(x);
+  elseif( strcmp(inverseA_approach,'diag'))
+    % partion matrix 
+    nAi=ncellphi;
+   
+    % use block inverse
+    diag_block_invA(Nt,1)=sparse_inverse;
+    ctrl_loc=ctrl_solver;
+   
+    for i=1:Nt
+      ctrl_loc=ctrl_solver;
+      ctrl_loc.init(ctrl_inner11.approach,...
+    		    ctrl_inner11.tolerance,...
+    		    ctrl_inner11.itermax,...
+    		    ctrl_inner11.omega,...
+    		    ctrl_inner11.verbose,...
+    		    sprintf('BD%sA%d',ctrl_inner11.label,i));
+      diag_block_invA(i).name=sprintf('inverse A%d',i);
+
+      % create local block and passing to solver
+      % with a potential relaxation
+      matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi) + ...
+	       controls.relax4inv11*speye(nAi,nAi) ;
+      diag_block_invA(i).init(matrixAi,ctrl_loc);     
+    end
+
+    % define function
+    inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+  end
+	build_inverse11=toc(time_A);
+	
+
+  %
+  % BUILD APPROXIMATE INVERSE OF SCHUR COMPLEMENT
+  %
+  
+	% set dimension of inner solver
+  inner_nequ=Nr;
+
+	% store time
+  build_S=tic;
+
+	%select among differnt approaches
+	inverse22 = controls.inverse22;
+	ctrl_inner22 = controls.ctrl_inner22;
+	
+  if (strcmp(inverse22,'diagA'))
+    % assembly SAC=-(C+B2 * diag(A)^{-1} B1T)
+    invDiagA   = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
+    approx_SCA = (C+B2*invDiagA*B1T);
+
+    inv_SCA=sparse_inverse;
+    inv_SCA.init(approx_SCA + controls.relax4inv22*speye(Nr,Nr),ctrl_inner22);
+    inv_SCA.info_inverse.label='schur_ca';
+    inv_SCA.cumulative_iter=0;
+    inv_SCA.cumulative_cpu=0; 
+    inverse_block22 = @(x) -inv_SCA.apply(x);
+
+  elseif (strcmp(inverse22,'diagA'))
+    % define the preconditioner as the result of an iterative solver
+    % acting with operator C+B^T A^{-1} B
+
+    SCA = @(x) (C*x + B2*(invA(B1T*x)));
+    %assembly inverse of  SAC iterative solver with no precodnitioner
+    inverse_block22 = @(y) ...
+											- apply_iterative_solver( SCA, y, ctrl_inner22, @(z) z);
+  end
+  cpu_assembly_inverseS=toc(build_S);
+
+  % store time required to build prec
+  prec_cpu=toc(time_prec);
+
+  %
+  % Define action of preconditoner
+  % 
+  prec = @(x) SchurCA_based_preconditioner(x, ...
+																					 @(y) projector(inv_A(y),kernel),...
+																					 @(z) proj(inverse_block22(z)),...
+																					 @(y) B1T*proj(y),...
+																					 @(z) proj(B2*z),...
+																					 Np,Nr,...
+																					 controls.outer_prec,ncellphi);
+
+	outer_timing=tic;
+  [d,info_J]=apply_iterative_solver(@(x) ...
+																		 apply_saddle_point(x,@(y) A*y ,...
+																												@(y) B1T*proj(y),...
+																												@(z) proj(B2*z),...
+																												@(z) proj(C*proj(z)),...
+																												Np,Nr), ...
+																		rhsR, controls.ctrl_outer, ...
+																		@(z) prec(z),[],controls.left_right );
+
+	info_J.print();
+
+	
+	print_imbalance(d(1:Np),ncellphi)
+
+	
+	for i = 1:N
+		imb=d(Np+1+(i-1)*ncellrho:Np+i*ncellrho)'*area2h;
+		state_message=sprintf('y*area= %1.4e',imb);
+		fprintf('%s \n',state_message);
+	end
+
+	res=apply_saddle_point(d,@(y) A*y ,...
+														@(y) B1T*y,...
+														@(z) B2*z,...
+														@(z) C*z,...
+														Np,Nr)-rhsR;
+	
+	fprintf('|res p|=%1.1e - |res r|=%1.1e - |rhsR|=%1.1e  \n',...
+					norm(res(1:Np)),norm(res(1+Np:Np+Nr)),norm(rhsR));
+
+	d(Np+1:Np+Nr)=proj(d(Np+1:Np+Nr));
+	res=apply_saddle_point(d,@(y) A*y ,...
+												 @(y) B1T*y,...
+												 @(z) B2*z,...
+												 @(z) C*z,...
+												 Np,Nr)-rhsR;
+	
+	fprintf('|res p|=%1.1e - |res r|=%1.1e - |rhsR|=%1.1e  \n',...
+					norm(res(1:Np)),norm(res(1+Np:Np+Nr)),norm(rhsR));
+	
+	
+	% get s increment
+  ds = JF.ss\(-F.s-JF.sr*d(Np+1:end));
+  d = [d; ds];
+	
+
+	
+	
+	% stop cpu
+  outer_cpu=toc(outer_timing);
+
+	% get info
+  inner_iter=inv_SCA.cumulative_iter;
+  outer_iter=uint32(info_J.iter);
+  flag=info_J.flag;
+  relres=info_J.res;
+  iter=info_J.iter;
+  normd = norm(d);
+
+	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
+  dl=get_dl(JF,F,d);
+  
+  % correction of phi increment 
+	d(1:Np) = dp_correction(d(1:Np),JF,dl);
+  [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
+  
+  resume_msg=sprintf('res=%1.1e p=%1.1e r=%1.1e s=%1.1e\n',resnorm,resp,resr,ress);
+  normd = norm(d);
+
+	disp(resume_msg)
+	
+
+	return
+ 
+    
+  inner_nequ=Np;
+  inner_iter=0;
+  outer_iter=0;
+  outer_cpu=0;
+  prec_cpu=0;
+  inner_iter2=Nr;
+  inner_nequ3=0;
+  inner_iter3=0;
 
 end
 

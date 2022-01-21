@@ -336,7 +336,7 @@ for mesh_type = 5
 	  % pcg works only with full
 
 	  % tranform system to enforce the mass increment ha zero mean
-	  remove_imbalance=1
+	  remove_imbalance=0
 
 	  
 	  outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
@@ -954,8 +954,99 @@ for mesh_type = 5
 
 	  approach_string=('augmented');
 	  geod
-	end
-      end
+	elseif (sol ==18)
+	  grounded_node=-1;
+	  controls = struct('save_data',save_data,...
+			    'indc',grounded_node,...
+			    'sol',sol);
+
+	  approach_string=('augmented');
+	  geod
+	elseif (sol ==19)
+		% list of outer solvers
+		outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
+
+		% set here fgmres (for non stationary prec), bicgstab,gmres, pcg
+		for isolver=[3]%1:length(outer_solvers)
+			ctrl_outer=ctrl_solver;
+			ctrl_outer.init(outer_solvers{isolver},1e-5,100,0.0,0);
+			
+			
+			% external prec appraoch
+			outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
+			nouter_precs=length(outer_precs);
+
+			% left or right preconditioner
+			left_right='right';
+			% fgmres works only with right prec
+			if (strcmp(outer_solvers,'fgmres'))
+				left_right='right';
+			end
+
+			% node for grounding
+			grounded_node=-1;
+			
+			for iprec=[1]%1:nouter_precs
+				outer_prec=outer_precs{iprec};
+				
+				% inverse approach
+				inverse11='full';
+				inverse11='diag';
+				
+				% relaxation
+				% A = A + relax * Id
+				relax4inv11=1e-12;
+				
+				% set here other approximate inverse of block11
+				ctrl_inner11.init('agmg',... %approach
+													1e-1,... %tolerance
+													10,...% itermax
+													0.0,... %omega
+													0,... %verbose
+													'diag'); %label
+				
+				% possible choices for dual schur complement
+				inverses22={'diagA','iterative'}
+				
+				for ia = [1];
+					inverse22=inverses22{ia};		
+					
+					% set here list of solvers for block 22 
+					solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete','diag','krylov_no_prec'};
+					iters  ={1      ,10      ,100,1       ,1        ,10        ,  1          ,0,10};
+					label  ={'agmg1','agmg10','agmg1e-1','direct','krylov1','krylov10','incomplete','diag','purekrylov'};
+					relax4inv22=0;
+					
+					
+					for i=[3];%1:length(solvers)
+						ctrl_inner22.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
+						controls = struct('save_data',save_data,...
+															'indc',grounded_node,...
+															'sol',sol,...
+															'outer_prec',outer_prec,...
+															'left_right',left_right,...
+															'ctrl_inner11',ctrl_inner11,...
+															'ctrl_inner22',ctrl_inner22,...
+															'ctrl_outer',ctrl_outer,...
+															'verbose',verbose,...
+															'inverse11',inverse11,...
+															'relax4inv11',relax4inv11,...
+															'inverse22',inverse22,...
+															'relax4inv22',relax4inv22 );
+							
+						
+						approach_string=strcat('augemented',...
+																	 'invA',ctrl_inner11.label,'_',...
+																	 'invSCA',ctrl_inner22.label);
+						
+						
+						geod
+					end
+				end
+						end
+					end
+				end
+			end
     end
   end
 end

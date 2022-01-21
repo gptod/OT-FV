@@ -11,6 +11,5 @@ function [out] = projector(v,kernel)
     %maxs=max(maxs,scalin);
     out(1+(i-1)*dim:i*dim)=...
     out(1+(i-1)*dim:i*dim) - scalin/(kernel'*kernel) * kernel;
-    scalout=out(1+(i-1)*dim:i*dim)'*kernel;
   end
 end

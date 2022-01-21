@@ -19,6 +19,7 @@ gradphi = gradt*phi;
 % derivatives of the optimality conditions in phi
 JOCpp = divt*spdiags(rhos,0,te,te)*gradt;
 JOCpr = Mxt*Nt*Dt*It*I_all+divt*spdiags(gradphi,0,te,te)*drhos;
+JOC.Dt = Mxt*Nt*Dt*It*I_all;
 JOCps = sparse(tnp,tnr2h);
 
 % derivatives of the optimality conditions in rho
@@ -53,6 +54,10 @@ JOC.diagrho=spdiags(rhos,0,te,te);
 JOC.It=It;
 
 JOC.Mxt=Mxt;
+
+				% store this diagonal
+Np=tnp;
+JOC.area2h=-spdiags(JOC.rs(1:ncell2h,1:ncell2h));
 
 
 end
