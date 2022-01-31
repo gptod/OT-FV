@@ -126,6 +126,13 @@ end
 
 Np = ncell*Nt;
 Nr = ncell2h*N;
+
+% normalize rho
+for k = 1:N
+	rhomass=area2h'*uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h);
+  uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h) = uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h)/rhomass;
+end
+
 save_data=controls.save_data;
 if (save_data)
   filename_h5=([strcat('runs/',folder_approach,'PhiRhoSMuTheta',str_test,approach_string,'.h5')]);
@@ -180,6 +187,11 @@ imbalance_increment_phi=zeros(Nt,1);
 
 Np = ncell*Nt;
 Nr = ncell2h*N;
+
+
+
+
+
 
 while true
   assembly=tic;
@@ -319,92 +331,247 @@ while true
         fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
       end
 
-	resvar.set(kel,eps_lin,delta_mu,tnr2h+tnp);
-			   %resvar.set(kel,0.5*mu,delta_mu,tnr2h+tnp);
-	%ctrl_outer.tolerance = resvar.etak;
-	% Solve the linear system
-	timelinsys=tic;
-				%try
+			resvar.set(kel,eps_lin,delta_mu,tnr2h+tnp);
+			%resvar.set(kel,0.5*mu,delta_mu,tnr2h+tnp);
+			%ctrl_outer.tolerance = resvar.etak;
+			% Solve the linear system
+			timelinsys=tic;
+			%try
 
-	% for i = 1: Nt
-	%   fprintf('%d <1,f^i>=%1.2e\n',i,...
-	%  	  sum(OC.p(1+(i-1)*ncell:i*ncell)))
-	% end
-	
-        [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls);
-	disp(resume_msg)
-	%[res,resp,resr,ress]=compute_linear_system_residuum(JOC,OC,omegak);
-	
-	
-	%state_message=sprintf('%d - | res p|=%1.4e |res r|=%1.4e |res s|=%1.4e |res|=%1.2e' ,...
-	%			itk2+1, resp,resr,ress,res);
-	%fprintf('%s \n',state_message);
-	
-	
-	sum_linsys= sum_linsys+toc(timelinsys);
-        sum_total = sum_total+toc(total);
-	sum_prec  = sum_prec+info_solver_newton.prec_cpu;
-	if (strcmp(resume_msg,''))
-	  print_info_solver(info_solver_newton)
-	  print_info_solver(info_solver_newton,logID)
-	else
-	  fprintf('%s\n',resume_msg);
-	  fprintf(logID,'%s\n',resume_msg);
-	end
+			% for i = 1: Nt
+			%   fprintf('%d <1,f^i>=%1.2e\n',i,...
+			%  	  sum(OC.p(1+(i-1)*ncell:i*ncell)))
+			% end
 
-	if (~ (info_solver_newton.flag == 0) )
-	  disp('ERROR')
+			times_H=0;
+			ground=0;
+			diagonal_scaling=0;
+			if (1)
+				[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JOC,OC);
+				B1T_time=-JOC.B1T_time;
+				B1T_space=-JOC.B1T_space;
+
+				
+				if (times_H)
+					% A,   B1T*mat_H';
+  				% mat_H*B2, -mat_H*C*mat_H'; 
+					[A,B1T_time,B1T_space,B2,C,f1,f2,H_mat] = times_H(A,B1T_time,B1T_space,B2,C,f1,f2,JOC)
+				end
+
+				if (ground)
+					% ground system 
+					[A,B1T_time,B1_space,B2,f1]=ground_saddle(A,B1T_time,B1T_space,B2,f1,N)
+				end
+
+				
+				if (diagonal_scaling)
+					% scale system by its diagonal
+					[sqrt_diagA,sqrt_diagC,inv_sqrt_diagA,inv_sqrt_diagC] = get_diagonal_scaling (A,C);
+					
+					[A,B1T,B2,C,f1,f2,W_mat]=scale_saddle_point(A,B1T,B2,C,...
+																											f1,f2,W_mat,...
+																											inv_sqrt_diagA,...
+																											inv_sqrt_diagC);
+					B1T_time=inv_sqrt_diagA* B1T_time *inv_sqrt_diagC;
+					B1T_spce=inv_sqrt_diagA* B1T_space *inv_sqrt_diagC;
+				end
+
+				if (times_H)
+					[S_tt,S_tx,S_xx]=assemble_dual_schur_components(A,size(B1T_time,2),...
+																												 @(y) B1T_time*y,...
+																												 @(y) B1T_space*y,...
+																												 @(x) B1T_time'*x,...
+																												 @(x) B1T_space'*x);
+				else
+					P = @(y) ort_proj(y,W_mat);
+					[S_tt,S_tx,S_xx]=assemble_dual_schur_components(A,size(B1T_time,2),...
+																												 @(y) B1T_time*P(y),...
+																												 @(y) B1T_space*P(y),...
+																												 @(x) P(B1T_time'*x),...
+																												 @(x) P(B1T_space'*x));
+
+					PC=apply_prec_matrix(P,apply_prec_matrix(P,full(C)))
+				end
+
+				% Schur complement S
+				S=PC+S_tt+S_tx+S_tx'+S_xx;
+
+				% inverse of S
+				invS=sparse_inverse;
+				ctrl_loc=ctrl_solver;
+				ctrl_loc.init('direct',...
+											1e-14,...
+											200,...
+											0,...
+											0,...
+											'S',64);
+				invS.init(S+1e-12*speye(Nr,Nr),ctrl_loc);
+				inverseS=@(y) invS.apply(y)
+				
+				C_S  = apply_prec_matrix(inverseS,PC);
+				Stt_S= apply_prec_matrix(inverseS,S_tt);
+				Stx_S= apply_prec_matrix(inverseS,S_tx);
+				Sxx_S= apply_prec_matrix(inverseS,S_xx);
+
+				[real,imag,eigenvec]= study_eigenvalues(C_S,'C_S');
+				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
+				figure
+				plot(real,imag,'o')
+				title('C')
+				
+				[real,imag,eigenvec]= study_eigenvalues(Stt_S,'Stt_S');
+				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
+				figure
+				plot(real,imag,'o')
+				title('S_tt')
+
+				[real,imag,eigenvec]= study_eigenvalues(Stx_S,'Stx_S');
+				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
+				figure
+				plot(real,imag,'o')
+				title('S_tx')
+				
+				[real,imag,eigenvec]= study_eigenvalues(Sxx_S,'Stx_S');
+				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
+				figure
+				plot(real,imag,'o')
+				title('S_xx')
+
+				[real,imag,eigenvec]= study_eigenvalues(Stt_S+C_S,'Stt+C_S');
+				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
+				figure
+				plot(real,imag,'o')
+				title('S_tt+C')
+
+				% prec A_Nr(Lapl_tt + A_Nr *C)^{-1}
+				Lapl_tt=B1T_time'*B1T_time;
+				A_tilde=I'*A*I;
+				temp=zeros(Nr,1);
+
+				% check commutation
+				invA_tilde=sparse_inverse;
+				ctrl_loc=ctrl_solver;
+				ctrl_loc.init('agmg',...
+											1e-14,...
+											200,...
+											0,...
+											0,...
+											'A_tilde',64);
+
+				invA_tilde.init(A_tilde+1e-12*speye(Nr,Nr),ctrl_loc);
+				approx=zeros(Nr,Nr)
+				for i=1:Nr
+					disp(i/Nr*100);
+					temp(:)=0;
+					temp(i)=1;
+					approx(:,i)=P(invA_tilde.apply(S_tt*P(temp)));
+				end
+
+				norm(
+
+
+				
+				return
+
+				
+				% assembly SAC=-(C+B2 * diag(A)^{-1} B1T)
+				[prec] = assemble_prec_dual(A,B1T,B2,C,1e-1);
+				
+				precS=apply_prec_matrix(prec,S);
+				
+				[real,imag,eigenvec]= study_eigenvalues(precS,'prec_S');
+				
+				fprintf('max/min %1.1e\n', real(Nr)/real(N+1))
+				figure
+				plot(real,imag,'o')
+				figure
+				
+			end 
+
+			
+			
+			[omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JOC,OC, controls);
+			%[res,resp,resr,ress]=compute_linear_system_residuum(JOC,OC,omegak);
+			
+			
+			%state_message=sprintf('%d - | res p|=%1.4e |res r|=%1.4e |res s|=%1.4e |res|=%1.2e' ,...
+			%			itk2+1, resp,resr,ress,res);
+			%fprintf('%s \n',state_message);
+			
+			
+			sum_linsys= sum_linsys+toc(timelinsys);
+      sum_total = sum_total+toc(total);
+			sum_prec  = sum_prec+info_solver_newton.prec_cpu;
+			if (strcmp(resume_msg,''))
+				print_info_solver(info_solver_newton)
+				print_info_solver(info_solver_newton,logID)
+			else
+				fprintf('%s\n',resume_msg);
+				fprintf(logID,'%s\n',resume_msg);
+			end
+
+			if (~ (info_solver_newton.flag == 0) )
+				disp('ERROR')
 				%return	
-	end
-	
-	% deltat=1/(N+1);
-	% masses=zeros(N,1);
-	% for i = 1:N
-	%   masses(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
-	%   state_message=sprintf('y*area= %1.4e',min(masses(i)));
-	%   fprintf('%s \n',state_message);
-	%   fprintf(logID,'%s \n',state_message);
-	% end
-	
-	%return
-	
+			end
+			
+			% deltat=1/(N+1);
+			% masses=zeros(N,1);
+			% for i = 1:N
+			%   masses(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
+			%   state_message=sprintf('y*area= %1.4e',min(masses(i)));
+			%   fprintf('%s \n',state_message);
+			%   fprintf(logID,'%s \n',state_message);
+			% end
+			
+			%return
+			
 
-	
-	sum_iter_outer_linear= sum_iter_outer_linear+info_solver_newton.outer_iter;
-	sum_iter_inner_linear= sum_iter_inner_linear+info_solver_newton.inner_iter;
-	sum_iter2_inner_linear= sum_iter2_inner_linear+info_solver_newton.inner_iter2;
-	sum_iter3_inner_linear= sum_iter3_inner_linear+info_solver_newton.inner_iter3;
+			
+			sum_iter_outer_linear= sum_iter_outer_linear+info_solver_newton.outer_iter;
+			sum_iter_inner_linear= sum_iter_inner_linear+info_solver_newton.inner_iter;
+			sum_iter2_inner_linear= sum_iter2_inner_linear+info_solver_newton.inner_iter2;
+			sum_iter3_inner_linear= sum_iter3_inner_linear+info_solver_newton.inner_iter3;
 
 
-	
-	
-        % Linesearch just to ensure that rho and s stay positive
-        alfak = 1;
-        while any(uk(tnp+1:end)+alfak*omegak(tnp+1:end)<=0)
-            alfak = 0.5*alfak;
-            if alfak < alfamin
-                alfak = alfamin;
-                break
-            end
-        end
+			
+			
+			% Linesearch just to ensure that rho and s stay positive
+			alfak = 1;
+			while any(uk(tnp+1:end)+alfak*omegak(tnp+1:end)<=0)
+				alfak = 0.5*alfak;
+				if alfak < alfamin
+					alfak = alfamin;
+					break
+				end
+			end
 
-        uk = uk + alfak*omegak;
-	
-	%fprintf('Step=%1.2e\n',alfak)
-        if alfak==alfamin
-	  disp('Step too small')
-            flag2 = 1;
-        end
+			uk = uk + alfak*omegak;
+			
+			%fprintf('Step=%1.2e\n',alfak)
+			if alfak==alfamin
+				disp('Step too small')
+				flag2 = 1;
+			end
 
-	%catch
-	%  disp('Not solved, breaking')
-	%  return
-	%end
-    end
+			% se phi to sum to zero
+			uk(1:Np)=ort_proj(uk(1:Np),ones(1,Np));
+			
+			% normalize rho
+			for k = 1:N
+				rhomass=area2h'*uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h);
+				fprintf('mass rho(%d)-1.0=%1.1e\n',k,rhomass-1.0)
+				uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h) = uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h)/rhomass;
+			end
+			%catch
+			%  disp('Not solved, breaking')
+			%  return
+			%end
+		end
 
     
     if flag_theta==1
-        break
+      break
     end
     
     phimu = uk(1:tnp);

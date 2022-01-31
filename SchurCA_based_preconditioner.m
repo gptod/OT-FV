@@ -63,7 +63,7 @@ function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,dimA,dimS,p
       print_imbalance(w,dimblock)
     end
     out(1:n) = invA ( w );
-		if (verbose)
+		if (0)%verbose)
       disp(' ouput second A^{-1}')
       print_imbalance(out(1:n),dimblock)
     end
@@ -101,15 +101,21 @@ function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,dimA,dimS,p
     
     % v= f - B1T*y
     if (verbose)
+			disp('imb f')
       print_imbalance(in(1:n),dimblock)
     end
     v=in(1:n) - B1T ( out(n+1:n+m));
     if (verbose)
+			disp('imb f2=f-B1Ty')
       print_imbalance(v,dimblock)
     end
     
     % x = A^{-1} v
     out(1:n) = invA(v);
+		if (verbose)
+			disp('imb x=A^{-1}v')
+      print_imbalance(out(1:n),dimblock)
+    end
 
   elseif(strcmp(type,'identity'))
     out=in;
