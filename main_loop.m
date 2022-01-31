@@ -39,7 +39,7 @@ plot_figures=0
 
 
 save_data=1;
-read_from_file=0;
+read_from_file=2;
 %h5_file2read='runs/sol10/PhiRhoSMuThetasin_h1_rec1_N00032__schurACwithdiagC_fgmres_full_invSACfullagmg1e-1_invC1_diag.h5';
 
 compute_eigen=0;
@@ -104,7 +104,7 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[17];
+      for sol=[18];
 
 	%folder_run=sprintf('runs/sol%d',sol)
 	%mkdir folder_run
@@ -969,7 +969,7 @@ for mesh_type = 5
 		% set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 		for isolver=[3]%1:length(outer_solvers)
 			ctrl_outer=ctrl_solver;
-			ctrl_outer.init(outer_solvers{isolver},1e-5,100,0.0,0);
+			ctrl_outer.init(outer_solvers{isolver},1e-5,200,0.0,2);
 			
 			
 			% external prec appraoch
@@ -986,7 +986,7 @@ for mesh_type = 5
 			% node for grounding
 			grounded_node=-1;
 			
-			for iprec=[1]%1:nouter_precs
+			for iprec=[3]%1:nouter_precs
 				outer_prec=outer_precs{iprec};
 				
 				% inverse approach
@@ -995,15 +995,15 @@ for mesh_type = 5
 				
 				% relaxation
 				% A = A + relax * Id
-				relax4inv11=1e-12;
+				relax4inv11=0e-11;
 				
 				% set here other approximate inverse of block11
 				ctrl_inner11.init('agmg',... %approach
-													1e-1,... %tolerance
-													10,...% itermax
+													1e-3,... %tolerance
+													40,...% itermax
 													0.0,... %omega
 													0,... %verbose
-													'diag'); %label
+													'agmg'); %label
 				
 				% possible choices for dual schur complement
 				inverses22={'diagA','iterative'}
@@ -1018,7 +1018,7 @@ for mesh_type = 5
 					relax4inv22=0;
 					
 					
-					for i=[3];%1:length(solvers)
+					for i=[2];%1:length(solvers)
 						ctrl_inner22.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
 						controls = struct('save_data',save_data,...
 															'indc',grounded_node,...
