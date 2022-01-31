@@ -56,10 +56,10 @@ function [Mtt,Mss,dense_S]=study_eigen_S(A,invA,B2_time,B2_space,B1T_time,B1T_sp
   candidate=prec_times_matrix(@(x) real_inverseS.apply(x),prec);
   
   
-  eigenvalues=study_eigenvalues(prec\dense_S, 'S^{-1}(Candidate)',1);
+  [real,img]=study_eigenvalues(prec\dense_S, 'S^{-1}(Candidate)',1);
 
   figure
-  plot(eigenvalues,'o')
+  plot([real,img],'o')
   
   
   %figure

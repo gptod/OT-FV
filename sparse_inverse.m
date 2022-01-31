@@ -195,11 +195,11 @@ classdef sparse_inverse <handle
        end
        cpu=toc(apply_cpu);
 
-
        obj.cumulative_application=obj.cumulative_application +1;
        obj.info_inverse.rhsnorm=norm(rhs);
        obj.info_inverse.balance=sum(rhs);
        obj.info_inverse.res=norm(obj.matrix*sol-rhs);
+			 
        obj.info_inverse.realres=obj.info_inverse.res/norm(rhs);
        obj.cumulative_iter=obj.cumulative_iter+obj.info_inverse.iter;
        obj.cumulative_cpu=obj.cumulative_cpu+cpu;
@@ -207,7 +207,7 @@ classdef sparse_inverse <handle
        obj.info_inverse.label=obj.ctrl.label;
        obj.info_inverse.sumsol=sum(sol);
        if (obj.ctrl.verbose)
-	 obj.info_inverse.print(obj.ctrl.unit_out);
+				 obj.info_inverse.print(obj.ctrl.unit_out);
        end
        
        
