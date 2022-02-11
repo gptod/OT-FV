@@ -27,6 +27,7 @@ cpu_linsys=0.0;
 clear 'I'
 load(mesh_name)
 
+
 if exist('I','var')==0
     % if the injection operator I does not exist in the mesh structure,
     % the nested sub-mesh coincides with the outer one (labeled with 2h)
@@ -66,6 +67,9 @@ controls.basename=filename;
 log_filename=strcat(filename,'.log')
 logID = fopen(log_filename,'w');
 controls.logID=logID;
+
+eigen_fn=sprintf('eigenS%d.csv',read_from_file);
+eigen_fid = fopen(eigen_fn, 'a+');
 
 fprintf(logID,'mesh type       = %d\n',mesh_type);
 fprintf(logID,'rec type       = %d\n',rec);
@@ -163,6 +167,7 @@ Mxt2h = assembleMxt(N,ncell2h,Mx2h);
 Mst = assembleMst(N,nei,Ms);
 RHt = assembleRHt(N,ncell);
 It = assembleIt(N,ncell,ncell2h,I);
+I_all = [sparse(ncell2h,tnr2h);speye(tnr2h,tnr2h);sparse(ncell2h,tnr2h)];
 if rec==1
     Rs=Ktos2D(ind,edges,cc,mid);
     Rst = repmat({Rs},1,N+1);
@@ -318,7 +323,7 @@ while true
       % Compute the jacobian of the system of equations
       [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
       
-      JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk);
+      JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,uk,I);
 
       if (augmented)
         % aug. Jacobian need the original OC
@@ -331,9 +336,10 @@ while true
         fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
       end
 
-			resvar.set(kel,eps_lin,delta_mu,tnr2h+tnp);
+			%resvar.set(kel,eps_lin,delta_mu,tnr2h+tnp);
 			%resvar.set(kel,0.5*mu,delta_mu,tnr2h+tnp);
 			%ctrl_outer.tolerance = resvar.etak;
+			%fprintf('tol=%1.1e \n',ctrl_outer.tolerance)
 			% Solve the linear system
 			timelinsys=tic;
 			%try
@@ -343,10 +349,9 @@ while true
 			%  	  sum(OC.p(1+(i-1)*ncell:i*ncell)))
 			% end
 
-			times_H=0;
-			ground=0;
-			diagonal_scaling=0;
-			if (1)
+		
+			
+			if ( compute_eigen)
 				[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JOC,OC);
 				B1T_time=-JOC.B1T_time;
 				B1T_space=-JOC.B1T_space;
@@ -376,26 +381,397 @@ while true
 					B1T_spce=inv_sqrt_diagA* B1T_space *inv_sqrt_diagC;
 				end
 
-				if (times_H)
-					[S_tt,S_tx,S_xx]=assemble_dual_schur_components(A,size(B1T_time,2),...
+				if (1)
+					if (times_H)
+						[Stt,Stx,Sxx]=assemble_dual_schur_components(A,size(B1T_time,2),N,...
 																												 @(y) B1T_time*y,...
 																												 @(y) B1T_space*y,...
 																												 @(x) B1T_time'*x,...
 																												 @(x) B1T_space'*x);
-				else
-					P = @(y) ort_proj(y,W_mat);
-					[S_tt,S_tx,S_xx]=assemble_dual_schur_components(A,size(B1T_time,2),...
+						PCP=C;
+					else
+						P = @(y) ort_proj(y,W_mat);
+						[Stt,Stx,Sxx]=assemble_dual_schur_components(A,size(B1T_time,2),N,...
 																												 @(y) B1T_time*P(y),...
 																												 @(y) B1T_space*P(y),...
-																												 @(x) P(B1T_time'*x),...
-																												 @(x) P(B1T_space'*x));
+																												 @(x) B1T_time'*x,...
+																												 @(x) B1T_space'*x);
+						
+						CP=matrix_times_prec(C,P);
+						PCP=apply_prec_matrix(P,CP);
+						Stt=prec_times_matrix(P,Stt);
+						Stx=prec_times_matrix(P,Stx);
+						Sxx=prec_times_matrix(P,Sxx);
+					end
 
-					PC=apply_prec_matrix(P,apply_prec_matrix(P,full(C)))
 				end
 
-				% Schur complement S
-				S=PC+S_tt+S_tx+S_tx'+S_xx;
+				if (1)
+					%S_without_P=CP+Stt+Sxx+Stx+Stx';
+					S=P(CP+Stt+Sxx+Stx+Stx');
 
+					Pspace=assemble_space_projector(N+1,I');  
+					Ptime=assemble_time_projector(N,ncell2h);
+					pr = Pspace'*Ptime';
+					
+					time_Laplacian=(Nt*Dt*It*I_all)'*Mxt*Mxt*(Nt*Dt*It*I_all);
+					inv_Mxt  = sparse(1:Np,1:Np,(1./spdiags(Mxt,0))',Np,Np);
+					inv_Mrho = sparse(1:Nr,1:Nr,(-1./spdiags(JOC.rs))',Nr,Nr);
+					
+					A_rho = pr'*inv_Mxt*A*inv_Mxt* pr;
+
+					my=time_Laplacian*A_rho;
+					my=prec_times_matrix(P,my);
+					my=matrix_times_prec(my,P);
+
+					%
+					%	(C+B2 invA B1^T)^{-1}=
+					% (C+B2*B1T*invA)^{-1}=
+					% (A_rho)*(C*A_rho+time_laplacian)^{-1}=:prec
+					% 
+					approx=C*A_rho+B2*inv_Mxt*inv_Mxt*B1T;%time_Laplacian;
+					inverse_SC=sparse_inverse;
+					ctrl_loc=ctrl_solver;
+					ctrl_loc.init('agmg',...
+					 							1e-1,...
+					 							200,...
+					 							0,...
+					 							0,...
+					 							'MS',...
+					 							84);
+					inverse_SC.init(approx+1e-12*speye(Nr),ctrl_loc);
+					inverseS = @(y) A_rho*(inverse_SC.apply(y));
+
+
+					%
+					% PREPROCESS NULL SPACE METHOD
+					%
+					time_null=tic;
+					invS_Wmat=prec_times_matrix(inverseS,W_mat'); %S^{-1}Z
+					MS=W_mat*(invS_Wmat);	 %MS=Z^TA^{-1} Z				
+					inverse_MS=sparse_inverse; % create LU factorization of MS
+					ctrl_loc=ctrl_solver;
+					ctrl_loc.init('direct',...
+					 							1e-14,...
+					 							200,...
+					 							0,...
+					 							0,...
+					 							'MS',...
+					 							84);
+					inverse_MS.init(MS,ctrl_loc);
+
+					%
+					% Define action of schur complement
+					%
+					null_space_application=@(y) null_space_method(y,P,...
+																												inverseS,...
+																												W_mat,invS_Wmat,...
+																												@(x) inverse_MS.apply(x));
+					inverse_S=@(y) apply_Schur_inverse(y,null_space_application);
+
+
+					%temp=matrix_times_prec(S,inverse_S);
+					temp=prec_times_matrix(inverse_S,S);
+
+					%
+					%	(C+Dt invA Dt^T)^{-1}=
+					% (C+time_laplacian*invA)^{-1}=
+					% (A_rho)*(C*A_rho+time_laplacian)^{-1}=:prec
+					%
+
+					inverseA=sparse_inverse;
+					ctrl_loc=ctrl_solver;
+					index_agmg=1;
+					ctrl_loc.init(ctrl_inner11.approach,...
+    										1e-10,...
+    										ctrl_inner11.itermax,...
+    										ctrl_inner11.omega,...
+    										ctrl_inner11.verbose,...
+    										strcat('A',ctrl_inner11.label),...
+												index_agmg);
+					
+					inverseA.init(A+controls.relax4inv11*speye(Np,Np),ctrl_loc);
+					inverseA.cumulative_iter=0;
+					inverseA.cumulative_cpu=0;
+
+					% define function
+					invA = @(x) inverseA.apply(x);
+
+					
+					prec = @(x) SchurCA_based_preconditioner(x, invA,...
+																									 inverse_S,...
+																									 @(y) B1T*P(y),...
+																									 @(z) P(B2*z),...
+																									 Np,Nr,...
+																									 'full',ncell);
+
+					temp=matrix_times_prec(S,inverse_S);
+					
+
+					
+					% J=[
+					% 	 A, matrix_times_prec(B1T,P);
+					% 	 prec_times_matrix(P,B2), -prec_times_matrix(P,matrix_times_prec(C,P))
+					% ];
+					% temp=prec_times_matrix(prec,J);
+					% %temp=matrix_times_prec(J,prec);
+
+					% rhsR=[f1;P(f2)];
+					% sol=prec(rhsR);
+					% norm(J*sol-rhsR)/norm(rhsR)
+
+					% %return
+
+					[real,imag,eigenvec,perm]= study_eigenvalues(temp,'never gonna works');
+
+					
+					figure
+					plot(real,imag,'o')
+					%semilogy(abs(real))
+					title('no hope')
+					fprintf('%1.1e, %1.1e (min,max) max/min %1.1e \n', real(N+1), real(Nr),	real(Nr)/		real(N+1))
+				
+											 
+					return
+
+					[real,imag,eigenvec,perm]= study_eigenvalues(my,'my');
+					figure
+					semilogy(abs(real(N+1:Nr)))
+					title('my')
+					fprintf('%1.1e, %1.1e (min,max) max/min %1.1e \n', real(N+1), real(Nr),	real(Nr)/		real(N+1))
+					
+					
+					test=prec_times_matrix(@(y) inverse_SC.apply(y),my);
+
+					[real,imag,eigenvec,perm]= study_eigenvalues(test,'prec_S');
+					figure
+					semilogy(abs(real(N+1:Nr)))
+					title('stt/my')
+					fprintf('%1.1e, %1.1e (min,max) max/min %1.1e \n', real(N+1), real(Nr),	real(Nr)/		real(N+1))
+					return
+
+					
+					
+
+					
+					
+
+
+					
+					norm(full(Stt-my))
+
+					figure
+					plot(diag(Stt))
+					figure
+					plot(diag(my))
+
+					
+					return
+					
+					
+
+					mode=1
+					if (mode==1)
+						invDiagA = sparse(1:Np,1:Np,(1.0./spdiags(A,0))',Np,Np);
+						approx_SCA = sparse(C+B2*invDiagA*B1T);
+						
+						% passing index_agmg+1 we will use one copy of agmg, allowing preprocess
+						inv_S=sparse_inverse;
+						ctrl_loc=ctrl_solver;
+						ctrl_loc.init('agmg',...
+													1e-1,...
+													200,...
+													0,...
+													0,...
+													'C+B1diag(A)^{-1}B2',...
+													73);
+						inv_S.init(approx_SCA+1e-12*speye(Nr,Nr),ctrl_loc);
+						inv_S.info_inverse.label='schur_ca';
+						inverseS = @(x) inv_S.apply(x);
+						%%
+					elseif (mode==2)
+						Pspace=assemble_space_projector(N+1,I');  
+						Ptime=assemble_time_projector(N,ncell2h);
+						P_pr = Pspace'*Ptime';
+						
+						time_Laplacian=(Nt*Dt*It*I_all)'*Mxt*(Nt*Dt*It*I_all);
+						A_rho=Ptime*Pspace*A*Pspace'*Ptime';
+
+						Stilde  = A_rho*C+time_Laplacian;
+
+						inv_Stilde=sparse_inverse;
+						ctrl_loc=ctrl_solver;
+						ctrl_loc.init('agmg',...
+													1e-4,...
+													200,...
+													0,...
+													0,...
+													'S_tilde',...
+													73);
+						inv_Stilde.init(Stilde+1e-12*speye(Nr,Nr),ctrl_loc);
+
+
+						inverseS = @(x) inv_S.apply(x);
+
+
+					end
+						
+					invS_Wmat=prec_times_matrix(inverseS,W_mat');
+					MS=W_mat*(invS_Wmat);
+					
+					
+					inverse_MS=sparse_inverse;
+					ctrl_loc=ctrl_solver;
+					ctrl_loc.init('direct',...
+					 							1e-14,...
+					 							200,...
+					 							0,...
+					 							0,...
+					 							'MS',...
+					 							84);
+					inverse_MS.init(MS,ctrl_loc);
+
+					prec_S=zeros(Nr,Nr);
+					for i=1:Nr
+						c=S_without_P(:,i);
+						prec_S(:,i)=null_space_method(c,P,inverseS,W_mat,invS_Wmat,	inverse_MS);
+					end
+
+					[real,imag,eigenvec,perm]= study_eigenvalues(prec_S,'prec_S');
+					figure
+					semilogy(abs(real(N+1:Nr)))
+					title('prec_null_space')
+					fprintf('%1.1e, %1.1e (min,max) max/min %1.1e \n', real(N+1), real(Nr),	real(Nr)/		real(N+1))
+
+					pure=prec_times_matrix(@(x) P(inverseS(x)),S);
+					[real,imag,eigenvec,perm]= study_eigenvalues(pure,'prec_S');
+					hold on
+					semilogy(abs(real(N+1:Nr)))
+					title('prec_S')
+					
+					[real,imag,eigenvec,perm]= study_eigenvalues(S,'prec_S');
+					semilogy(abs(real(N+1:Nr)))
+					title('S')
+					hold off
+					fprintf('%1.1e, %1.1e (min,max) max/min %1.1e \n', real(N+1), real(Nr),	real(Nr)/		real(N+1))
+					
+					fprintf(eigen_fid,'%d,%d, %1.1e, %1.1e \n',2^(h_i-1),2^(dt_i-1), real(N+1), real(Nr))
+					return
+					fclose(eigen_fid)
+					
+					
+				end
+
+				if (0)
+					% time laplacian
+					time_Laplacian=I_all'*Dt'*Nt*Nt*Dt*I_all;
+					
+					% first space, then time 
+					Pspace=assemble_space_projector(N,I');  
+					Ptime=assemble_time_projector(N,ncell);
+					A_rho_ts=Pspace*Ptime*A*Ptime'*Pspace';
+					
+					% first time, then space
+					Pspace=assemble_space_projector(N+1,I');  
+					Ptime=assemble_time_projector(N,ncell2h);
+					A_rho_st=Ptime*Pspace*A*Pspace'*Ptime';
+					
+					% A_rho_st and A_rho_ts are equal
+ 					A_rho=A_rho_st;
+					% inverse of A_rho
+					invA_rho=sparse_inverse;
+					ctrl_loc=ctrl_solver;
+					ctrl_loc.init('direct',...
+												1e-14,...
+												200,...
+												0,...
+												0,...
+												'A_rho',100);
+					invA_rho.init(A_rho+1e-12*speye(Nr,Nr),ctrl_loc);
+								
+				
+					S_tilde=zeros(Nr,Nr);
+					temp=zeros(Nr,1);
+					for i=1:Nr
+						temp(:)=0;
+						temp(i)=1;
+						v=P(temp);
+						sum(v)
+						v2=time_Laplacian*v;
+						sum(v2)
+						S_tilde(:,i)=P(invA_rho.apply(time_Laplacian*v)+C*v);
+					end
+				end
+
+			
+
+				
+				
+				
+
+				if (1)
+
+					% define the inverse 
+					invA=sparse_inverse;
+					ctrl_loc=ctrl_solver;
+					ctrl_loc.init('agmg',...
+												1e-14,...
+												200,...
+												0,...
+												0,...
+												'A',64);
+					invA.init(A+1e-12*speye(Np,Np),ctrl_loc);
+					
+					
+				
+
+					mode=1
+					if (mode ==1)
+						time_Laplacian=(Nt*Dt*It*I_all)'*Mxt*(Nt*Dt*It*I_all);
+					elseif (mode==2)
+						time_Laplacian=(Nt*Dt*It*I_all)'*(Nt*Dt*It*I_all);
+					elseif(mode==3)
+						Dt_rho = assembleDt(N-2,ncell2h);
+						time_Laplacian = (Nt*Dt_rho)'*(Nt*Dt_rho);
+					end
+					
+					
+					% define operator that project rho_variable into phi_variables
+					Pspace=assemble_space_projector(N,I'); Ptime=assemble_time_projector(N,ncell);
+					P_pr = (Pspace*Ptime)';
+					
+					%Pspace=assemble_space_projector(N+1,I'); Ptime=assemble_time_projector(N,ncell2h);
+					%P_pr = Pspace'*Ptime';
+
+					
+					%
+					S_tilde=zeros(Nr,Nr);
+					temp=zeros(Nr,1);
+					for i=1:Nr
+						temp(:)=0;
+						temp(i)=1;
+						v=P(temp);
+						if (mode ==1)
+							S_tilde(:,i)=time_Laplacian*P_pr'*invA.apply(Mxt*P_pr*v);
+							%S_tilde(:,i)=P_pr'*invA.apply(Mxt*P_pr*time_Laplacian*v);
+						elseif(mode==2)
+							%S_tilde(:,i)=time_Laplacian*P_pr'*Mxt*invA.apply(Mxt*P_pr*v);
+							S_tilde(:,i)=P_pr'*Mxt*invA.apply(Mxt*P_pr*time_Laplacian*v);
+						elseif(mode==3)
+							S_tilde(:,i)=time_Laplacian*P_pr'*Mxt*invA.apply(Mxt*P_pr*v);
+						end
+							
+						S_tilde(:,i)=P(S_tilde(:,i));
+					end
+				end
+
+				%norm(Stt-S_tilde)/norm(Stt)
+
+				
+				% Schur complement S
+				%S=PCP+Stt+Stx+Stx'+Sxx;
+				S=Stt;
+				
 				% inverse of S
 				invS=sparse_inverse;
 				ctrl_loc=ctrl_solver;
@@ -406,68 +782,34 @@ while true
 											0,...
 											'S',64);
 				invS.init(S+1e-12*speye(Nr,Nr),ctrl_loc);
-				inverseS=@(y) invS.apply(y)
+				inverseS=@(y) invS.apply(y);
+
+				approx=S_tilde;
 				
-				C_S  = apply_prec_matrix(inverseS,PC);
-				Stt_S= apply_prec_matrix(inverseS,S_tt);
-				Stx_S= apply_prec_matrix(inverseS,S_tx);
-				Sxx_S= apply_prec_matrix(inverseS,S_xx);
-
-				[real,imag,eigenvec]= study_eigenvalues(C_S,'C_S');
+				my_S  = apply_prec_matrix(inverseS,approx);
+				[real,imag,eigenvec]= study_eigenvalues(my_S,'my_S');
 				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
 				figure
-				plot(real,imag,'o')
-				title('C')
+				semilogy(real(N+1:Nr))
+				title('my')
+				return
+
+				C_p_Stt=PCP+Stt;
 				
-				[real,imag,eigenvec]= study_eigenvalues(Stt_S,'Stt_S');
-				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
-				figure
-				plot(real,imag,'o')
-				title('S_tt')
-
-				[real,imag,eigenvec]= study_eigenvalues(Stx_S,'Stx_S');
-				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
-				figure
-				plot(real,imag,'o')
-				title('S_tx')
+				%my_S  = apply_prec_matrix(inverseS,C_p_Stt); see_eigen(my_S,'myS',N)
 				
-				[real,imag,eigenvec]= study_eigenvalues(Sxx_S,'Stx_S');
-				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
-				figure
-				plot(real,imag,'o')
-				title('S_xx')
+				
+				C_S  = apply_prec_matrix(inverseS,PCP);
+				Stt_S= apply_prec_matrix(inverseS,Stt);
+				Stx_S= apply_prec_matrix(inverseS,Stx);
+				Sxx_S= apply_prec_matrix(inverseS,Sxx);
 
-				[real,imag,eigenvec]= study_eigenvalues(Stt_S+C_S,'Stt+C_S');
-				fprintf('max/min %1.1e\n', real(Nr)/real(N+1));
-				figure
-				plot(real,imag,'o')
-				title('S_tt+C')
-
-				% prec A_Nr(Lapl_tt + A_Nr *C)^{-1}
-				Lapl_tt=B1T_time'*B1T_time;
-				A_tilde=I'*A*I;
-				temp=zeros(Nr,1);
-
-				% check commutation
-				invA_tilde=sparse_inverse;
-				ctrl_loc=ctrl_solver;
-				ctrl_loc.init('agmg',...
-											1e-14,...
-											200,...
-											0,...
-											0,...
-											'A_tilde',64);
-
-				invA_tilde.init(A_tilde+1e-12*speye(Nr,Nr),ctrl_loc);
-				approx=zeros(Nr,Nr)
-				for i=1:Nr
-					disp(i/Nr*100);
-					temp(:)=0;
-					temp(i)=1;
-					approx(:,i)=P(invA_tilde.apply(S_tt*P(temp)));
-				end
-
-				norm(
+				see_eigen(C_S,'CS',N)
+				see_eigen(Stt_S,'Stt',N)
+				see_eigen(Stx_S,'Stx',N)
+				see_eigen(Sxx_S,'Sxx',N)
+				
+				
 
 
 				
@@ -560,7 +902,7 @@ while true
 			% normalize rho
 			for k = 1:N
 				rhomass=area2h'*uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h);
-				fprintf('mass rho(%d)-1.0=%1.1e\n',k,rhomass-1.0)
+				%fprintf('mass rho(%d)-1.0=%1.1e\n',k,rhomass-1.0)
 				uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h) = uk(Np+1+(k-1)*ncell2h:Np+k*ncell2h)/rhomass;
 			end
 			%catch
