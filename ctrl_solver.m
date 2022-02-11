@@ -27,7 +27,7 @@ classdef ctrl_solver <handle
 	 obj.verbose=verbose;
        end
        if (~exist('label','var') )
-	 obj.label=approach;
+	 obj.label=sprintf('%s%1.1e',approach,tolerance);
        else
 	 obj.label=label;
        end

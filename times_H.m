@@ -1,4 +1,4 @@
-function [A,B1T_time,B1T_space,B2,C,f1,f2,H_mat] = times_H(A,B1T_time,B1T_space,B2,C,f1,f2,JF)
+function [B1T_time_out,B1T_space_out,B2_out,C_out,f1_out,f2_out,mat_H] = times_H(B1T_time,B1T_space,B2,C,f1,f2,JF)
 	ncellrho = JF.ncellrho;
 	N = JF.N;
 	
@@ -9,14 +9,13 @@ function [A,B1T_time,B1T_space,B2,C,f1,f2,H_mat] = times_H(A,B1T_time,B1T_space,
 	mat_H = repmat({H},1,N);
 	mat_H = blkdiag(mat_H{:});
 	
-	A=A;
-  B1T_time  = B1T_time * mat_H';
-	B1T_space = B1T_space * mat_H';
-  B2 = mat_H*B2;
-	C  = mat_H*C*mat_H';
+  B1T_time_out  = B1T_time * mat_H';
+	B1T_space_out = B1T_space * mat_H';
+  B2_out = mat_H*B2;
+	C_out  = mat_H*C*mat_H';
 
-	f1=f1;
-	f2=mat_H*f2;
+	f1_out=f1;
+	f2_out=mat_H*f2;
 end
 
 	

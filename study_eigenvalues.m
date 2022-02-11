@@ -1,10 +1,10 @@
-function [real_part,imag_part,eigenvectors]= study_eigenvalues(matrix,label,ID)
+function [real_part,imag_part,eigenvectors,ind]= study_eigenvalues(matrix,label,ID)
 
   if (~exist('ID','var'))
     ID=1;
   end
   
-  [eigenvectors,eigenvalues]=eig(matrix);
+  [eigenvectors,eigenvalues]=eig(full(matrix));
 	eigenvalues=diag(eigenvalues);
 	abs_eig=abs(eigenvalues);
 	[abs_eig,ind] = sort(abs_eig);
