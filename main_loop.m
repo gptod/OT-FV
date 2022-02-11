@@ -39,10 +39,9 @@ plot_figures=0
 
 
 save_data=1;
-read_from_file=2;
+read_from_file=4;
 %h5_file2read='runs/sol10/PhiRhoSMuThetasin_h1_rec1_N00032__schurACwithdiagC_fgmres_full_invSACfullagmg1e-1_invC1_diag.h5';
 
-compute_eigen=0;
 verbose=0;
 
 				%mkdir 'runs'
@@ -52,6 +51,13 @@ line=1;  % local line to modify
 option=1; % 1=first augmentation 2=augmentation (see newton_augementation)
 
 
+outer_tol=1e-3;
+dual_schur_tol=1e-1;
+
+compute_eigen=1;
+times_H=0;
+ground=0;
+diagonal_scaling=0;
      
     % Space discretization. Three types of mesh families available:
     % 1 -> regular triangulation of the domain, with only acute angles
@@ -61,7 +67,7 @@ option=1; % 1=first augmentation 2=augmentation (see newton_augementation)
 % 3 -> cartesian grids
 
 % set here 1 to 2
-for mesh_type = 5
+for mesh_type = 6
   % INCRESINg DISCRETIZATION SPACE
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
@@ -69,8 +75,8 @@ for mesh_type = 5
   for h_i = 1
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for i=1
-      N=4*(2^(i-1))
+    for dt_i=2
+      N=4*(2^(dt_i-1))
       Nt = N+1;
 
       str_folder=sprintf('%s_mesh%d_rec%d',test_case,mesh_type,rec)
@@ -78,8 +84,8 @@ for mesh_type = 5
 
       h5_file2read=strcat('runs/',str_folder,'/PhiRhoSMuTheta',str_test(1:strlength(str_test)-1),'.h5')
       if (read_from_file>0)
-	str=sprintf('restart%d_',read_from_file);
-	str_test=strcat(str,str_test);
+				str=sprintf('restart%d_',read_from_file);
+				str_test=strcat(str,str_test);
       end
       %
       % 9 : P=(A B1T)
@@ -104,7 +110,7 @@ for mesh_type = 5
       %  (~SCA)^{-1}= approx. inverse
       
       %set here [9,10,11]
-      for sol=[18];
+      for sol=[20];
 
 	%folder_run=sprintf('runs/sol%d',sol)
 	%mkdir folder_run
@@ -174,8 +180,7 @@ for mesh_type = 5
 		  diagonal_scaling=iii;
 
 		  
-		  relax4inv11=0;
-		  relax4inv11
+		  relax4inv11=1e-12;
 		  
 		  
 				% set solver for block 11 (schurAC)
@@ -344,7 +349,7 @@ for mesh_type = 5
 	  % set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 	  for isolver=[3]%1:length(outer_solvers)
 	    ctrl_outer=ctrl_solver;
-	    ctrl_outer.init(outer_solvers{isolver},1e-5,400,0.0,1);
+	    ctrl_outer.init(outer_solvers{isolver},outer_tol,4000,0.0,0);
 	  
 	  
 	  % external prec appraoch
@@ -367,14 +372,14 @@ for mesh_type = 5
 	    outer_prec=outer_precs{iprec};
 	  
 	  % set here other approximate inverse of block11
-	  ctrl_inner11.init('agmg',... %approach
+	  ctrl_inner11.init('diag',... %approach
 			    1e-1,... %tolerance
 			    10,...% itermax
 			    0.0,... %omega
 			    0,... %verbose
-			    'agmg1e-4'); %label
-	  %inverse11='full';
-	  inverse11='diag';
+			    'diag'); %label
+	  inverse11='full';
+	  %inverse11='diag';
 	  %inverse11='block';
 	  relax4_inv11=1e-12;
 	  
@@ -392,7 +397,8 @@ for mesh_type = 5
 	  relax4_inv22=0;
 	  
 	  for i=[3];%1:length(solvers)
-	    ctrl_inner22.init(solvers{i},1e-1,iters{i},1.0,0,label{i});
+	    ctrl_inner22.init(solvers{i},dual_schur_tol,iters{i},1.0,0,...
+												sprintf('%s%1.1e',solvers{i},dual_schur_tol));
 	    controls = struct('save_data',save_data,...
 			      'indc',grounded_node,...
 			      'diagonal_scaling',diagonal_scaling,...
@@ -957,8 +963,8 @@ for mesh_type = 5
 	elseif (sol ==18)
 	  grounded_node=-1;
 	  controls = struct('save_data',save_data,...
-			    'indc',grounded_node,...
-			    'sol',sol);
+											'indc',grounded_node,...
+											'sol',sol);
 
 	  approach_string=('augmented');
 	  geod
@@ -1033,7 +1039,7 @@ for mesh_type = 5
 															'relax4inv11',relax4inv11,...
 															'inverse22',inverse22,...
 															'relax4inv22',relax4inv22 );
-							
+						
 						
 						approach_string=strcat('augemented',...
 																	 'invA',ctrl_inner11.label,'_',...
@@ -1043,11 +1049,101 @@ for mesh_type = 5
 						geod
 					end
 				end
-						end
+			end
+		end
+	elseif (sol ==20)
+		% list of outer solvers
+		outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
+		
+		% set here fgmres (for non stationary prec), bicgstab,gmres, pcg
+		for isolver=[3]%1:length(outer_solvers)
+			ctrl_outer=ctrl_solver;
+			ctrl_outer.init(outer_solvers{isolver},outer_tol,400,0.0,0);
+			
+			
+			% external prec appraoch
+			outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
+			nouter_precs=length(outer_precs);
+
+			% left or right preconditioner
+			left_right='right';
+			% fgmres works only with right prec
+			if (strcmp(outer_solvers,'fgmres'))
+				left_right='right';
+			end
+
+			% node for grounding
+			grounded_node=-1;
+			diagonal_scaling=0;
+			
+			for iprec=[1]%1:nouter_precs
+				outer_prec=outer_precs{iprec};
+				
+				% inverse approach
+				%inverse11='full';
+				inverse11='diag';
+				
+				% relaxation
+				% A = A + relax * Id
+				relax4inv11=1e-12;
+
+				
+				% set here other approximate inverse of block11
+				ctrl_inner11.init('direct',... %approach
+													1e-5,... %tolerance
+													40,...% itermax
+													0.0,... %omega
+													0); %verbose
+				
+				% possible choices for dual schur complement
+				inverses22={'diagA','time','perm','lsc'};
+				
+				for ia = [2];
+					inverse22=inverses22{ia};		
+					
+					% set here list of solvers for block 22 
+					solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete','diag','krylov_no_prec'};
+					iters  ={1      ,10      ,100,1       ,1        ,10        ,  1          ,0,10};
+					label  ={'agmg1','agmg10','agmg1e-1','direct','krylov1','krylov10','incomplete','diag','purekrylov'};
+					relax4inv22=0;%1e-8;
+
+					tolerance_preprocess=1e-13;
+					
+					for i=[3];%1:length(solvers)
+						ctrl_inner22.init(solvers{i},1e-7,iters{i},1.0,0);%,...
+						%sprintf('%s%1.1e',solvers{i},dual_schur_tol));
+						controls = struct('save_data',save_data,...
+															'indc',grounded_node,...
+															'sol',sol,...
+															'diagonal_scaling',diagonal_scaling,...
+															'outer_prec',outer_prec,...
+															'left_right',left_right,...
+															'ctrl_inner11',ctrl_inner11,...
+															'ctrl_inner22',ctrl_inner22,...
+															'ctrl_outer',ctrl_outer,...
+															'verbose',verbose,...
+															'inverse11',inverse11,...
+															'relax4inv11',relax4inv11,...
+															'inverse22',inverse22,...
+															'relax4inv22',relax4inv22,...
+															'tolerance_preprocess',tolerance_preprocess);
+						
+						
+						approach_string=strcat('augemented',...
+																	 'outer_prec',outer_prec,'_',...
+																	 'invA',ctrl_inner11.label,'_',...
+																	 'inverse22',inverse22,'_',...
+																	 'invSCA',ctrl_inner22.label);
+						
+						
+						geod
 					end
 				end
 			end
-    end
-  end
-end
+		end
+	end
+	end
+			end
+		end
+	end
 end
