@@ -1,4 +1,4 @@
-function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,solini,left_right)
+function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, solini,left_right,prec_right)
 
   if (exist('solini','var') )
     x0=solini;
@@ -20,6 +20,14 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,sol
   end
   
   if (strcmp(ctrl.approach,'bicgstab'))
+		if (exist('prec_right','var') )
+			'left_and_right'
+			[sol,infos,j,info.iter] = bicgstab(@(y) matrix_operator(y),rhs,...
+																				 ctrl.tolerance,...
+																				 ctrl.itermax,...
+																				 @(x) prec(x),prec_right,...% left  prec
+																				 x0);
+		end
     if (strcmp(left_right,'left'))
 	      [sol,infos,j,info.iter] = bicgstab(@(y) matrix_operator(y),rhs,...
 						     ctrl.tolerance,...
@@ -30,7 +38,7 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,sol
       [sol,infos,j,info.iter] = bicgstab(@(y) matrix_operator(y),rhs,...
 					     ctrl.tolerance,...
 					     ctrl.itermax,...
-					     [],@(x) prec(x),...% left  prec
+					     [],@(x) prec(x),...% right  prec
 					     x0);
     end
     info.approach_used='BICGSTAB';
@@ -65,6 +73,15 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec,sol
     
   elseif (strcmp(ctrl.approach,'gmres'))
     nrestart=20;
+		if (exist('prec_right','var') )
+			 [sol,infos,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
+			      nrestart, ... % to fix the total number of iterattion
+			      ctrl.tolerance,...
+			      int64(ctrl.itermax/nrestart),...
+ 			      @(x) prec(x),prec_right,... %left ,right
+			      x0);
+		end
+			
     if (strcmp(left_right,'left'))
       [sol,infos,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
 			      nrestart, ... % to fix the total number of iterattion
