@@ -3776,9 +3776,9 @@ elseif (sol==20)
 	ground=0;
 	if (ground)
 		% ground system 
-		[A,B1T_time,B1_space,B2,f1]=ground_saddle(A,B1T_time,B1T_space,B2,f1,N);
+		[A,B1T_time,B1T_space,B2,f1]=ground_saddle(A,B1T_time,B1T_space,B2,f1,N);
 		B1T=B1T_time+B1T_space;		
-		rhsR=[f1;f2];
+		rhsR=[f1;P(f2)];
 	end
 
 	if (controls.diagonal_scaling)
@@ -3967,22 +3967,22 @@ elseif (sol==20)
 		Pspace=assemble_space_projector(N+1,I');  
 		Ptime=assemble_time_projector(N,ncellrho);
 		pr = Pspace'*Ptime';
-		rp = pr';
-
+		
 		%	(C+time_laplacian*invA)^{-1}=(A_rho)*(C*A_rho+time_laplacian)^{-1}
-		A_rho=rp*inv_Mphi*A*pr*inv_Mrho;
-		Dt_rho=Nt*Dt*It*I_all;
-		time_Laplacian=Dt_rho'*Dt_rho;
-		approx_S=time_Laplacian;
-		if (reduced)
-			approx_S=approx_S+A_rho*C;
-		end
+		A_rho=pr'*inv_Mphi*A*inv_Mphi*pr;
+		%Dt_rho=Nt*Dt*It*I_all;
+		%time_Laplacian=Dt_rho'*Dt_rho;
+		%approx_S=time_Laplacian;
+		approx_S=B2*inv_Mphi*inv_Mphi*B1T+C*A_rho;
+		%if (reduced)
+		%		approx_S=approx_S+C*A_rho;
+		%	end
 		
 		inv_SCA=sparse_inverse;
 		ctrl_inner22 = controls.ctrl_inner22;
 		index_agmg=index_agmg+1;
 		ctrl_loc=ctrl_solver;
-		ctrl_loc.init('direct',...%ctrl_inner22.approach,...
+		ctrl_loc.init(ctrl_inner22.approach,...
     							controls.tolerance_preprocess,...
     							ctrl_inner22.itermax,...
     							ctrl_inner22.omega,...
@@ -4009,11 +4009,15 @@ elseif (sol==20)
 		pr = Pspace'*Ptime';
 		rp = pr';
 
+		Dt = assembleDt(N,ncellphi);
+		I_all = [sparse(ncellrho,Nr);speye(Nr,Nr);sparse(ncellrho,Nr)];
+		time_Laplacian=(Nt*Dt*JF.It*I_all)'*Mphi*(Nt*Dt*JF.It*I_all);
+
 		%	(C+time_laplacian*invA)^{-1}=(A_rho)*(C*A_rho+time_laplacian)^{-1}
-		A_rho=rp*A*pr;
-		approx_S=B2*B1T;
+		A_rho = pr'*inv_Mphi*A* pr;
+		approx_S=time_Laplacian;
 		if (reduced)
-			approx_S=approx_S+A_rho*C;
+			approx_S=approx_S+C*A_rho;
 		end
 
 		inv_SCA=sparse_inverse;
@@ -4099,9 +4103,22 @@ elseif (sol==20)
 	null_space_application=@(y) null_space_method(y,P,...
 																								@(z) inv_SCA.apply(z),...
 																								W_mat,invS_Wmat,...
-																								@(x) inverse_MS.apply(x),@(y) SCA*y);
-	inverse_S=@(y) -apply_Schur_inverse(y,null_space_application,P,SCA);
-	%inverse_S=@(z) -P(inv_SCA.apply(P(z)));
+																								@(x) inverse_MS.apply(x));
+	inverse_S=@(y) -apply_Schur_inverse(y,null_space_application);
+
+	% ctrl_inner=ctrl_solver;
+	% ctrl_inner.init('fgmres',... %approach
+	% 									1e-1,... %tolerance
+	% 									10,...% itermax
+	% 									0.0,... %omega
+	% 									2); %verbose
+	% inverse_S=@(y) -apply_iterative_solver(@(z) P(C*P(z)+B2*invA(B1T*P(z))),...
+	% 																			 y,...
+	% 																			 ctrl_inner, ...
+	% 																			 null_space_application,...
+	% 																			 [],'right'); 
+
+	
 
 	% Define action of block preconditoner
 	if(times_H)
@@ -4141,6 +4158,29 @@ elseif (sol==20)
 		
 		outer_cpu=tic;
 		if (reduced)
+			J=[
+				 A, matrix_times_prec(B1T,P);
+				 prec_times_matrix(P,B2), -prec_times_matrix(P,matrix_times_prec(C,P))
+			];
+			%temp=prec_times_matrix(prec,J);
+			temp=matrix_times_prec(J,prec);
+			norm(W_mat*rhsR(Np+1:Np+Nr))
+
+			sol=prec(rhsR);
+			res=J*sol-rhsR;
+			figure
+			plot(res)
+			norm(res)/norm(rhsR)
+			
+			figure
+			[real,imag,eigenvec,perm]= study_eigenvalues(temp,'never gonna works');
+			plot(real,imag,'o')
+
+			figure
+			semilogy(abs(real))
+			return
+			
+			
 			
 			[d,info_J]=apply_iterative_solver(@(v) ...
 																				 apply_saddle_point(v,@(x) A*x ,...
@@ -4150,7 +4190,9 @@ elseif (sol==20)
 																														Np,Nr,N), ...
 																				rhsR, controls.ctrl_outer, ...
 																				@(z) prec(z),[],controls.left_right );
-
+																				%@(z) apply_left(z,invA,@(x) P(B2*x),Np,Nr),...
+																				%[],controls.left_right,prec);
+																				
 			% get s increment
 			d(Np+1:Np+Nr)=P(d(Np+1:Np+Nr));
 
