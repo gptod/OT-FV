@@ -4075,7 +4075,8 @@ elseif (sol==20)
 		
 	elseif (contains(controls.inverse22,'commute'))
 		lrb=controls.lrb;
-		[pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb,JF);
+		[pr,A_rho, approx_S,start]=...
+		build_approx_Schur_components( A,B1T,B2,C,lrb,JF,controls.inverse22,controls.mode_Arho);
 		
 		
 		ctrl_inner22 = controls.ctrl_inner22;
@@ -4092,12 +4093,11 @@ elseif (sol==20)
 		inv_SCA.init(approx_S+1e-10*speye(Nr),ctrl_loc);
 		inv_SCA.cumulative_iter=0;
 		inv_SCA.cumulative_cpu=0;
-		
 		inverseS = @(y) ...
 								 compute_inverse_approx_S(y,...
 																					@(z) inv_SCA.apply(z),...
 																					A_rho,pr,...
-																					lrb,start,Nr,size(approx_S,1));
+																					lrb,controls.mode_Arho);
 		
 	elseif (strcmp(controls.inverse22,'full'))
 		schur=prec_times_matrix(apply_schur,speye(Nr,Nr));

@@ -1,4 +1,4 @@
-function [JOC] = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhos,drhos,ddrhosa,uk,I,Rs,Rst_rho,divt_rho,gradt_rho,mode)
+function [JOC] = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhos,drhos,ddrhosa,uk,I,Rs,Rst_rho,divt_rho,gradt_rho)
 
 % Compute jacobian of the system of first-order optimality conditions
 
@@ -75,5 +75,4 @@ JOC.Rst_rho=Rst_rho;
 JOC.Rs=Rs;
 JOC.divt_rho=divt_rho;
 JOC.gradt_rho=gradt_rho;
-JOC.mode=mode;
 end

@@ -340,7 +340,7 @@ while true
       [ddrhosak]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
       
       JOC = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhosk,drhosk,ddrhosak,...
-										uk,I,Rs,Rst_rho,divt_rho,gradt_rho,controls.inverse22);
+										uk,I,Rs,Rst_rho,divt_rho,gradt_rho);
 
       if (augmented)
         % aug. Jacobian need the original OC

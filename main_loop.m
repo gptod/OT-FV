@@ -77,10 +77,10 @@ for mesh_type = 5
   % For each mesh, five levels of refinement h_i, 1->5, are available.
 
   % set here for 1 to 4
-  for h_i = 4
+  for h_i = 2
 	       % INCRESING TIME STEP
 	       % set here 1:5
-    for dt_i = 7
+    for dt_i = 3
       N=4*(2^(dt_i-1))
       Nt = N+1;
 
@@ -1117,6 +1117,7 @@ for mesh_type = 5
 				null_space=0;
 				lrb='r';
 				ground=0;
+				mode_Arho=2; 
 				
 				
 				for ia = [8];
@@ -1144,6 +1145,7 @@ for mesh_type = 5
 															'sol',sol,...
 															'null_space',null_space,...
 															'lrb',lrb,...
+															'mode_Arho',mode_Arho,...
 															'diagonal_scaling',diagonal_scaling,...
 															'outer_prec',outer_prec,...
 															'left_right',left_right,...

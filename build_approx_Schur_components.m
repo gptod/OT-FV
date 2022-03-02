@@ -1,4 +1,4 @@
-function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb,JF)
+function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb,JF,mode,mode_Arho)
 	% lrb = l=left,r=right,b=both 
 
 	
@@ -25,15 +25,9 @@ function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb
 	
 	pr = Pspace'*Ptime';
 
-	mode=2;
-	if (mode==1)
+	if (mode_Arho==1)
 		A_rho = Ptime*Pspace*inv_Mphi*A*inv_Mphi*Pspace'*Ptime';
-	else
-		
-		%if (ncellrho ~= ncellphi)
-		%	disp('not working with two meshes')
-	%		return
-		%end
+	elseif (mode_Arho==2)		
 		old=0;
 		if (old)
 			nei=size(JF.div,2);
@@ -44,11 +38,11 @@ function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb
 			Rst = blkdiag(Rst{:});
 			rho=spdiags(-JF.ss,0);
 			rho_edge=spdiags(Rst*rho,0,neit,neit);
-			if (strcmp(JF.mode,'commute'))
+			if (strcmp(mode,'commute'))
 				A_rho = -inv_Mrho * divt*(rho_edge)*gradt*inv_Mrho;
-			elseif (strcmp(JF.mode,'commute_bis'))
+			elseif (strcmp(mode,'commute_bis'))
 				A_rho = -divt*(rho_edge)*gradt*inv_Mrho;
-			elseif (strcmp(JF.mode,'commute_ter'))
+			elseif (strcmp(mode,'commute_ter'))
 				A_rho = - divt*(rho_edge)*gradt;
 			end
 		else		
@@ -56,13 +50,13 @@ function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb
 			rho=spdiags(-JF.ss,0);
 			rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
 			%A_rho = -inv_Mrho * JF.divt_rho*(rho_edge)*JF.gradt_rho*inv_Mrho ;
-			if (strcmp(JF.mode,'commute'))
+			if (strcmp(mode,'commute'))
 				A_rho = -inv_Mrho *  JF.divt_rho*(rho_edge)*JF.gradt_rho*inv_Mrho;
-			elseif (strcmp(JF.mode,'commute_bis'))
+			elseif (strcmp(mode,'commute_bis'))
 				A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho*inv_Mrho;
-			elseif (strcmp(JF.mode,'commute_ter'))
+			elseif (strcmp(mode,'commute_ter'))
 				A_rho = -  JF.divt_rho*(rho_edge)*JF.gradt_rho;
-			elseif (strcmp(JF.mode,'commute_quater'))
+			elseif (strcmp(mode,'commute_quater'))
 				A_rho = - inv_Mrho*JF.divt_rho*(rho_edge)*JF.gradt_rho;
 			end
 		end
@@ -84,13 +78,13 @@ function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb
 		approx_S(start+1:start+Nr,start+1:start+Nr) = B2*inv_Mphi*inv_Mphi*B1T;	
 		approx_S(start+1:start+Nr,start+1:start+Nr) = A_rho*pr'*pr*C+approx_S(start+1:start+Nr,start+1:start+Nr);
 	elseif strcmp(lrb,'r')
-		if (strcmp(JF.mode,'commute'))
+		if (strcmp(mode,'commute'))
 			approx_S(start+1:start+Nr,start+1:start+Nr) = B2*inv_Mphi*inv_Mphi*B1T;	
-		elseif (strcmp(JF.mode,'commute_bis'))
+		elseif (strcmp(mode,'commute_bis'))
 			approx_S(start+1:start+Nr,start+1:start+Nr) = B2*inv_Mphi*B1T;	
-		elseif (strcmp(JF.mode,'commute_ter'))
+		elseif (strcmp(mode,'commute_ter'))
 			approx_S(start+1:start+Nr,start+1:start+Nr) = B2*B1T;
-		elseif (strcmp(JF.mode,'commute_quater'))
+		elseif (strcmp(mode,'commute_quater'))
 			approx_S(start+1:start+Nr,start+1:start+Nr) = B2*inv_Mphi*B1T;	
 		end		
 		%approx_S(start+1:start+Nr,start+1:start+Nr) = C*A_rho*pr'*pr+approx_S(start+1:start+Nr,start+1:start+Nr);
