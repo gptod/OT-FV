@@ -1,4 +1,4 @@
-function [out] = SchurAC_based_preconditioner(in, invSAC,invC,B1T,B2,n,m,prec_type,dimblock)
+function [out] = SchurAC_based_preconditioner(in, invSAC,invC,B1T,B2,n,m,prec_type,dimblock,P,PT)
   % P out = in
   % out = (x;y)
   % in  = (f;g)

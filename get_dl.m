@@ -1,19 +1,19 @@
-function dl = get_dl(JF,F,d,W_mat) 
-  % dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
-
+function dl = get_dl(JF,F,d) 
+  % dl=-1/area E*(B*x + R*y + M*z-g)
   ncellrho=JF.ncellrho;
   N = JF.ntimestep;
 
   %
-  dl=-W_mat*([JF.rp JF.rr JF.rs]*d + F.r);
+	dl=zeros(N,1);	
+	res=[JF.rp JF.rr JF.rs]*d + F.r;
   for k = 1:N
-		dl(k) = dl(k)/norm(W_mat(k,:))^2;
+		dl(k) = -sum(res((k-1)*ncellrho+1:k*ncellrho))/JF.areadomain;
   end
     
   
   if (0)
-    for i = 1:N    
-      fprintf('dlambda(%d)=%1.2e\n',i,dl(i)) 
+    for k = 1:N    
+      fprintf('dlambda(%d)=%1.2e\n',k,dl(k)) 
     end
   end
 end

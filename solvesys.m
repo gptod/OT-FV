@@ -121,7 +121,7 @@ if sol==1
     
     %eps = 1e-8;
     %eId = eps*speye(size(JF.pp));
-  if (1)
+  if (0)
     Sys = [A B1T; B2 -C];
     fp=f1;
 
@@ -170,8 +170,7 @@ if sol==1
 		%d_new(1+Np:Np+Nr)=P(d_new(1+Np:Np+Nr));
 	
 
-		plot(d_new-d)
-		return
+	
 
 		 E=zeros(Np,N);
 		 for i=1:N
@@ -952,15 +951,15 @@ elseif sol==10
   %       ( 0    -C )
 
   % cpu time preprocessing main solver
-  tic;
+  time_prep=tic;
 
   time_manipulate=tic;
   % set rows 
-  [indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
-  [vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
+  %[indeces_global, indeces_local]=set_grounding_node(A,ncellphi);
+  %[vectors_x,vectors_y,alphas]=get_vectors_alphas_from_OC(JF,F,controls);
  
   % grounding ,manipualtion etc
-  [A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
+  %[A,B1T,B2,rhs,B1T_perturbation]=preprocess_system(A,B1T,B2,rhs,indeces_global,vectors_x,vectors_y,alphas,controls);
 
   
   % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2} rhs
@@ -1011,38 +1010,67 @@ elseif sol==10
     if ( strcmp(controls.assembly_S,'full') )
 				%S = A+B1T*(invdiagC*B2);
       S = A+...
-	  JF.B1T_time* (invdiagC*JF.B1T_time' )+...
-	  JF.B1T_space*(invdiagC*JF.B1T_space')+...	 
-	  JF.B1T_time* (invdiagC*JF.B1T_space')+...
-	  JF.B1T_space*(invdiagC*JF.B1T_time');
+					JF.B1T_time* (invdiagC*JF.B1T_time' )+...
+					JF.B1T_space*(invdiagC*JF.B1T_space')+...	 
+					JF.B1T_time* (invdiagC*JF.B1T_space')+...
+					JF.B1T_space*(invdiagC*JF.B1T_time');
 
     elseif ( strcmp(controls.assembly_S,'A_Mtt') ) 
       S = A+JF.B1T_time*(invdiagC*JF.B1T_time');
     elseif ( strcmp(controls.assembly_S,'A_Mtt_Mxx') ) 
-      S = A+...
-	  JF.B1T_time* (invdiagC*JF.B1T_time' )+...
-	  JF.B1T_space*(invdiagC*JF.B1T_space');
+      S = A+JF.B1T_time* (invdiagC*JF.B1T_time' )+JF.B1T_space*(invdiagC*JF.B1T_space');
+		elseif ( strcmp(controls.assembly_S,'A_Mtt_Mxx_lamped') ) 
+      S = A+JF.B1T_time* (invdiagC*JF.B1T_time' );
+			space=JF.B1T_space*(invdiagC*JF.B1T_space');
+			%temp=log(abs(space));
+			%imagesc(temp)
+			%return
+			% using a sort of mass lamping since weight in the mxx matrix
+			% have the following structure
+			% g1**2 g1*g2
+			% g1*g2 2*g2**2 g1*g3
+			%       
+			i=1;
+			S(    (i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)=...
+			S(    (i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)+...
+			space((i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)+...
+			space((i  )*ncellphi+1:(i+1)*ncellphi,(i  )*ncellphi+1:(i+1)*ncellphi);
+			% 
+			for i=2:Nt-1
+				S(    (i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)=...
+				S(    (i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)+...
+				space((i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)+...
+				space((i-2)*ncellphi+1:(i-1)*ncellphi,(i-2)*ncellphi+1:(i-1)*ncellphi)+...
+				space((i  )*ncellphi+1:(i+1)*ncellphi,(i  )*ncellphi+1:(i+1)*ncellphi);
+			end
+			%
+			i=Nt;
+			S(    (i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)=...
+			S(    (i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)+...
+			space((i-1)*ncellphi+1:(i  )*ncellphi,(i-1)*ncellphi+1:(i  )*ncellphi)+...
+			space((i-2)*ncellphi+1:(i-1)*ncellphi,(i-2)*ncellphi+1:(i-1)*ncellphi);
+			
     elseif ( strcmp(controls.assembly_S,'A_Mtx_Mxt') )
       S = A+...
-	  JF.B1T_time* (invdiagC*JF.B1T_space')+...
-	  JF.B1T_space*(invdiagC*JF.B1T_time');
+					JF.B1T_time* (invdiagC*JF.B1T_space')+...
+					JF.B1T_space*(invdiagC*JF.B1T_time');
     elseif ( strcmp(controls.assembly_S,'A_Mtt_Mtx_Mxt') )
       S = A+...
-	  JF.B1T_time* (invdiagC*JF.B1T_time' )+...	  
-	  JF.B1T_time* (invdiagC*JF.B1T_space')+...
-	  JF.B1T_space*(invdiagC*JF.B1T_time');
+					JF.B1T_time* (invdiagC*JF.B1T_time' )+...	  
+					JF.B1T_time* (invdiagC*JF.B1T_space')+...
+					JF.B1T_space*(invdiagC*JF.B1T_time');
     elseif ( strcmp(controls.assembly_S,'A_Mtt_Mtx_Mxt_blockdiagMxx') )
       block=sparse(Np,Np);
       temp=JF.B1T_space*(invdiagC*JF.B1T_space');
       for i=1:Nt
-	block(1+(i-1)*ncellphi:i*ncellphi,1+(i-1)*ncellphi:i*ncellphi)=...
-	temp(1+(i-1)*ncellphi:i*ncellphi,1+(i-1)*ncellphi:i*ncellphi);
+				block(1+(i-1)*ncellphi:i*ncellphi,1+(i-1)*ncellphi:i*ncellphi)=...
+				temp(1+(i-1)*ncellphi:i*ncellphi,1+(i-1)*ncellphi:i*ncellphi);
       end
       S = A+...
-	  JF.B1T_time* (invdiagC*JF.B1T_time' )+...	  
-	  JF.B1T_time* (invdiagC*JF.B1T_space')+...
-	  JF.B1T_space*(invdiagC*JF.B1T_time')+...
-	  block;
+					JF.B1T_time* (invdiagC*JF.B1T_time' )+...	  
+					JF.B1T_time* (invdiagC*JF.B1T_space')+...
+					JF.B1T_space*(invdiagC*JF.B1T_time')+...
+					block;
     end 
 
     
@@ -1110,7 +1138,20 @@ elseif sol==10
 
   %plot(ps)
 
-  
+  if ( controls.permute == 1)
+    % define permutation
+    perm = symrcm(S);
+    iperm(perm)=(1:Np)';
+    
+    % apply   fprintf('res=%1.2e\n',norm(S_old*x-b))
+    A=A(perm,perm);
+    B1T=B1T(perm,:);
+    B2=B2(:,perm);
+    rhs(1:Np)=rhs(perm);
+		f=f(perm);
+		S=S(perm,perm);
+		fp=fp(perm);
+  end
   
   
   %return
@@ -1186,10 +1227,10 @@ elseif sol==10
       diag_block_S{i}      =S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
       below_diag_block_S{i}=S(i    *nAi+1 : (i+1)*nAi , (i-1)*nAi+1 : i*nAi);
       if (debug)
-	explicit_diag_block_S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)=...
-	S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-	explicit_diag_block_S(i    *nAi+1 : (i+1)*nAi , (i-1)*nAi+1 : i*nAi)=...
-	S(i    *nAi+1 : (i+1)*nAi , (i-1)*nAi+1 : i*nAi);
+				explicit_diag_block_S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)=...
+				S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
+				explicit_diag_block_S(i    *nAi+1 : (i+1)*nAi , (i-1)*nAi+1 : i*nAi)=...
+				S(i    *nAi+1 : (i+1)*nAi , (i-1)*nAi+1 : i*nAi);
       end
     end
     i=Nt;
@@ -1267,12 +1308,7 @@ elseif sol==10
     sol_phi=inverse_block11(fp);
     sol_rho=inverseC(B2*sol_phi-rhs(Np+1:Np+Nr));
     fprintf(' res |S x -f_r|/f_r = %1.4e \n',norm(S*sol_phi-fp)/norm(fp));
-    
-    
-    jacobian=[A B1T;B2 -C];
     d=[sol_phi;sol_rho];
-    
-    
     fprintf(' res modified = %1.4e \n',norm(jacobian*d-rhs)/norm(rhs))
   end
   preprocess_S=toc(timeS);
@@ -1286,26 +1322,32 @@ elseif sol==10
   end
   fprintf(controls.logID,'%s\n',msg);
 
-  preprocess_cpu=toc;
+  preprocess_cpu=toc(time_prep);
   
   %
   % Define action of preconditoner
   % 
-  prec = @(x) SchurAC_based_preconditioner(x, inverse_block11, inverseC ,...
-					   @(x) B1T*y,@(x) B2*x,Np,Nr,controls.outer_prec,ncellphi);
-
-  %prec = @(x) lower_triang_prec(x,inverse_block11,B2, @(y) invC.apply(y));
+  prec = @(v) SchurAC_based_preconditioner(v, inverse_block11, inverseC ,...
+					   @(y) B1T*y,@(x) B2*x,Np,Nr,controls.outer_prec,ncellphi);
 
 
   % solve with fgmres or bicgstab if prec is linear
   outer_timing=tic;
-  jacobian = [A B1T; B2 -C];
   if ( verbose >= 2)
     fprintf('START SOLVER \n')
   end
-  [d,info_J]=apply_iterative_solver(@(x) jacobian*x, rhs, ctrl_outer, prec );
+  [d,info_J]=apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,...
+																														@(y) B1T*y,...
+																														@(z) B2*z,...
+																														@(z) C*z,...
+																														Np,Nr),...
+																		rhs, ctrl_outer, prec );
   
-  
+	if (controls.permute==1)
+    d(1:Np) = d(iperm);
+	end
+
+	
   if ( verbose >= 2)
     fprintf('END SOLVER \n')
   end
@@ -1341,15 +1383,11 @@ elseif sol==10
     end
   end
 
-  if (0)    
-    test_vectors(d,vectors_x,vectors_y,alphas,N,Np,Nr);
-  end
-
   
 
   
   %info_J.resvec=info_J.resvec(1:outer_iter);
-  info_J.res=norm(jacobian*d-rhs)/norm(rhs);
+  %info_J.res=norm(jacobian*d-rhs)/norm(rhs);
   info_J.flag=1;
   if (info_J.res <= ctrl_outer.tolerance)
     info_J.flag=0;
@@ -1360,7 +1398,7 @@ elseif sol==10
   relres=info_J.res;
   iter=info_J.iter;
 
-  relres=norm(jacobian*d-rhs)/norm(rhs);
+  %relres=norm(jacobian*d-rhs)/norm(rhs);
 
   if (controls.diagonal_scaling)
     d(1:Np)      =diagA_scaling*d(1:Np);
@@ -2607,13 +2645,15 @@ elseif sol==14
 		  controls.ctrl_inner11.omega,...
 		  controls.ctrl_inner11.verbose,...
 		  'augA',index_agmg);
+		
 
     inv_augA=sparse_inverse;
     inv_augA.init(augA,ctrl_loc);
+		%inv_augA.ctrl.info()
     inv_augA.cumulative_iter=0;
     inv_augA.cumulative_cpu=0;
     inv_augA.dimblock=ncellphi;
-				%inv_S.info();
+		%inv_S.info();
     
     inverse11 = @(x) inv_augA.apply(x);
 
@@ -2763,12 +2803,13 @@ elseif sol==14
   % Define action of preconditoner
   %
   % assembly 2x2 prec
-  prec = @(x) SchurCA_based_preconditioner(x, inverse11,...
-					   inverse22,...
-					   @(y) augB1T*y,...
-					   @(z) B2*z,...
-					   Np,Nr,...
-					   controls.outer_prec,ncellphi);
+  prec = @(x) SchurCA_based_preconditioner(x, ...
+																					 inverse11,...
+																					 inverse22,...
+																					 @(y) augB1T*y,...
+																					 @(z) B2*z,...
+																					 Np,Nr,...
+																					 controls.outer_prec,ncellphi);
 
 
 
@@ -2777,7 +2818,7 @@ elseif sol==14
   
   % solve with fgmres 
   outer_timing=tic;
-  augjacobian = [augA augB1T; B2 -C];
+  
 
   
   if (0)
@@ -2800,7 +2841,7 @@ elseif sol==14
     %plot(eigenvalues,'o')
 
     
-
+		%augjacobian = [augA augB1T; B2 -C];
     out=prec_times_matrix(prec,augjacobian);
 
     
@@ -2818,7 +2859,13 @@ elseif sol==14
   if ( verbose >= 2)
     fprintf('START SOLVER \n')
   end
-  [d,info_J]=apply_iterative_solver(@(x) augjacobian*x, augrhs, ctrl_outer, prec );
+  [d,info_J]=apply_iterative_solver(@(v) ...
+																		 apply_saddle_point(v,@(x) augA*x ,...
+																												@(y) augB1T*y,...
+																												@(x) B2*x,...
+																												@(y) C*y,...
+																												Np,Nr,N), ...
+																		augrhs, ctrl_outer, prec );
   if ( verbose >= 2)
     fprintf('END SOLVER \n')
   end
@@ -3233,32 +3280,98 @@ elseif (sol==18)
   
   % build projector matrix
 	factor=1/(norm(v))^2;
-  P=speye(Nr,Nr)-factor*W_mat'*W_mat;
+  P = @(y) P_apply(y,area2h);
+	PT = @(y) PT_apply(y,area2h);
 
-	exact=0;
+	ground_A=1;
+	if ground_A==1
+		%diagA=spdiags(SysR(1:Np,1:Np),0);
+		node=1;
+		dim=Np+Nr;
+		for i=1
+			%[dmax,imax]=max(diagA(1+(i-1)*ncellphi:i*ncellphi));
+			%indc=imax+(i-1)*ncellphi;
+			indc=node+(i-1)*ncellphi;
+			
+			A(indc,:) = sparse(1,Np);
+			%A(:,indc) = sparse(dim,1);
+			A(indc,indc) = 1;
+			B1T(indc,:) = sparse(1,Nr);
+			
+			f1(indc)=0;		
+		end
+	end
+	
+
+	
+	
+	exact=1;
 	if (exact ==1)
 		SysR = sparse([...
   									A,   B1T;
-  									P*B2, -P*C;   ...
+  									B2, -C;   ...
   								]);
-		change=[...
-			 			 speye(Np), sparse(Np,Nr);...
-			 			 sparse(Nr,Np), P; ....
-			 		 ];
-		
-		%SysR = change*SysR*change';
-		SysR = change*SysR;
-		
 		% 
 		relax=0e-12;
 		SysR(1:Np,1:Np) = SysR(1:Np,1:Np) + relax*speye(Np);
 		SysR(1+Np:Np+Nr,1+Np:Np+Nr) = SysR(1+Np:Np+Nr,1+Np:Np+Nr) - relax*speye(Nr);
 
-		rhsR = [f1; P*f2];
+		rhsR = [f1; f2];
 		d_exact = SysR\rhsR;
 		ds = Dr\(h-Ds*d_exact(Np+1:Np+Nr));
 		d_exact=[d_exact;ds];
 	end
+
+	% defined H
+	H=speye(ncellrho-1,ncellrho);   
+	H(1:ncellrho-1,ncellrho)=-area2h(1:ncellrho-1)/area2h(ncellrho);
+	mat_H = repmat({H},1,N);
+	mat_H = blkdiag(mat_H{:});
+
+	% defined k
+	K=speye(ncellrho-1,ncellrho);   
+	mat_K = repmat({K},1,N);
+	mat_K = blkdiag(mat_K{:});
+	%mat_K (ncellrho-1,ncellrho)=1.0;
+	mat_K=mat_H;
+	
+	SysR = sparse([...
+  										A,   B1T*mat_H';
+  										mat_K*B2, -mat_K*C*mat_H';   ...
+  									]);
+
+	rhsR=blkdiag(speye(Np,Np),mat_K)*rhsR;
+	d=SysR\rhsR;
+	
+	d = blkdiag(speye(Np,Np),mat_H')*d;
+	ds = Dr\(h-Ds*d(Np+1:Np+Nr));
+	d=[d;ds];
+
+	figure
+	plot(d_exact-d)
+
+
+	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
+	dl = get_dl(JF,F,d);
+  
+  % correction of phi increment 
+	d(1:Np) = dp_correction(d(1:Np),JF,dl);
+
+
+	figure
+	
+	size(d_exact)
+	size(d)
+	plot(d_exact-d)
+
+	figure
+	spy(SysR)
+	
+	
+	return
+	
+
+	
 
 	mode=1;
 	if (mode==0)
@@ -3427,10 +3540,10 @@ elseif (sol==18)
 	end
 
 	norm(d(Np+1:Np+Nr)-ort_proj(d(Np+1:Np+Nr),W_mat))
-  d(Np+1:Np+Nr)=ort_proj(d(Np+1:Np+Nr),W_mat);
+  d(Np+1:Np+Nr)=PT(d(Np+1:Np+Nr));
 		
 	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
-	dl=get_dl(JF,F,d,W_mat);
+	dl=get_dl(JF,F,d);
   
   % correction of phi increment 
 	d(1:Np) = dp_correction(d(1:Np),JF,dl);
@@ -3689,7 +3802,7 @@ elseif (sol==19)
   normd = norm(d);
 
 	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
-  dl=get_dl(JF,F,d,W_mat);
+  dl=get_dl(JF,F,d);
   
   % correction of phi increment 
 	d(1:Np) = dp_correction(d(1:Np),JF,dl);
@@ -3740,7 +3853,9 @@ elseif (sol==20)
 	[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
 	B1T_time=-JF.B1T_time;
 	B1T_space=-JF.B1T_space;
-	P = @(y) ort_proj(y,W_mat);
+	P = @(y) P_apply(y,area2h);
+	PT = @(y) PT_apply(y,area2h);
+	
 	rhsR=[f1;P(f2)];
 	% assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
   % reduced to system only in rho
@@ -3773,11 +3888,12 @@ elseif (sol==20)
 		Nr=size(f2,1);
 	end
 
-	ground=0;
+	ground=controls.ground;
 	if (ground)
 		% ground system 
-		[A,B1T_time,B1T_space,B2,f1]=ground_saddle(A,B1T_time,B1T_space,B2,f1,N);
-		B1T=B1T_time+B1T_space;		
+		[A,B1T_time,B1T_space,B2_time,B2_space,f1]=ground_saddle(A,B1T_time,B1T_space,f1,N);
+		B1T=B1T_time+B1T_space;
+		B2 = B2_time+B2_space;
 		rhsR=[f1;P(f2)];
 	end
 
@@ -3793,12 +3909,623 @@ elseif (sol==20)
 		B1T_space=inv_sqrt_diagA* B1T_space *inv_sqrt_diagC;
 		B1T=B1T_time+B1T_space;
 		invDiagA=sparse(1:Np,1:Np,(1./spdiags(A,0))',Np,Np);
-		P = @(y) ort_proj(y,W_mat);
+
+		disp('fix diagonal scaling')
+		return
 		rhsR=[f1;P(f2)];
 	end
 	time_A=tic;
 	
   % define approxiamte inverse of (~A)^{-1}  
+  inverseA_approach=controls.inverse11;
+	ctrl_inner11 = controls.ctrl_inner11;
+	
+  if ( strcmp(inverseA_approach,'full'))
+    % set inverse
+    inverseA=sparse_inverse;
+		ctrl_loc=ctrl_solver;
+		index_agmg=index_agmg+1;
+		ctrl_loc.init(ctrl_inner11.approach,...
+    							ctrl_inner11.tolerance,...
+    							ctrl_inner11.itermax,...
+    							ctrl_inner11.omega,...
+    							ctrl_inner11.verbose,...
+    							strcat('A',ctrl_inner11.label),...
+									index_agmg);
+		
+    inverseA.init(A+controls.relax4inv11*speye(Np,Np),ctrl_loc);
+    inverseA.cumulative_iter=0;
+    inverseA.cumulative_cpu=0;
+
+    % define function
+    invA = @(x) inverseA.apply(x);
+
+		inner_nequ=Np;
+
+		nsysA=1;
+  elseif( strcmp(inverseA_approach,'diag'))
+    % partion matrix 
+    nAi=ncellphi;
+   
+    % use block inverse
+    diag_block_invA(Nt,1)=sparse_inverse;
+    ctrl_loc=ctrl_solver;
+   
+    for i=1:Nt
+			index_agmg=index_agmg+1;
+      ctrl_loc=ctrl_solver;
+      ctrl_loc.init(ctrl_inner11.approach,...
+    		    ctrl_inner11.tolerance,...
+    		    ctrl_inner11.itermax,...
+    		    ctrl_inner11.omega,...
+    		    ctrl_inner11.verbose,...
+    		    sprintf('%sA%d',ctrl_inner11.label,i),...
+						index_agmg);
+      diag_block_invA(i).name=sprintf('inverse A%d',i);
+
+      % create local block and passing to solver
+      % with a potential relaxation
+      matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi) + ...
+	       controls.relax4inv11*speye(nAi,nAi) ;
+      diag_block_invA(i).init(matrixAi,ctrl_loc);
+
+			nsysA=Nt;
+    end
+
+    % define function
+    invA  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+
+		inner_nequ=ncellphi;
+  end
+	cpu_assembly_inverseA=toc(time_A);
+
+
+	if (0)
+		if (times_H)
+			[Stt,Stx,Sxx]=assemble_dual_schur_components(A,size(B1T_time,2),N,...
+																									 @(y) B1T_time*y,...
+																									 @(y) B1T_space*y,...
+																									 @(x) B1T_time'*x,...
+																									 @(x) B1T_space'*x);
+			PCP=C;
+		else
+			[Stt,Stx,Sxx]=assemble_dual_schur_components(A,size(B1T_time,2),N,...
+																									 @(y) B1T_time*P(y),...
+																									 @(y) B1T_space*P(y),...
+																									 @(x) P(B1T_time'*x),...
+																									 @(x) P(B1T_space'*x));
+			
+			CP=matrix_times_prec(C,P);
+			PCP=apply_prec_matrix(P,CP);
+		end
+		S=PCP+Stt+Sxx+Stx+Stx';
+
+		[real,imag,eigenvec,perm]= study_eigenvalues(S,'prec_S');
+		figure
+		semilogy(abs(real))
+
+		fprintf('%1.1e, %1.1e (min,max) max/min %1.1e \n', real(N+1), real(Nr),	real(Nr)/		real(N+1))
+
+		rho=-spdiags(JF.ss);
+		min(abs(rho))
+		return
+
+		T=prec_times_matrix(@(x) S\x,speye(Nr));
+		
+
+		[real,imag,eigenvec,perm]= study_eigenvalues(T,'prec_S');
+		figure
+		semilogy(abs(real))
+
+		imagesc(log(abs(T)))
+		return
+			
+
+
+		if (1)
+			[real,imag,eigenvec,perm]= study_eigenvalues(S,'prec_S');
+			real(Nr)/real(N+1)
+			figure
+			plot(real,imag,'o')
+			title('precJ')
+			figure
+			semilogy(abs(real))
+
+			prec=Stt+1e-10*speye(Nr);
+			precS=prec_times_matrix(@(x) Stt\x,S);
+			[real,imag,eigenvec,perm]= study_eigenvalues(precS,'prec_S');
+			figure
+			semilogy(abs(real))
+			return
+		end
+		
+	end
+
+	apply_schur=@(x) P(C*PT(x)+B2*invA(B1T*PT(x)));
+
+	
+	%
+	% ASSEMBLY SCHUR COMPLEMENT INVERSE
+	%
+	timeS=tic;
+	if (strcmp(controls.inverse22,'diagA'))
+		SCA = (B2*invDiagA*B1T);
+		if (reduced)
+			SCA=SCA+C;
+		end
+		inv_SCA=sparse_inverse;
+		ctrl_inner22 = controls.ctrl_inner22;
+		index_agmg=index_agmg+1;
+		ctrl_loc=ctrl_solver;
+		ctrl_loc.init(ctrl_inner22.approach,...
+    							ctrl_inner22.tolerance,...
+    							ctrl_inner22.itermax,...
+    							ctrl_inner22.omega,...
+    							ctrl_inner22.verbose,...
+    							'SCA',...
+									index_agmg);
+		inv_SCA.init(SCA + controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
+		inv_SCA.info_inverse.label='schur_ca';
+		inv_SCA.cumulative_iter=0;
+		inv_SCA.cumulative_cpu=0;
+
+
+		%define inverse action
+		inverseS=	@(z) inv_SCA.apply(z);
+		
+	elseif (contains(controls.inverse22,'commute'))
+		lrb=controls.lrb;
+		[pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb,JF);
+		
+		
+		ctrl_inner22 = controls.ctrl_inner22;
+		inv_SCA=sparse_inverse;
+		ctrl_loc=ctrl_solver;
+		index_agmg=index_agmg+1;
+		ctrl_loc.init('agmg',...
+     							ctrl_inner22.tolerance,...
+     							ctrl_inner22.itermax,...
+     							0.0,...
+     							ctrl_inner22.verbose,...
+     							'SCA',...
+		 							index_agmg);
+		inv_SCA.init(approx_S+1e-10*speye(Nr),ctrl_loc);
+		inv_SCA.cumulative_iter=0;
+		inv_SCA.cumulative_cpu=0;
+		
+		inverseS = @(y) ...
+								 compute_inverse_approx_S(y,...
+																					@(z) inv_SCA.apply(z),...
+																					A_rho,pr,...
+																					lrb,start,Nr,size(approx_S,1));
+		
+	elseif (strcmp(controls.inverse22,'full'))
+		schur=prec_times_matrix(apply_schur,speye(Nr,Nr));
+
+		inv_Schur=sparse_inverse;
+		ctrl_loc=ctrl_solver;
+		index_agmg=index_agmg+1;
+		ctrl_loc.init('direct',...
+     							1e-12,...
+     							200,...
+     							0.0,...
+     							1,...
+     							'SCA',...
+		 							index_agmg);
+		inv_Schur.init(schur+1e-12*speye(Nr),ctrl_loc);
+
+		inverseS=@(y) inv_Schur.apply(y);
+
+		% test=zeros(Nr,1);
+		% norms=zeros(N,1);
+		% for i = 1:N
+		% 	test(:)=0;
+		% 	test((i-1)*ncellrho+1:i*ncellrho)=area2h;
+		% 	x=inv_Schur.apply(test);
+		% 	disp('res')
+		% 	res=(apply_schur(x))-test;
+		% 	norms(i)=norm(res);
+		% end
+		% norms
+		% return
+		
+	elseif(strcmp(controls.inverse22,'lsc'))
+		
+		invQ = sparse(1:Np,1:Np,(1./spdiags(JF.Mxt,0))',Np,Np);
+		%invQ = sparse(1:Np,1:Np,((1./spdiags(JF.Mxt,0)).^2)',Np,Np);
+		%invQ = sparse(1:Np,1:Np,(spdiags(JF.Mxt,0))',Np,Np);
+		%invQ = speye(Np);
+		% parameters
+		gamma=1.0;
+		alpha=0e-2;
+
+		
+		SCA = (gamma*C+B2*invQ*B1T);
+		inv_SCA=sparse_inverse;
+		ctrl_inner22 = controls.ctrl_inner22;
+		index_agmg=index_agmg+1;
+		ctrl_loc=ctrl_solver;
+		ctrl_loc.init(ctrl_inner22.approach,...
+    							controls.tolerance_preprocess,...
+    							ctrl_inner22.itermax,...
+    							ctrl_inner22.omega,...
+    							ctrl_inner22.verbose,...
+    							'SCA',...
+									index_agmg);
+		inv_SCA.init(SCA + controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
+		inv_SCA.info_inverse.label='schur_ca';
+		inv_SCA.cumulative_iter=0;
+		inv_SCA.cumulative_cpu=0;
+
+		central_block=B2*invQ*A*invQ*B1T;
+		SCA = (C+B2*invDiagA*B1T);
+		inv_diag_SCA=sparse(1:Nr,1:Nr,(1./spdiags(SCA,0))',Nr,Nr);
+
+		inverse_bbt=@(y) P(inv_SCA.apply(PT(y)));
+		
+		inverseS=@(y) inverse_bbt(P(central_block*PT(inverse_bbt(y))))+alpha*inv_diag_SCA*y;
+		
+	end
+	cpu_assembly_S=toc(timeS);
+
+	%
+	% PREPROCESS NULL SPACE METHOD
+	%
+	cpu_assembly_null_space=0;
+	if (controls.null_space)
+		time_null=tic;
+		inv_SCA.ctrl.tolerance=controls.tolerance_preprocess;
+		%inv_SCA.ctrl.verbose=1;
+		invS_Wmat=prec_times_matrix(inverseS,W_mat'); %S^{-1}Z
+
+		inv_SCA.ctrl.tolerance=controls.ctrl_inner22.tolerance;
+		inv_SCA.ctrl.verbose=controls.ctrl_inner22.verbose;
+		
+		% for i=1:N
+		% 	res = SCA*invS_Wmat(:,i)-W_mat(i,:)';
+		% 	norm(res)
+		% end
+	
+		
+		MS=W_mat*(invS_Wmat);	 %MS=Z^TA^{-1} Z				
+		inverse_MS=sparse_inverse; % create LU factorization of MS
+		ctrl_loc=ctrl_solver;
+		ctrl_loc.init('direct',...
+					 				1e-14,...
+					 				200,...
+					 				0,...
+					 				0,...
+					 				'MS',...
+					 				84);
+		inverse_MS.init(MS,ctrl_loc);
+		cpu_assembly_null_space=toc(time_null);
+
+		
+		fprintf('preprocess A=%1.1e S=%1.1e NullSpace=%1.1e\n',...
+						cpu_assembly_inverseA,cpu_assembly_S,cpu_assembly_null_space) 
+
+		
+		%
+		% Define action of schur complement
+		%
+		inv_SCA.ctrl.tolerance=controls.ctrl_inner22.tolerance;	
+	
+		
+		
+		null_space_application=@(y) null_space_method(y,P,PT,...
+																									inverseS,...
+																									W_mat,invS_Wmat,...
+																									@(x) inverse_MS.apply(x));
+		inverse_S=@(y) -apply_Schur_inverse(y,null_space_application,apply_schur);
+	else
+		inverse_S=@(y) -PT(apply_Schur_inverse(y,inverseS,apply_schur));
+	end
+	
+
+	% Define action of block preconditoner
+	if(times_H)
+		B1T=B1T_time+B1T_space;
+		prec = @(x) SchurCA_based_preconditioner(x, @(y) ort_proj(invA(y),A_kernels),...
+																						 inverse_S,...
+																						 @(y) B1T*(y),...
+																						 @(z) B2*z,...
+																						 Np,Nr,...
+																						 controls.outer_prec,ncellphi);
+
+	
+
+		
+		[d,info_J]=apply_iterative_solver(@(v) ...
+																			 apply_saddle_point(v,@(x) A*x ,...
+																													@(y) B1T*y,...
+																													@(x) B2*x,...
+																													@(y) C*y,...
+																													Np,Nr,N), ...
+																			rhsR, controls.ctrl_outer, ...
+																			@(z) prec(z),[],controls.left_right );
+
+		disp(info_J.res)
+
+		d = blkdiag(speye(Np,Np),mat_H')*d;
+		Nr = Nr+N;
+		% get s increment
+		d(Np+1:Np+Nr)=P(d(Np+1:Np+Nr));
+		ds = JF.ss\(-F.s-JF.sr*d(Np+1:Np+Nr));
+		d = [d; ds];
+	else
+		if (ground)
+			prec = @(x) SchurCA_based_preconditioner(x, @(y) invA(y),...
+																							 @(y) inverse_S(y),...
+																							 @(y) B1T*y,...
+																							 @(z) P(B2*z),...
+																							 Np,Nr,...
+																							 controls.outer_prec,ncellphi,P,PT);%,@(y) SCA*y);
+
+		else
+			prec = @(x) SchurCA_based_preconditioner(x, @(y) ort_proj(invA(y),A_kernels),...
+																							 @(y) PT(inverse_S(y)),...
+																							 @(y) B1T*PT(y),...
+																							 @(z) P(B2*z),...
+																							 Np,Nr,...
+																							 controls.outer_prec,ncellphi,P,PT);%,@(y) SCA*y);
+
+		end
+		outer_cpu=tic;
+		compute_eigen=0;
+		if (compute_eigen)
+			J=[
+				 A, B1T;
+				 prec_times_matrix(P,B2), -prec_times_matrix(P,C)
+			];
+			temp=prec_times_matrix(prec,J);
+			%temp=matrix_times_prec(J,prec);
+
+			[real,imag,eigenvec,perm]= study_eigenvalues(temp,'never gonna works');
+			
+			figure
+			plot(abs(real))
+			title('prec S')
+			%return
+		end
+		
+		
+		if (reduced)
+			if (ground)
+				rhsR=[f1;P(f2)];
+				[d,info_J]=apply_iterative_solver(@(v) ...
+																					 apply_saddle_point(v,@(x) A*x ,...
+																															@(y) B1T*(y),...
+																															@(x) P(B2*x),...
+																															@(y) P(C*(y)),...
+																															Np,Nr,N), ...
+																					rhsR, controls.ctrl_outer, ...
+																					@(z) prec(z),[],controls.left_right );
+			else
+				rhsR=[f1;P(f2)];
+				[d,info_J]=apply_iterative_solver(@(v) ...
+																					 apply_saddle_point(v,@(x) A*x ,...
+																															@(y) B1T*PT(y),...
+																															@(x) P(B2*x),...
+																															@(y) P(C*PT(y)),...
+																															Np,Nr,N), ...
+																					rhsR, controls.ctrl_outer, ...
+																					@(z) prec(z),[],controls.left_right );
+			end
+
+			% get s increment
+			d(Np+1:Np+Nr)=PT(d(Np+1:Np+Nr));
+			
+			if (controls.diagonal_scaling == 1)
+				d(1:Np)      = inv_sqrt_diagA * d(1:Np);
+				d(1+Np:Np+Nr)= inv_sqrt_diagC * d(1+Np:Np+Nr);
+
+				[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
+				B1T_time=-JF.B1T_time;
+				B1T_space=-JF.B1T_space;
+				P = @(y) ort_proj(y,W_mat);
+				rhsR=[f1;P(f2)];
+				disp('fix diagonal scaling')
+				return 
+			end
+
+			
+			ds = JF.ss\(-F.s-JF.sr*d(Np+1:Np+Nr));
+			d = [d; ds];
+			
+		else
+			% get other components
+			M  = -sparse(JF.rs);
+			Ds = -sparse(JF.sr);
+			Dr = -sparse(JF.ss);
+			R  = -sparse(JF.rr);
+			R  = -R;
+			
+			global_C=-Dr;
+
+			invM = sparse(1:Nr,1:Nr,(1./spdiags(M,0))',Nr,Nr);			
+			inv_global_C = sparse(1:Nr,1:Nr,(1./spdiags(global_C,0))',Nr,Nr);
+			
+			
+			global_A = @(x) apply_saddle_point(x,@(y) A*y ,...
+																					@(y) B1T*PT(y),...
+																					@(z) P(B2*z),...
+																					@(z) P(R*PT(z)),...
+																					Np,Nr);
+
+			global_B1T = @(y) [zeros(Np,1);P(M*y)];
+			global_B2  = @(x) Ds*P(x(Np+1:Np+Nr));
+
+			operator=@(d) apply_saddle_point(d,...
+																			 global_A ,...
+																			 global_B1T,...
+																			 global_B2,...
+																			 @(y) global_C*y,...
+																			 Np+Nr,Nr);
+
+			
+			% operator=@(d) full_system_times_vector(d, ...
+			% 																				 @(x) A*x,...
+			% 																				 @(y) B1T*P(y),...
+			% 																				 @(x) P(B2*x),...
+			% 																				 @(y) P(R*P(y)),...
+			% 																				 @(z) M*z,...
+			% 																				 @(y) Ds*P(y),...
+			% 																				 @(z) Dr*z,...
+			% 																				 Np,Nr)
+			rhs=[f;P(g);h];
+
+			if (primal)
+				prec_global = @(x) SchurAC_based_preconditioner(x, ...
+																												prec, ...
+																												@(y) inv_global_C*y,...
+																												global_B1T,...
+																												global_B2,...
+																												Np+Nr,Nr,...
+																												controls.outer_prec,ncellphi);
+			
+				[d,info_J]=apply_iterative_solver(@(x) operator(x),...
+																					rhs, controls.ctrl_outer, ...
+																					@(y) prec_global(y) ,[],controls.left_right );
+			else
+				
+				% SS  = GC+Ds*S^{-1}*M = (GC*invM*S+Ds)*(S^{-1}*M) ;
+				approxS=(B2*invDiagA*B1T);
+				SSS = (-global_C+Ds);
+				inverse_SS=@(z) -(invM*inverse_S(SSS\z));
+				
+				
+				prec_global = @(x) SchurCA_based_preconditioner(x, prec,...
+																												inverse_SS,...
+																												global_B1T,...
+																												global_B2,...
+																												Np+Nr,Nr,...
+																												controls.outer_prec,ncellphi);
+
+				[d,info_J]=apply_iterative_solver(@(x) operator(x),...
+																					rhs, controls.ctrl_outer, ...
+																					@(z) prec_global(z),[],controls.left_right );
+
+			end
+		end
+		outer_cpu=toc(outer_cpu);
+	end
+
+
+	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
+  dl=get_dl(JF,F,d);
+  
+  % correction of phi increment 
+	d(1:Np) = dp_correction(d(1:Np),JF,dl);
+
+	%
+	% STORE INFO
+	%
+	outer_iter=uint32(info_J.iter);
+  flag=info_J.flag;
+  relres=info_J.res;
+  iter=info_J.iter;
+  normd = norm(d);
+
+	if ( strcmp(inverseA_approach,'full'))
+		inner_iter=inverseA.cumulative_iter;
+		inner_cpu=inverseA.cumulative_cpu;
+		inverseA.kill();
+	elseif ( strcmp(inverseA_approach,'diag'))
+		inner_iter=0;
+		inner_cpu=0;
+		for i=1:Nt
+			inner_iter=inner_iter+diag_block_invA(i).cumulative_iter;
+			inner_cpu=inner_cpu+diag_block_invA(i).cumulative_cpu;
+			diag_block_invA(i).kill();
+		end
+	end
+		
+  inner_nequ2=Nr;
+	if (  strcmp(controls.inverse22,'diagA') ||...
+				contains(controls.inverse22,'commute'))
+		inner_iter2=inv_SCA.cumulative_iter;
+		inv_SCA.kill();
+
+	elseif (  strcmp(controls.inverse22,'lsc') )
+		inner_iter2=inv_SCA.cumulative_iter;
+		inv_SCA.kill();
+	end
+	
+	cpu_assembly_inverseS=cpu_assembly_S+cpu_assembly_null_space;
+	prec_cpu=cpu_assembly_inverseA+cpu_assembly_inverseS;
+	% check res
+  [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
+	resume_msg=sprintf('outer: %d res=%1.1e [%1.1e,%1.1e,%1.1e] iter=%d cpu=%1.1e| A %s : in/out=%0.1f bt=%1.1e  | S : in/out=%d bt=%1.1e',...
+   									 info_J.flag,resnorm,resp,resr,ress,outer_iter,outer_cpu,...
+										 controls.inverse11,(inner_iter/outer_iter)/nsysA,cpu_assembly_inverseA,...
+   									 inner_iter2/outer_iter,cpu_assembly_inverseS);
+
+
+	if (0)
+		[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
+		Sys = [A B1T; B2 -C];
+		fp=f1;
+
+		indc=1;
+		%[dmax,indc]=max(spdiags(A(1:ncellphi:1:ncellphi),0));
+		Sys(indc,:) = sparse(1,Np+Nr);
+		Sys(:,indc) = sparse(Np+Nr,1);
+		Sys(indc,indc) = 1;
+		fp(indc)=0;
+		
+		d_exact = Sys\[fp;f2];
+
+		d_exact(1:Np)=ort_proj(	d_exact(1:Np),A_kernels);
+		d(1:Np)=ort_proj(	d(1:Np),A_kernels);
+		d(1+Np:Np+Nr)=ort_proj(	d(1+Np:Np+Nr),W_mat);
+
+		
+		figure
+		
+		plot (d(1:Np+Nr)-d_exact)
+		return
+	end	
+	% grounded_node=400;
+	% controls_loc = struct('save_data',0,...
+	% 									'indc',grounded_node,...
+	% 									'sol',1,...
+	% 									'swap_sign',1)
+	% approach_string='direct';
+	% [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JF,F, controls_loc);
+
+
+	% figure
+	% plot(omegak-d)
+
+
+	% sww
+	% return
+
+elseif (sol==21)
+	index_agmg=0;
+
+	
+	[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
+	B1T_time=-JF.B1T_time;
+	B1T_space=-JF.B1T_space;
+
+	Q=JF.Mxt;
+	inv_Q = sparse(1:Np,1:Np,(1./spdiags(Q,0))',Np,Np);
+	
+	P = @(y) ort_proj(y,W_mat);
+	rhsR=[f1;P(f2)];
+	
+	ground=0;
+	if (ground)
+		% ground system 
+		[A,B1T_time,B1T_space,B2,f1]=ground_saddle(A,B1T_time,B1T_space,B2,f1,N);
+		B1T=B1T_time+B1T_space;		
+		rhsR=[f1;P(f2)];
+	end
+
+
+	% define approxiamte inverse of (~A)^{-1}  
+	time_A=tic;
   inverseA_approach=controls.inverse11;
 	ctrl_inner11 = controls.ctrl_inner11;
 	
@@ -3857,446 +4584,155 @@ elseif (sol==20)
 		inner_nequ=ncellphi;
   end
 	cpu_assembly_inverseA=toc(time_A);
-
-
-	if (0)
-		if (times_H)
-			[Stt,Stx,Sxx]=assemble_dual_schur_components(A,size(B1T_time,2),N,...
-																									 @(y) B1T_time*y,...
-																									 @(y) B1T_space*y,...
-																									 @(x) B1T_time'*x,...
-																									 @(x) B1T_space'*x);
-			PCP=C;
-		else
-			P = @(y) ort_proj(y,W_mat);
-			[Stt,Stx,Sxx]=assemble_dual_schur_components(A,size(B1T_time,2),N,...
-																									 @(y) B1T_time*P(y),...
-																									 @(y) B1T_space*P(y),...
-																									 @(x) P(B1T_time'*x),...
-																									 @(x) P(B1T_space'*x));
-			
-			CP=matrix_times_prec(C,P);
-			PCP=apply_prec_matrix(P,CP);
-		end
-		S=PCP+Stt+Sxx+Stx+Stx';
-
-		[real,imag,eigenvec,perm]= study_eigenvalues(S,'prec_S');
-		figure
-		semilogy(abs(real))
-
-		fprintf('%1.1e, %1.1e (min,max) max/min %1.1e \n', real(N+1), real(Nr),	real(Nr)/		real(N+1))
-
-		rho=-spdiags(JF.ss);
-		min(abs(rho))
-		return
-
-		T=prec_times_matrix(@(x) S\x,speye(Nr));
-		
-
-		[real,imag,eigenvec,perm]= study_eigenvalues(T,'prec_S');
-		figure
-		semilogy(abs(real))
-
-		imagesc(log(abs(T)))
-		return
-			
-
-
-		if (1)
-			[real,imag,eigenvec,perm]= study_eigenvalues(S,'prec_S');
-			real(Nr)/real(N+1)
-			figure
-			plot(real,imag,'o')
-			title('precJ')
-			figure
-			semilogy(abs(real))
-
-			prec=Stt+1e-10*speye(Nr);
-			precS=prec_times_matrix(@(x) Stt\x,S);
-			[real,imag,eigenvec,perm]= study_eigenvalues(precS,'prec_S');
-			figure
-			semilogy(abs(real))
-			return
-		end
-		
-	end
-
 	
 	%
 	% ASSEMBLY SCHUR COMPLEMENT INVERSE
 	%
 	timeS=tic;
-	if (strcmp(controls.inverse22,'diagA'))
-		SCA = (B2*invDiagA*B1T);
-		if (reduced)
-			SCA=SCA+C;
-		end
-		inv_SCA=sparse_inverse;
-		ctrl_inner22 = controls.ctrl_inner22;
-		index_agmg=index_agmg+1;
-		ctrl_loc=ctrl_solver;
-		ctrl_loc.init(ctrl_inner22.approach,...
-    							controls.tolerance_preprocess,...
-    							ctrl_inner22.itermax,...
-    							ctrl_inner22.omega,...
-    							ctrl_inner22.verbose,...
-    							'SCA',...
-									index_agmg);
-		inv_SCA.init(SCA + controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
-		inv_SCA.info_inverse.label='schur_ca';
-		inv_SCA.cumulative_iter=0;
-		inv_SCA.cumulative_cpu=0;
 
+	BBT=B2*inv_Q*B1T;
+	BABT=B2*inv_Q*A*inv_Q*B1T;
+	ctrl_inner22 = controls.ctrl_inner22;
+	inv_BBT=sparse_inverse;
+	ctrl_loc=ctrl_solver;
+	index_agmg=index_agmg+1;
+	ctrl_loc.init('agmg',...
+     						ctrl_inner22.tolerance,...
+     						200,...
+     						0.0,...
+     						ctrl_inner22.verbose,...
+     						'SCA',...
+		 						index_agmg);
 
-		%define inverse action
-		inverseS=	@(z) inv_SCA.apply(z);
-		
-	elseif (strcmp(controls.inverse22,'time'))
-		% define operator that project rho_variable into phi_variables
-		I=JF.I;
-		Mphi=JF.Mxt;
-		Mrho=-JF.rs;
-		
-		Dt = assembleDt(N,ncellphi);
-		It=JF.It;
-		I_all = [sparse(ncellrho,Nr);speye(Nr,Nr);sparse(ncellrho,Nr)];
-		inv_Mphi  = sparse(1:Np,1:Np,(1./spdiags(Mphi,0))',Np,Np);
-		inv_Mrho = sparse(1:Nr,1:Nr,(1./spdiags(Mrho,0))',Nr,Nr);
+	inv_BBT.init(BBT+1e-10*speye(Nr),ctrl_loc);
+	inv_BBT.ctrl.info();
+	inv_BBT.cumulative_iter=0;
+	inv_BBT.cumulative_cpu=0;
 
-		
-		Pspace=assemble_space_projector(N+1,I');  
-		Ptime=assemble_time_projector(N,ncellrho);
-		pr = Pspace'*Ptime';
-		
-		%	(C+time_laplacian*invA)^{-1}=(A_rho)*(C*A_rho+time_laplacian)^{-1}
-		A_rho=pr'*inv_Mphi*A*inv_Mphi*pr;
-		%Dt_rho=Nt*Dt*It*I_all;
-		%time_Laplacian=Dt_rho'*Dt_rho;
-		%approx_S=time_Laplacian;
-		approx_S=B2*inv_Mphi*inv_Mphi*B1T+C*A_rho;
-		%if (reduced)
-		%		approx_S=approx_S+C*A_rho;
-		%	end
-		
-		inv_SCA=sparse_inverse;
-		ctrl_inner22 = controls.ctrl_inner22;
-		index_agmg=index_agmg+1;
-		ctrl_loc=ctrl_solver;
-		ctrl_loc.init(ctrl_inner22.approach,...
-    							controls.tolerance_preprocess,...
-    							ctrl_inner22.itermax,...
-    							ctrl_inner22.omega,...
-    							0,...%ctrl_inner22.verbose,...
-    							'SCA',...
-									index_agmg);
-		inv_SCA.init(approx_S + controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
-		inv_SCA.info_inverse.label='schur_ca';
-		inv_SCA.cumulative_iter=0;
-		inv_SCA.cumulative_cpu=0;
-
-		inverseS=@(y) A_rho*inv_SCA.apply(y);
-
-	elseif (strcmp(controls.inverse22,'perm'))
-		I=JF.I;
-		Mphi=JF.Mxt;
-		Mrho=-JF.rs;
-		inv_Mphi  = sparse(1:Np,1:Np,(1./spdiags(Mphi,0))',Np,Np);
-		inv_Mrho = sparse(1:Nr,1:Nr,(1./spdiags(Mrho,0))',Nr,Nr);
-
-		
-		Pspace=assemble_space_projector(N+1,I');  
-		Ptime=assemble_time_projector(N,ncellrho);
-		pr = Pspace'*Ptime';
-		rp = pr';
-
-		Dt = assembleDt(N,ncellphi);
-		I_all = [sparse(ncellrho,Nr);speye(Nr,Nr);sparse(ncellrho,Nr)];
-		time_Laplacian=(Nt*Dt*JF.It*I_all)'*Mphi*(Nt*Dt*JF.It*I_all);
-
-		%	(C+time_laplacian*invA)^{-1}=(A_rho)*(C*A_rho+time_laplacian)^{-1}
-		A_rho = pr'*inv_Mphi*A* pr;
-		approx_S=time_Laplacian;
-		if (reduced)
-			approx_S=approx_S+C*A_rho;
-		end
-
-		inv_SCA=sparse_inverse;
-		ctrl_inner22 = controls.ctrl_inner22;
-		index_agmg=index_agmg+1;
-		ctrl_loc=ctrl_solver;
-		ctrl_loc.init('agmg',...%ctrl_inner22.approach,...
-    							controls.tolerance_preprocess,...
-    							ctrl_inner22.itermax,...
-    							ctrl_inner22.omega,...
-    							0,...%ctrl_inner22.verbose,...
-    							'SCA',...
-									index_agmg);
-		inv_SCA.init(approx_S + controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
-		inv_SCA.info_inverse.label='schur_ca';
-		inv_SCA.cumulative_iter=0;
-		inv_SCA.cumulative_cpu=0;
-
-		inverseS=@(y) A_rho*inv_SCA.apply(y);
 	
-		
+	inverse_lsc = @(y) inv_BBT(A*(inv_BBT(y)));
 
-	elseif(strcmp(controls.inverse22,'lsc'))
-		invQ = sparse(1:Np,1:Np,(1./spdiags(JF.Mxt,0))',Np,Np);
 
-		% parameters
-		gamma=1;
-		alpha=0.01;
-
-		SCA = (gamma*C+B2*invQ*B1T);
-		inv_SCA=sparse_inverse;
-		ctrl_inner22 = controls.ctrl_inner22;
-		index_agmg=index_agmg+1;
-		ctrl_loc=ctrl_solver;
-		ctrl_loc.init(ctrl_inner22.approach,...
-    							controls.tolerance_preprocess,...
-    							ctrl_inner22.itermax,...
-    							ctrl_inner22.omega,...
-    							ctrl_inner22.verbose,...
-    							'SCA',...
-									index_agmg);
-		inv_SCA.init(SCA + controls.relax4inv22*speye(Nr,Nr),ctrl_loc);
-		inv_SCA.info_inverse.label='schur_ca';
-		inv_SCA.cumulative_iter=0;
-		inv_SCA.cumulative_cpu=0;
-
-		central_block=B2*invQ*A*invQ*B1T;
-		SCA = (C+B2*invDiagA*B1T);
-		inv_diag_SCA=sparse(1:Nr,1:Nr,(1./spdiags(SCA,0))',Nr,Nr);
-		
-		inverseS=@(y) inv_SCA.apply(central_block*inv_SCA.apply(y))+alpha*inv_diag_SCA*y;
-		
-	end
 	cpu_assembly_S=toc(timeS);
 
 	%
 	% PREPROCESS NULL SPACE METHOD
 	%
-	time_null=tic;
-	invS_Wmat=prec_times_matrix(inverseS,W_mat'); %S^{-1}Z
-	MS=W_mat*(invS_Wmat);	 %MS=Z^TA^{-1} Z				
-	inverse_MS=sparse_inverse; % create LU factorization of MS
-	ctrl_loc=ctrl_solver;
-	ctrl_loc.init('direct',...
-					 			1e-14,...
-					 			200,...
-					 			0,...
-					 			0,...
-					 			'MS',...
-					 			84);
-	inverse_MS.init(MS,ctrl_loc);
-	cpu_assembly_null_space=toc(time_null);
-
-	
-	fprintf('preprocess A=%1.1e S=%1.1e NullSpace=%1.1e\n',...
-					cpu_assembly_inverseA,cpu_assembly_S,cpu_assembly_null_space) 
-
-
-	%
-	% Define action of schur complement
-	%
-	inv_SCA.ctrl.tolerance=controls.ctrl_inner22.tolerance;
-	null_space_application=@(y) null_space_method(y,P,...
-																								@(z) inv_SCA.apply(z),...
-																								W_mat,invS_Wmat,...
-																								@(x) inverse_MS.apply(x));
-	inverse_S=@(y) -apply_Schur_inverse(y,null_space_application);
-
-	% ctrl_inner=ctrl_solver;
-	% ctrl_inner.init('fgmres',... %approach
-	% 									1e-1,... %tolerance
-	% 									10,...% itermax
-	% 									0.0,... %omega
-	% 									2); %verbose
-	% inverse_S=@(y) -apply_iterative_solver(@(z) P(C*P(z)+B2*invA(B1T*P(z))),...
-	% 																			 y,...
-	% 																			 ctrl_inner, ...
-	% 																			 null_space_application,...
-	% 																			 [],'right'); 
-
-	
-
-	% Define action of block preconditoner
-	if(times_H)
-		B1T=B1T_time+B1T_space;
-		prec = @(x) SchurCA_based_preconditioner(x, invA,...
-																						 inverse_S,...
-																						 @(y) B1T*(y),...
-																						 @(z) B2*z,...
-																						 Np,Nr,...
-																						 controls.outer_prec,ncellphi);
-
+	cpu_assembly_null_space=0;
+	if (controls.null_space)
+		time_null=tic;
+		invS_Wmat=prec_times_matrix(inverse_lsc,W_mat'); %S^{-1}Z
+		MS=W_mat*(invS_Wmat);	 %MS=Z^TA^{-1} Z				
+		inverse_MS=sparse_inverse; % create LU factorization of MS
+		ctrl_loc=ctrl_solver;
+		ctrl_loc.init('direct',...
+					 				1e-14,...
+					 				200,...
+					 				0,...
+					 				0,...
+					 				'MS',...
+					 				84);
+		inverse_MS.init(MS,ctrl_loc);
+		cpu_assembly_null_space=toc(time_null);
 
 		
-		[d,info_J]=apply_iterative_solver(@(v) ...
-																			 apply_saddle_point(v,@(x) A*x ,...
-																													@(y) B1T*y,...
-																													@(x) B2*x,...
-																													@(y) C*y,...
-																													Np,Nr,N), ...
-																			rhsR, controls.ctrl_outer, ...
-																			@(z) prec(z),[],controls.left_right );	
+		fprintf('preprocess A=%1.1e S=%1.1e NullSpace=%1.1e\n',...
+						cpu_assembly_inverseA,cpu_assembly_S,cpu_assembly_null_space) 
 
-		d = blkdiag(speye(Np,Np),mat_H')*d;
-		Nr = Nr+N;
-		% get s increment
-		d(Np+1:Np+Nr)=P(d(Np+1:Np+Nr));
-		ds = JF.ss\(-F.s-JF.sr*d(Np+1:Np+Nr));
-		d = [d; ds];
+		
+		%
+		% Define action of schur complement
+		%
+		inv_BBT.ctrl.tolerance=controls.ctrl_inner22.tolerance;	
+		null_space_application=@(y) null_space_method(y,P,...
+																									inverse_lsc,...
+																									W_mat,invS_Wmat,...
+																									@(x) inverse_MS.apply(x));
+		inverse_S=@(y) -apply_Schur_inverse(y,null_space_application);
 	else
-		B1T=B1T_time+B1T_space;
-		prec = @(x) SchurCA_based_preconditioner(x, invA,...
-																						 inverse_S,...
-																						 @(y) B1T*P(y),...
-																						 @(z) P(B2*z),...
-																						 Np,Nr,...
-																						 controls.outer_prec,ncellphi);
-		
-		outer_cpu=tic;
-		if (reduced)
-			J=[
-				 A, matrix_times_prec(B1T,P);
-				 prec_times_matrix(P,B2), -prec_times_matrix(P,matrix_times_prec(C,P))
-			];
-			%temp=prec_times_matrix(prec,J);
-			temp=matrix_times_prec(J,prec);
-			norm(W_mat*rhsR(Np+1:Np+Nr))
-
-			sol=prec(rhsR);
-			res=J*sol-rhsR;
-			figure
-			plot(res)
-			norm(res)/norm(rhsR)
-			
-			figure
-			[real,imag,eigenvec,perm]= study_eigenvalues(temp,'never gonna works');
-			plot(real,imag,'o')
-
-			figure
-			semilogy(abs(real))
-			return
-			
-			
-			
-			[d,info_J]=apply_iterative_solver(@(v) ...
-																				 apply_saddle_point(v,@(x) A*x ,...
-																														@(y) B1T*P(y),...
-																														@(x) P(B2*x),...
-																														@(y) P(C*P(y)),...
-																														Np,Nr,N), ...
-																				rhsR, controls.ctrl_outer, ...
-																				@(z) prec(z),[],controls.left_right );
-																				%@(z) apply_left(z,invA,@(x) P(B2*x),Np,Nr),...
-																				%[],controls.left_right,prec);
-																				
-			% get s increment
-			d(Np+1:Np+Nr)=P(d(Np+1:Np+Nr));
-
-			if (controls.diagonal_scaling == 1)
-				d(1:Np)      = inv_sqrt_diagA * d(1:Np);
-				d(1+Np:Np+Nr)= inv_sqrt_diagC * d(1+Np:Np+Nr);
-
-				[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
-				B1T_time=-JF.B1T_time;
-				B1T_space=-JF.B1T_space;
-				P = @(y) ort_proj(y,W_mat);
-				rhsR=[f1;P(f2)];
-			end
-
-			
-			ds = JF.ss\(-F.s-JF.sr*d(Np+1:Np+Nr));
-			d = [d; ds];
-			
-		else
-			% get other components
-			M  = -sparse(JF.rs);
-			Ds = -sparse(JF.sr);
-			Dr = -sparse(JF.ss);
-			R  = -sparse(JF.rr);
-			R  = -R;
-			
-			global_C=-Dr;
-
-			invM = sparse(1:Nr,1:Nr,(1./spdiags(M,0))',Nr,Nr);			
-			inv_global_C = sparse(1:Nr,1:Nr,(1./spdiags(global_C,0))',Nr,Nr);
-			
-			
-			global_A = @(x) apply_saddle_point(x,@(y) A*y ,...
-																					@(y) B1T*P(y),...
-																					@(z) P(B2*z),...
-																					@(z) P(R*P(z)),...
-																					Np,Nr);
-
-			global_B1T = @(y) [zeros(Np,1);P(M*y)];
-			global_B2  = @(x) Ds*P(x(Np+1:Np+Nr));
-
-			operator=@(d) apply_saddle_point(d,...
-																			 global_A ,...
-																			 global_B1T,...
-																			 global_B2,...
-																			 @(y) global_C*y,...
-																			 Np+Nr,Nr);
-
-			
-			% operator=@(d) full_system_times_vector(d, ...
-			% 																				 @(x) A*x,...
-			% 																				 @(y) B1T*P(y),...
-			% 																				 @(x) P(B2*x),...
-			% 																				 @(y) P(R*P(y)),...
-			% 																				 @(z) M*z,...
-			% 																				 @(y) Ds*P(y),...
-			% 																				 @(z) Dr*z,...
-			% 																				 Np,Nr)
-			rhs=[f;P(g);h];
-
-			if (primal)
-				prec_global = @(x) SchurAC_based_preconditioner(x, ...
-																												prec, ...
-																												@(y) inv_global_C*y,...
-																												global_B1T,...
-																												global_B2,...
-																												Np+Nr,Nr,...
-																												controls.outer_prec,ncellphi);
-				%test=prec_global(rhs);
-				%size(test)
-				%test=operator(rhs);
-				%size(test)
-				[d,info_J]=apply_iterative_solver(@(x) operator(x),...
-																					rhs, controls.ctrl_outer, ...
-																					@(y) prec_global(y) ,[],controls.left_right );
-			else
-				
-				% SS  = GC+Ds*S^{-1}*M = (GC*invM*S+Ds)*(S^{-1}*M) ;
-				approxS=(B2*invDiagA*B1T);
-				SSS = (-global_C+Ds);
-				inverse_SS=@(z) -(invM*inverse_S(SSS\z));
-				
-				
-				prec_global = @(x) SchurCA_based_preconditioner(x, prec,...
-																												inverse_SS,...
-																												global_B1T,...
-																												global_B2,...
-																												Np+Nr,Nr,...
-																												controls.outer_prec,ncellphi);
-
-				[d,info_J]=apply_iterative_solver(@(x) operator(x),...
-																					rhs, controls.ctrl_outer, ...
-																					@(z) prec_global(z),[],controls.left_right );
-
-			end
-		end
-		outer_cpu=toc(outer_cpu);
+		inverse_S=@(y) -apply_Schur_inverse(y,inverse_lsc);
 	end
 
+
+	prec = @(x) SchurCA_based_preconditioner(x, @(y) ort_proj(invA(y),A_kernels),...
+																					 inverse_S,...
+																					 @(y) B1T*y,...
+																					 @(z) P(B2*z),...
+																					 Np,Nr,...
+																					 controls.outer_prec,ncellphi);
+
+	% get other components changing sign
+	M  = -sparse(JF.rs);
+	Ds = -sparse(JF.sr);
+	Dr = -sparse(JF.ss);
+	R  = -sparse(JF.rr);
+	R  = -R;
+
+	% get standard component of saddle point
+	global_C=-Dr;
+			
+	global_A = @(x) apply_saddle_point(x,@(y) A*y ,...
+																		 @(y) B1T*y,...
+																		 @(z) P(B2*z),...
+																		 @(z) P(R*z),...
+																		 Np,Nr);
+
+	global_B1T = @(y) [zeros(Np,1);P(M*y)];
+	global_B2  = @(x) Ds*P(x(Np+1:Np+Nr));
+	
+	operator=@(d) apply_saddle_point(d,...
+																	 global_A ,...
+																	 global_B1T,...
+																	 global_B2,...
+																	 @(y) global_C*y,...
+																	 Np+Nr,Nr);
+	rhs=[f;P(g);h];
+
+
+	% SS
+	time_ss=tic;
+
+
+	% invert diagonal compenents
+	inv_M   = sparse(1:Nr,1:Nr,(1./spdiags(M,0))',Nr,Nr);			
+	inv_Ds = sparse(1:Nr,1:Nr,(1./spdiags(Ds,0))',Nr,Nr);
+
+	% form matrix K=B Ds^{-1} Dr M^{-1} BT + A)
+	Schur_s = (B1T*inv_Ds*Dr*inv_M*B2+A);
+
+	% ctrl inverse Schur s
+	ctrl_loc=controls.inner33;
+	index_agmg=index_agmg+1;
+	ctrl_loc.	index_agmg =	index_agmg;
+	
+	% set inverse
+	inv_Schur_s=sparse_inverse;
+	inv_Schur_s.init(Schur_s+1e-10*speye(Nr),ctrl_loc);
+	inverse_SS=@(z) -(inv_M*B2*inv_Schur_s.apply(B1T*inv_Ds(z)));
+	cpu_assembly_ss=toc(time_ss);
+	
+
+	% set precondtioenr for full system 
+	prec_global = @(x) SchurCA_based_preconditioner(x, prec,...
+																									inverse_SS,...
+																									global_B1T,...
+																									global_B2,...
+																									Np+Nr,Nr,...
+																									'upper_triang');
+
+
+	% apply iterative solver
+	outer_cpu=tic;
+	[d,info_J]=apply_iterative_solver(@(x) operator(x),...
+																		rhs, controls.ctrl_outer, ...
+																		@(z) prec_global(z),[],controls.left_right );
+	
+	outer_cpu=toc(outer_cpu);
 	
 
 
 	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
-  dl=get_dl(JF,F,d,W_mat);
+  dl=get_dl(JF,F,d);
   
   % correction of phi increment 
 	d(1:Np) = dp_correction(d(1:Np),JF,dl);
@@ -4318,67 +4754,37 @@ elseif (sol==20)
 		inner_iter=0;
 		inner_cpu=0;
 		for i=1:Nt
-			inner_iter=diag_block_invA(i).cumulative_iter;
-			inner_cpu=diag_block_invA(i).cumulative_cpu;
+			inner_iter=inner_iter+diag_block_invA(i).cumulative_iter;
+			inner_cpu=inner_cpu+diag_block_invA(i).cumulative_cpu;
 			diag_block_invA(i).kill();
 		end
 	end
 		
   inner_nequ2=Nr;
-	inner_iter2=inv_SCA.cumulative_iter;
-	inv_SCA.kill();
+	inner_iter2=inv_BBT.cumulative_iter;
+	inv_BBT.kill();
+
+	inner_nequ3=Np;
+	inner_iter3=inv_Schur_s.cumulative_iter;
+	inv_Schur_s.kill();
+
 	
 	cpu_assembly_inverseS=cpu_assembly_S+cpu_assembly_null_space;
 	prec_cpu=cpu_assembly_inverseA+cpu_assembly_inverseS;
 	% check res
   [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
-	resume_msg=sprintf('outer: %d res=%1.1e [%1.1e,%1.1e,%1.1e] iter=%d cpu=%1.1e| A : n=%d it=%d bt=%1.1e  | S : n=%d it=%d bt=%1.1e',...
-   									 info_J.flag,resnorm,resp,resr,ress,outer_iter,outer_cpu,...
-										 inner_nequ, inner_iter,cpu_assembly_inverseA,...
-   									 inner_nequ2, inner_iter2,cpu_assembly_inverseS);
+	linsol_msg= sprintf('outer: %d res=%1.1e [%1.1e,%1.1e,%1.1e] iter=%d cpu=%1.1e|',...
+   									 info_J.flag,resnorm,resp,resr,ress,outer_iter,outer_cpu);
+	A_msg= sprintf(' A : n=%d it=%d bt=%1.1e ',...
+								 inner_nequ, inner_iter,cpu_assembly_inverseA);
 
+	S_msg= sprintf(' S : n=%d it=%d bt=%1.1e',...
+								 inner_nequ2, inner_iter2,cpu_assembly_inverseS);
 
-	if (0)
-		[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
-		Sys = [A B1T; B2 -C];
-		fp=f1;
-
-		indc=1;
-		%[dmax,indc]=max(spdiags(A(1:ncellphi:1:ncellphi),0));
-		Sys(indc,:) = sparse(1,Np+Nr);
-		Sys(:,indc) = sparse(Np+Nr,1);
-		Sys(indc,indc) = 1;
-		fp(indc)=0;
-		
-		d_exact = Sys\[fp;f2];
-
-		d_exact(1:Np)=ort_proj(	d_exact(1:Np),A_kernels);
-		d(1:Np)=ort_proj(	d(1:Np),A_kernels);
-		d(1+Np:Np+Nr)=ort_proj(	d(1+Np:Np+Nr),W_mat);
-
-		
-		figure
-		
-		plot (d(1:Np+Nr)-d_exact)
-		return
-	end	
-	% grounded_node=400;
-	% controls_loc = struct('save_data',0,...
-	% 									'indc',grounded_node,...
-	% 									'sol',1,...
-	% 									'swap_sign',1)
-	% approach_string='direct';
-	% [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JF,F, controls_loc);
-
-
-	% figure
-	% plot(omegak-d)
-
-
-	% sww
-	% return
+	SS_msg= sprintf(' SS : n=%d it=%d bt=%1.1e',...
+								 inner_nequ3, inner_iter3,cpu_assembly_inverseSS);
 	
-	
+	resume_msg=strcat(linsol_ms,A_msg,'\n',S_msg,SS_msg);
 
 end
 

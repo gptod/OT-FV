@@ -7,13 +7,13 @@ function [S_tt,S_tx,S_xx]=assemble_dual_schur_components(A,Nr,N,B1T_time,B1T_spa
 	% define approxiamte inverse of (~A)^{-1}
 	%
   inverseA_approach='diag'; % use 'full', or 'diag'
-	relax4inv11=1e-09; % system is singular, thus we need to lift it a bit
+	relax4inv11=1e-12; % system is singular, thus we need to lift it a bit
 	% set here other approximate inverse of block11
 	ctrl_inner11 = ctrl_solver;
 	ctrl_inner11.init('direct',... %approach
-										1e-14,... %tolerance
-										40,...% itermax
-										0.0,... %omega
+										5e-1,... %tolerance
+										4,...% itermax
+										1e-1,... %omega
 										0,... %verbose
 										'agmg'); %label
 	
@@ -67,8 +67,12 @@ function [S_tt,S_tx,S_xx]=assemble_dual_schur_components(A,Nr,N,B1T_time,B1T_spa
 		pb.print(i,Nr)
 		temp(:)=0;
 		temp(i)=1;
+		
 		vt=invA(B1T_time(temp));
+		%fprintf('res A=%1.1e \n',norm(A*vt-B1T_time(temp)))
 		vx=invA(B1T_space(temp));
+		%fprintf('res A=%1.1e \n',norm(A*vx-B1T_space(temp)))
+		
 		
 		S_tt(:,i)=B1_time(vt);
 		S_tx(:,i)=B1_time(vx);

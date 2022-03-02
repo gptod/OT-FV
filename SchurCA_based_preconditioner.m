@@ -1,4 +1,4 @@
-function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,dimA,dimS,prec_type,dimblock)
+function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,dimA,dimS,prec_type,dimblock,P,PT,SCA)
   % P out = in
   % out = (x;y)
   % in  = (f;g)
@@ -95,9 +95,29 @@ function [out] = SchurCA_based_preconditioner(in, invA,invSCA,B1T,B2,dimA,dimS,p
     % SCA=-(C+B2 A^{-1} B1)
     
     % y  = SCA^{-1} (  g)
-    
-    out(n+1:n+m)=invSCA(in(n+1:n+m));
-    
+    %if (exist('P','var') )
+		
+		%temp=in(n+1:n+m);
+		%res=P(temp)-temp;
+		%norm(res)
+		%end
+		%if (exist('PT','var') )
+	%		norm(PT(temp)-temp)
+	%	end
+		out(n+1:n+m)=invSCA(in(n+1:n+m));
+		if (exist('SCA','var') )
+			temp=out(n+1:n+m);
+			res=(SCA(temp)-in(n+1:n+m))/norm(in(n+1:n+m));
+			%norm(res)
+			%plot(res)
+			return
+		end
+   % 
+		%res=P(temp)-temp;
+		%norm(res)
+		%res=PT(temp)-temp;
+		%norm(res)
+		
     
     % v= f - B1T*y
     if (verbose)

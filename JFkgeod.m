@@ -1,4 +1,4 @@
-function [JOC] = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhos,drhos,ddrhosa,uk,I)
+function [JOC] = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhos,drhos,ddrhosa,uk,I,Rs,Rst_rho,divt_rho,gradt_rho,mode)
 
 % Compute jacobian of the system of first-order optimality conditions
 
@@ -47,7 +47,12 @@ JOC.ncellphi = ncell;
 JOC.DtT=Nt*Dt*It*I_all;
 JOC.B1T_time=Mxt*Nt*Dt*It*I_all;
 JOC.B1T_space=divt*spdiags(gradphi,0,te,te)*drhos;
-  
+
+%temp=(spdiags(gradphi,0,te,te)*drhos)'*spdiags(gradphi,0,te,te)*drhos;
+%imagesc(log(temp))
+%return
+
+
 JOC.LT=spdiags(gradphi,0,te,te)*drhos;
 JOC.diagrho=spdiags(rhos,0,te,te);
 
@@ -59,6 +64,16 @@ JOC.Mxt=Mxt;
 				% store this diagonal
 Np=tnp;
 JOC.area2h=-spdiags(JOC.rs(1:ncell2h,1:ncell2h));
+JOC.areadomain=sum(JOC.area2h);
+
 
 JOC.I=I;
+
+JOC.div=divt(1:ncell,1:size(divt,2)/Nt);
+JOC.grad=gradt(1:size(divt,2)/Nt,1:ncell);
+JOC.Rst_rho=Rst_rho;
+JOC.Rs=Rs;
+JOC.divt_rho=divt_rho;
+JOC.gradt_rho=gradt_rho;
+JOC.mode=mode;
 end
