@@ -1,4 +1,4 @@
-function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb,JF,mode,mode_Arho)
+function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,invC,lrb,JF,mode,mode_Arho)
 	% lrb = l=left,r=right,b=both 
 
 	
@@ -21,7 +21,8 @@ function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb
 	inv_Mphi  = sparse(1:Np,1:Np,(1./spdiags(Mphi,0))',Np,Np);
 	inv_Mrho  = sparse(1:Nr,1:Nr,(1./spdiags(Mrho,0))',Nr,Nr);
 		
-	
+	Ds=-JF.sr;
+	Dr=-JF.ss;
 	
 	pr = Pspace'*Ptime';
 
@@ -57,14 +58,13 @@ function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb
 			elseif (strcmp(mode,'commute_ter'))
 				A_rho = -  JF.divt_rho*(rho_edge)*JF.gradt_rho;
 			elseif (strcmp(mode,'commute_quater'))
-				A_rho = - inv_Mrho*JF.divt_rho*(rho_edge)*JF.gradt_rho;
+				A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
 			end
 		end
 		%size(JF.divt_rho)
 		%size(rho_edge)
 		%size(JF.gradt_rho)
 		%size(inv_Mrho)
-	
 	end
 
 	start=0;
@@ -88,7 +88,7 @@ function [pr,A_rho, approx_S,start]=build_approx_Schur_components(A,B1T,B2,C,lrb
 			approx_S(start+1:start+Nr,start+1:start+Nr) = B2*inv_Mphi*B1T;	
 		end		
 		%approx_S(start+1:start+Nr,start+1:start+Nr) = C*A_rho*pr'*pr+approx_S(start+1:start+Nr,start+1:start+Nr);
-		approx_S(start+1:start+Nr,start+1:start+Nr) = C*A_rho+approx_S(start+1:start+Nr,start+1:start+Nr);
+		approx_S(start+1:start+Nr,start+1:start+Nr) = Ds*inv_Mrho*A_rho + Dr*inv_Mrho*approx_S(start+1:start+Nr,start+1:start+Nr);
 	elseif strcmp(lrb,'b')
 		disp('here')
 		%approx_S(start+1:start+Nr,start+1:start+Nr) = JF.B1T_time'*inv_Mphi*inv_Mphi*A*inv_Mphi*inv_Mphi*JF.B1T_time;

@@ -33,5 +33,8 @@ OC.N = N;
 OC.ncell2h=ncell2h;
 OC.ncell=ncell;
 
+OC.rho_in=rho_in;
+OC.rho_f=rho_f;
+
 end
 

@@ -1,5 +1,6 @@
 classdef sparse_inverse <handle
   properties
+		initalized=0;
     dimblock=0;
     name='empty';
     preprocess_agmg=0;
@@ -27,6 +28,7 @@ classdef sparse_inverse <handle
   end
   methods
     function obj = init(obj,matrix,ctrl)
+			obj.initalized=1;
       obj.init_cpu=0;
       init_cpu=tic;
       obj.matrix=matrix;
@@ -230,7 +232,8 @@ classdef sparse_inverse <handle
 
 			end
 			% destructor
-			function obj = kill(obj)
+		function obj = kill(obj)
+			if (obj.initalized == 1)
 				if ( contains(obj.ctrl.approach ,'agmg'))
 					if( obj.preprocess_agmg>0 )
 						
@@ -248,6 +251,7 @@ classdef sparse_inverse <handle
 				clear obj.IL;
 				clear obj.IU;
 			end
+		end
 
 			% info
 			function obj = info(obj,fid)

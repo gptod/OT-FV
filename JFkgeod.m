@@ -61,10 +61,12 @@ JOC.It=It;
 
 JOC.Mxt=Mxt;
 
+
 				% store this diagonal
 Np=tnp;
 JOC.area2h=-spdiags(JOC.rs(1:ncell2h,1:ncell2h));
 JOC.areadomain=sum(JOC.area2h);
+
 
 
 JOC.I=I;

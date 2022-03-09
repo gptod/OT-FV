@@ -1,4 +1,4 @@
-function [x]=compute_inverse_approx_S(y, inverse,A_rho,pr,lrb,mode_Arho)
+function [x]=compute_inverse_approx_S(y, inverse,A_rho,pr,lrb,mode_Arho,invC,Dr,Mrho,inv_Mrho)
 	if (mode_Arho==1)
 		if strcmp(lrb,'l')
 			x=inverse(A_rho*pr'*pr*y);
@@ -11,7 +11,7 @@ function [x]=compute_inverse_approx_S(y, inverse,A_rho,pr,lrb,mode_Arho)
 		if strcmp(lrb,'l')
 			x=inverse(A_rho*y);
 		elseif strcmp(lrb,'r')
-			x=A_rho*(inverse(y));
+			x=inv_Mrho*A_rho*(inverse(Dr*inv_Mrho*y));
 		elseif strcmp(lrb,'b')
 			x=A_rho*(inverse(A_rho*y));
 		end
