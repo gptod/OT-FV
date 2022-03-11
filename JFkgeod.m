@@ -47,6 +47,7 @@ JOC.ncellphi = ncell;
 JOC.DtT=Nt*Dt*It*I_all;
 JOC.B1T_time=Mxt*Nt*Dt*It*I_all;
 JOC.B1T_space=divt*spdiags(gradphi,0,te,te)*drhos;
+JOC.G=spdiags(gradphi,0,te,te)*drhos;
 
 %temp=(spdiags(gradphi,0,te,te)*drhos)'*spdiags(gradphi,0,te,te)*drhos;
 %imagesc(log(temp))
@@ -77,4 +78,6 @@ JOC.Rst_rho=Rst_rho;
 JOC.Rs=Rs;
 JOC.divt_rho=divt_rho;
 JOC.gradt_rho=gradt_rho;
+
+JOC.gradphi=gradphi;
 end

@@ -4,7 +4,8 @@
 %N = 16;
 %test_case='gauss'
 clear;
-test_case='compression'
+test_case='sin';
+%test_case='compression'
 %test_case='sin_old'
 %test_case='cross'
 
@@ -40,7 +41,7 @@ for kk=1
 
 
 	save_data=1;
-	read_from_file=0;
+	read_from_file=3;
 	%h5_file2read='runs/sol10/PhiRhoSMuThetasin_h1_rec1_N00032__schurACwithdiagC_fgmres_full_invSACfullagmg1e-1_invC1_diag.h5';
 
 	verbose=0;
@@ -118,10 +119,17 @@ for kk=1
 				%  (~SCA)^{-1}= approx. inverse
 				
 				%set here [9,10,11]
-				for sol=[10,11,13,20];
+				for sol=[15];
 
-					%folder_run=sprintf('runs/sol%d',sol)
-					%mkdir folder_run
+					if ~isfolder('runs')
+						mkdir 'runs'
+					end
+						
+					folder_run=sprintf('runs/sol%d',sol)
+					if ~isfolder(folder_run)
+						% File exists.
+						mkdir folder_run
+					end
 					% Mesh structure:
 					% nodutees -> array of nodes coordinates [x y]
 					% cells -> array of cells nodes [#nodes node1 node2 node3 ...]
@@ -256,6 +264,7 @@ for kk=1
 						% select assembly of S=A+Mtt+(Mtx+Mtx')+Mxx
 						assembly_S='full'
 						%assembly_S='A_Mtt'
+						assembly_S='harmonic';
 						%assembly_S='A_Mtt_Mxx'
 						%assembly_S='A_Mtt_Mxx_lamped'
 						%assembly_S='A_Mtx_Mxt'
@@ -286,7 +295,7 @@ for kk=1
 						diagonal_scaling=0;
 
    					%ctrl_inner11.init('direct',1e-14,1,1.0,0,'direct');
-						ctrl_inner11.init('agmg',1e-1,200,1.0,1,'agmg1e-1');
+						ctrl_inner11.init('agmg',1e-1,200,1.0,0,'agmg1e-1');
 
 						% solver for C. It depends on the recostruction
 						if (rec==1)
@@ -744,58 +753,50 @@ for kk=1
 							end
 						end
 					elseif( sol==15)
-						diagonal_scaling=0;
-						grounded_node=0;
-						manipulation_approach=3;
-						manipulate=0;
-
-						block22_sol=10;
-						outer_solver=ctrl_solver;
-						outer_solver.init('fgmres',1e-5,1000,0.0,0);
-
-						if (block22_sol==10)
-							outer_prec='full'
-
-							ctrl_outer.init('fgmres',1e-1,1000,0.0,0);
-							extra_info0='full';
-							
-							ctrl_inner11.init('agmg',1e-1,100,1.0,0,'agmg1-1S');
-							
-							ctrl_inner22.init('diag',... %approach
-																1e-6,... %tolerance
-																100,...% itermax
-																0.0,... %omega
-																0,'diagC'); %verbose
-						elseif (block22_sol==11)
-							
-						end
-
+						ctrl_outer=ctrl_solver;
+						ctrl_outer.init('fgmres',1e-05,4000,0.0,0);
 						
+						
+						% external prec appraoch
+						outer_prec='full'
+						%outer_prec='lower_triang'
+						%outer_prec='upper_triang'						
+						left_right='right';
+						
+						% inverse A
+						relax_inv11=0e-12;
+						ctrl_inner11 = ctrl_solver;
+						ctrl_inner11.init('agmg',1e-1,10,1.0,1);
+						
+						
+						% set grounded_node>0 to gorund the potential in grounded node
+						grounded=0;
+						diagonal_scaling=0;
+						
+						% set here list of solvers for block 22 
+						relax_inv22=0;
+						
+						ctrl_inner22 = ctrl_solver;
+						ctrl_inner22.init('agmg',1e-1,20,1.0,0);
 						controls = struct('save_data',save_data,...
-															'indc',grounded_node,...
+															'ground',ground,...
 															'diagonal_scaling',diagonal_scaling,...
-															'manipulate',manipulate,...
-															'manipulation_approach',manipulation_approach,...
-															'block22_sol',block22_sol,...
 															'sol',solver_approach,...
 															'outer_prec',outer_prec,...
-															'left_right',left_right,...
-															'ctrl_inner11',ctrl_inner11,...
-															'ctrl_inner22',ctrl_inner22,...
 															'ctrl_outer',ctrl_outer,...
-															'outer_solver', outer_solver,...
-															'compute_eigen',compute_eigen,...
-															'verbose',verbose,...
-															'extra_info',extra_info,...
-															'relax4inv11',relax4_inv11,...
-															'relax4inv22',relax4_inv22);
-
-						approach_string=strcat('grounded',num2str(grounded_node),...
+															'left_right',left_right,...
+															'relax_inv11',relax_inv11,...
+															'ctrl_inner11',ctrl_inner11,...
+															'relax_inv22',relax_inv22,...
+															'ctrl_inner22',ctrl_inner22);
+						
+						
+						approach_string=strcat('integral_',ground',num2str(ground),...
 																	 '_diagscal',num2str(diagonal_scaling),...
-																	 '_manA',num2str(manipulate),...
-																	 'full_system_',num2str(block22_sol),...
-																	 '_inv11',ctrl_inner11.label,'_',...
-																	 '_inv22',ctrl_inner22.label);
+																	 ctrl_outer.approach,'_',...
+																	 left_right,'_',outer_prec,'_prec_',...
+																	 'invSCA',ctrl_inner22.label);
+						
 
 						
 						disp(approach_string)
@@ -803,6 +804,7 @@ for kk=1
 						geod;
 
 					elseif (sol==16)
+						
 						% set here bicgstab,gmres,fgmres (for non stationary prec)
 						ctrl_outer.init('fgmres',1e-5,1000,0.0,0);
 
