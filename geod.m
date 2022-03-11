@@ -87,7 +87,7 @@ ctrl_inner22.info(logID);
 
 csv_filename=strcat(filename,'.csv')
 csvID = fopen(csv_filename,'w');
-fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,      mu,   theta, cpulinsys, cpuassemb,   cpuprec, inner2,innernequ2,inner3,innernequ3\n');
+fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ,  minrho,  mu, theta,cpulinsys,cpuassemb,cpuprec, inner2,innernequ2,inner3,innernequ3\n');
 
 % Boundary conditions:
 [rho_in,rho_f,mass,midpoint,potential,geodesic,W2,bc_sol] = bc_density(test_case,cc2h,area2h);
@@ -98,7 +98,7 @@ fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  in
 % k1max = 20; % maximum number of outer iterations
 % theta0 = 0.2; % decay ratio for the perturbation parameter mu
 % theta_min = 0.2;
-% theta_max = 0.2;
+% theta_max = 0.2;mode_inverse22
 % alfamin = 0.1; % minimal step length accepted
 % mu0_up = 0;
 flag_theta = 0;
@@ -383,17 +383,6 @@ while true
 					return
 				end
 			end
-			
-			% deltat=1/(N+1);
-			% masses=zeros(N,1);
-			% for i = 1:N
-			%   masses(i)=omegak(tnp+1+(i-1)*ncell2h:tnp+i*ncell2h)'*area2h;
-			%   state_message=sprintf('y*area= %1.4e',min(masses(i)));
-			%   fprintf('%s \n',state_message);
-			%   fprintf(logID,'%s \n',state_message);
-			% end
-			
-			%return
 			
 
 			

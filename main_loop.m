@@ -18,7 +18,7 @@ for kk=1
 	rec = recs{kk};
 
 
-	eps_0 = 1e-6; % tolerance for the IPM
+	eps_0 = 1e-3; % tolerance for the IPM
 	eps_mu = 1e-6; % tolerance Newton
 	k2max = 15; % maximum number of inner (Newton) iterations
 	k1max = 13; % maximum number of outer iterations
@@ -41,7 +41,7 @@ for kk=1
 
 
 	save_data=1;
-	read_from_file=3;
+	read_from_file=0;
 	%h5_file2read='runs/sol10/PhiRhoSMuThetasin_h1_rec1_N00032__schurACwithdiagC_fgmres_full_invSACfullagmg1e-1_invC1_diag.h5';
 
 	verbose=0;
@@ -79,10 +79,10 @@ for kk=1
 		% For each mesh, five levels of refinement h_i, 1->5, are available.
 
 		% set here for 1 to 4
-		for h_i = 1
+		for h_i = 5
 	    % INCRESING TIME STEP
 	    % set here 1:5
-			for dt_i = 2
+			for dt_i = 3:6
 				N=4*(2^(dt_i-1))
 				Nt = N+1;
 
@@ -119,7 +119,7 @@ for kk=1
 				%  (~SCA)^{-1}= approx. inverse
 				
 				%set here [9,10,11]
-				for sol=[15];
+				for sol=[20];
 
 					if ~isfolder('runs')
 						mkdir 'runs'
@@ -1010,7 +1010,7 @@ for kk=1
 						% set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 						for isolver=[3]%1:length(outer_solvers)
 							ctrl_outer=ctrl_solver;
-							ctrl_outer.init(outer_solvers{isolver},outer_tol,400,0.0,0);
+							ctrl_outer.init(outer_solvers{isolver},outer_tol,800,0.0,0);
 							
 							
 							% external prec appraoch
@@ -1030,7 +1030,7 @@ for kk=1
 							diagonal_scaling=0;
 							
 							
-							for iprec=[1]%1:nouter_precs
+							for iprec=[3]%1:nouter_precs
 								outer_prec=outer_precs{iprec};
 								
 								% inverse approach
@@ -1056,6 +1056,9 @@ for kk=1
 								lrb='r';
 								ground=0;
 								mode_Arho=2; 
+
+								% for commute approach
+								mode_inverse22=2;
 								
 								
 								for ia = [8];
@@ -1096,6 +1099,7 @@ for kk=1
 																			'relax4inv11',relax4inv11,...
 																			'inverse22',inverse22,...
 																			'relax4inv22',relax4inv22,...
+																			'mode_inverse22',mode_inverse22,...
 																			'tolerance_preprocess',tolerance_preprocess);
 										
 										
@@ -1104,6 +1108,7 @@ for kk=1
 																					 'outer_prec',outer_prec,'_',...
 																					 'invA',ctrl_inner11.label,'_',...
 																					 'inverse22',label_inverse22,'_',...
+																					 'mode',num2str(mode_inverse22),'_',...
 																					 'invSCA',ctrl_inner22.label);
 										
 										

@@ -3882,16 +3882,12 @@ elseif (sol==20)
 		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
 		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
 
-		approx_S = B2*inv_Mphi*B1T;
-		%RHt = assembleRHt(N,ncellphi);
-		%Dr_phi = spdiags(RHt*JF.It*[F.rho_in;rho;F.rho_f],0,Np,Np);
-		%approx_S = B2*inv_Mphi*Dr_phi*B1T;
-		
-		approx_S = Ds*inv_Mrho*A_rho + Dr*inv_Mrho*approx_S;
-		%approx_S = Ds*A_rho + approx_S;
-		
-		
-	
+
+		if (controls.mode_inverse22==1)
+			approx_S =  inv_Mrho*C*A_rho + B2*inv_Mphi*B1T;
+		elseif (controls.mode_inverse22==2)
+			approx_S =  Ds*inv_Mrho*A_rho + Dr*inv_Mrho* B2*inv_Mphi*B1T;
+		end
 		
 		ctrl_inner22 = controls.ctrl_inner22;
 		inv_SCA=sparse_inverse;
@@ -3908,8 +3904,14 @@ elseif (sol==20)
 		inv_SCA.cumulative_iter=0;
 		inv_SCA.cumulative_cpu=0;
 
-		inverseS	= @(y) inv_Mrho*A_rho*(inv_SCA.apply(Dr*inv_Mrho*y));
+		
+
 		%inverseS	= @(y) Dr*inv_Mrho*A_rho*(inv_SCA.apply(y));
+		if (controls.mode_inverse22==1)
+			inverseS	= @(y) inv_Mrho*A_rho*(inv_SCA.apply(y));
+		elseif (controls.mode_inverse22==2)
+			inverseS	= @(y) inv_Mrho*A_rho*(inv_SCA.apply(Dr*inv_Mrho*y));
+		end
 		
 	elseif (strcmp(controls.inverse22,'full'))
 		schur=prec_times_matrix(apply_schur,speye(Nr,Nr));
@@ -4256,6 +4258,7 @@ elseif (sol==20)
 	if (  strcmp(controls.inverse22,'diagA') ||...
 				contains(controls.inverse22,'commute'))
 		inner_iter2=inv_SCA.cumulative_iter;
+		inner_nequ2=Nr;
 		inv_SCA.kill();
 
 	elseif (  strcmp(controls.inverse22,'lsc') )
