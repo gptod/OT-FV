@@ -413,7 +413,7 @@ while true
 			end
 
 			% se phi to sum to zero
-			uk(1:Np)=ort_proj(uk(1:Np),ones(1,Np));
+			%uk(1:Np)=ort_proj(uk(1:Np),ones(1,Np));
 			
 			% normalize rho
 			for k = 1:N
