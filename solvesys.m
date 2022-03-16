@@ -3831,7 +3831,7 @@ elseif (sol==20)
 		
 		
 		if (controls.mode_inverse22==1)
-			approx_S =  inv_Mrho*C*A_rho + B2*inv_Mphi*B1T;
+			approx_S =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T;
 		elseif (controls.mode_inverse22==2)
 			approx_S =  Ds*inv_Mrho*A_rho + Dr*inv_Mrho* B2*inv_Mphi*B1T;
 		end
@@ -4209,38 +4209,57 @@ elseif sol==220
 		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
 		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
 
-		S22 = (B2*inv_Mphi*B1T);
+		if strcmp( controls.approach_Schur_slack,'dual')
+			S22 = (B2*inv_Mphi*B1T);
 
-		% init inverse of full S
-		if ( verbose >= 2)
-			fprintf('INIT inverse S\n')
+			% init inverse of full S
+			inv_S22=sparse_inverse;
+			inv_S22.init( S22 + controls.relax4inv22 * speye(Nr,Nr),ctrl_inner22);
+			inv_S22.info_inverse.label='schur22';
+			inv_S22.cumulative_iter=0;
+			inv_S22.cumulative_cpu=0;
+			inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x);
+
+			
+			% (S_s)^{-1}= (Dr + Ds  (S22)^{-1}*M)^{-1}
+			%           = (Dr M^{-1} S22 S22^{-1}M  + Ds M^{-1} Ar * S22^{-1}*M)^{-1}
+			%           = M^{-1} S22 (Dr M^{-1} S22 + Ds M^{-1} Ar)^{-1}
+			%           = M^{-1} S22 * S33
+			S33  = (Dr*inv_Mrho*S22 + Ds*inv_Mrho*A_rho);
+
+			ctrl_inner33=controls.ctrl_inner33;
+			inv_S33 = sparse_inverse;
+			inv_S33.init(S33+controls.relax4inv22*speye(Nr,Nr),ctrl_inner33);
+			inv_S33.info_inverse.label='schur_ss';
+			inv_S33.cumulative_iter=0;
+			inv_S33.cumulative_cpu=0;
+			inverse_block33 = @(x) inv_Mrho*S22*(inv_S33.apply(x));
+			%inverse_block33 = @(x) inv_Mrho*apply_schur(inv_Mrho*S22*(inv_S33.apply(x)));		
+			%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, ctrl_inner33, @(z) z);
+	
+		elseif (strcmp( controls.approach_Schur_slack,'primal'))
+			S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T;
+			
+			% init inverse of full S
+			inv_S22=sparse_inverse;
+			inv_S22.init( S22 + controls.relax4inv22 * speye(Nr,Nr),ctrl_inner22);
+			inv_S22.info_inverse.label='schur22';
+			inv_S22.cumulative_iter=0;
+			inv_S22.cumulative_cpu=0;
+			inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x);
+
+			
+			
+			ctrl_inner33=controls.ctrl_inner33;
+			ctrl_inner33.approach='diag';
+			ctrl_inner33.verbose=0;
+			inv_S33 = sparse_inverse;
+			inv_S33.init(-Dr,ctrl_inner33);
+			inv_S33.info_inverse.label='schur_ss';
+			inv_S33.cumulative_iter=0;
+			inv_S33.cumulative_cpu=0;
+			inverse_block33 = @(x) inv_S33.apply(x);
 		end
-		inv_S22=sparse_inverse;
-		inv_S22.init( S22 + controls.relax4inv22 * speye(Nr,Nr),ctrl_inner22);
-		inv_S22.info_inverse.label='schur22';
-		inv_S22.cumulative_iter=0;
-		inv_S22.cumulative_cpu=0;
-		inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x);
-
-		
-		% (S_s)^{-1}= (Dr + Ds  (S22)^{-1}*M)^{-1}
-		%           = (Dr M^{-1} S22 S22^{-1}M  + Ds M^{-1} Ar * S22^{-1}*M)^{-1}
-		%           = M^{-1} S22 (Dr M^{-1} S22 + Ds M^{-1} Ar)^{-1}
-		%           = M^{-1} S22 * S33
-		S33  = (Dr*inv_Mrho*S22 + Ds*inv_Mrho*A_rho);
-
-		ctrl_inner33=controls.ctrl_inner33;
-		inv_S33 = sparse_inverse;
-		inv_S33.init(S33+controls.relax4inv22*speye(Nr,Nr),ctrl_inner33);
-		inv_S33.info_inverse.label='schur_ss';
-		inv_S33.cumulative_iter=0;
-		inv_S33.cumulative_cpu=0;
-		if ( verbose >= 2)
-			fprintf('DONE inverse S\n') 
-		end
-		inverse_block33 = @(x) inv_Mrho*S22*(inv_S33.apply(x));
-		%inverse_block33 = @(x) inv_Mrho*apply_schur(inv_Mrho*S22*(inv_S33.apply(x)));		
-		%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, ctrl_inner33, @(z) z);
 	elseif (strcmp(controls.approach_Schur_rho,'diagA'))
 		
 		S22 = (B2*invDiagA*B1T);
@@ -4330,27 +4349,46 @@ elseif sol==220
 	global_B1T = @(y) [zeros(Np,1);P(M*(y))];
 	global_B2  = @(x) Ds*PT(x(Np+1:Np+Nr));
 	global_C   = @(z) -Dr*(z);
-
+	
 	J=@(x) apply_saddle_point(x,global_A ,...
 														global_B1T,...
 														global_B2,...
 														global_C,...
 														Np+Nr,Nr);
-	
-	% Define action of block preconditoner 
-	prec = @(x) SchurCA_based_preconditioner(x, prec11_22 ,...
-																				 @(y) inverse_block33(y),...
-																					 global_B1T,...
-																					 global_B2,...
-																					 Np+Nr,Nr,...
-																					 controls.outer_prec,ncellphi);
-	
-	
-	outer_timing=tic;
+
+	%global rhs
 	rhs=[f;P(g);h];
+	
+	if strcmp( controls.approach_Schur_slack,'dual')
+		
+		% Define action of block preconditoner 
+		prec = @(x) SchurCA_based_preconditioner(x, prec11_22 ,...
+																						 @(y) inverse_block33(y),...
+																						 global_B1T,...
+																						 global_B2,...
+																						 Np+Nr,Nr,...
+																						 controls.outer_prec,ncellphi);
+		
+	elseif strcmp( controls.approach_Schur_slack,'primal')
+		
+		% Define action of block preconditoner 
+		prec = @(x) SchurAC_based_preconditioner(x, prec11_22 ,...
+																						 @(y) inverse_block33(y),...
+																						 global_B1T,...
+																						 global_B2,...
+																						 Np+Nr,Nr,...
+																						 'full',ncellphi);
+		
+	end
+
+	outer_timing=tic;
+
 	[d,info_J]=apply_iterative_solver(J, rhs, ctrl_outer, @(z) prec(z),[],controls.left_right );
 	outer_cpu=toc(outer_timing);
 
+
+
+		
 	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
   dl=get_dl(JF,F,d);
   

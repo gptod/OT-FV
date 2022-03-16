@@ -119,7 +119,7 @@ for kk=1
 				%  (~SCA)^{-1}= approx. inverse
 				
 				%set here [9,10,11]
-				for sol=[20];
+				for sol=[20,220];
 
 					if ~isfolder('runs')
 						mkdir 'runs'
@@ -1010,7 +1010,7 @@ for kk=1
 						% set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 						for isolver=[3]%1:length(outer_solvers)
 							ctrl_outer=ctrl_solver;
-							ctrl_outer.init(outer_solvers{isolver},outer_tol,800,0.0,0);
+							ctrl_outer.init(outer_solvers{isolver},1e-5,400,0.0,0);
 							
 							
 							% external prec appraoch
@@ -1046,7 +1046,7 @@ for kk=1
 								% set here other approximate inverse of block11
 								ctrl_inner11.init('agmg',... %approach
 																	10^(-precision_primal),... %tolerance
-																	10,...% itermax
+																	20,...% itermax
 																	0.0,... %omega
 																	0,strcat('agmg',num2str(precision_primal))); %verbose
 								
@@ -1194,22 +1194,25 @@ for kk=1
 						% inverse A with its diagonal
 						relax4_inv11=1e-12;
 						ctrl_inner11=ctrl_solver;
-						ctrl_inner11.init('agmg',1e-5,11,1.0,0,'A');
+						ctrl_inner11.init('agmg',1e-1,10,1.0,0,'A');
 
 						%approach_Schur_rho='diagA';
 						approach_Schur_rho='commute';
-						approach_Schur_rho='lsc';
+						%approach_Schur_rho='lsc';
 						
 						% inverse schur_rho 
 						relax4_inv22=1e-12;
 						ctrl_inner22=ctrl_solver;
-						ctrl_inner22.init('agmg',1e-2,12,1.0,0,'S22');
+						ctrl_inner22.init('agmg',1e-1,12,1.0,0,'S22');
 
+						approach_Schur_slack='primal';
+
+						
 						% inverse schur_s 
 						relax4_inv33=1e-12;
 						ctrl_inner33=ctrl_solver;
 						%ctrl_inner33.init('agmg',1e-1,13,1.0,0,'S33');
-						ctrl_inner33.init('fgmres',1e-1,10,1.0,1,'S33');
+						ctrl_inner33.init('fgmres',1e-1,10,1.0,0,'S33');
 
 
 						controls = struct('save_data',save_data,...
@@ -1223,6 +1226,7 @@ for kk=1
 															'ctrl_inner11',ctrl_inner11,...
 															'relax4inv22',relax4_inv22,...
 															'ctrl_inner22',ctrl_inner22,...
+															'approach_Schur_slack',approach_Schur_slack,...
 															'relax4inv33',relax4_inv33,...
 															'ctrl_inner33',ctrl_inner33,...											
 															'ctrl_outer',ctrl_outer,...

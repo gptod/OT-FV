@@ -257,6 +257,11 @@ for it=1:max_iters
     x = x+dx;
     
     if (resid<tol_exit); break; end;
+		real_resid=norm(A(x, tol_kryl)-b)/beta0;
+		if (real_resid<tol_exit);
+			resid=real_resid;
+			break;
+		end;
 end;
 
 if (verb>0)
