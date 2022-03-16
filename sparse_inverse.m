@@ -102,6 +102,7 @@ classdef sparse_inverse <handle
       result = sum(isnan(rhs(:)));
       if (result>0)
 				disp('Nan in RHS')
+				return
       end
       
       apply_cpu=tic;

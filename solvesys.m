@@ -2639,7 +2639,25 @@ elseif (sol==15)
 	inv_diag_C = sparse(1:Nr,1:Nr,(1.0./diag_C)',Nr,Nr);
 	P_mat=W_mat*inv_diag_C*B2;
 	alphas=W_mat*inv_diag_C*f2;
+
+	P_perturbation=sparse(Np,Np);
+	f_perturbation=zeros(Np,1);
+	for i=1:N
+		irow=(i-1)*ncellphi+1;
+		P_perturbation(irow,:)= P_mat(i,:);
+		f_perturbation(irow)  = alphas(i);
+	end
+	i=N+1;
+	irow=(i-1)*ncellphi+1;
+	P_perturbation(irow,Np-ncellphi+1:Np)=P_mat(N,Np-ncellphi+1:Np);
+	f_perturbation(irow)  = 0;
 	
+	inv_diag_A = 1.0./(spdiags(A,0)+controls.relax_inv11);
+  inv_Diag_A = sparse(1:Np,1:Np,(inv_diag_A)',Np,Np);
+	% add perturbation
+	A=A+P_perturbation;
+	f1=f1+f_perturbation;
+
 
 	time_prec=tic;
 	
@@ -2648,8 +2666,7 @@ elseif (sol==15)
   
   % use block inverse
   diag_block_invA(Nt,1)=sparse_inverse;
-  ctrl_loc=ctrl_solver;
-  
+  ctrl_loc=ctrl_solver; 
   for i=1:Nt
 		ctrl_inner11=controls.ctrl_inner11;
 		index_agmg=index_agmg+1;
@@ -2672,15 +2689,19 @@ elseif (sol==15)
 		nsysA=Nt;
   end
 
+	extra_diagonal=cell(N,1);
+	for i=1:N
+		extra_diagonal_matrices{i}=A((i-1)*nAi+1 :     i*nAi , (i)*nAi+1 : (i+1)*nAi);
+	end
+		
   % define function
-  inv_A  = @(x) shift_solution_Pmat(apply_block_diag_inverse(diag_block_invA,x),P_mat,alphas);
-	inner_nequ=ncellphi;
-
+	inv_A  = @(x) apply_block_triangular_inverse(diag_block_invA,extra_diagonal_matrices,'U',x);
+	
 	% assembly (~S)^{-1} = ( -(C+B2 * diag(A)^{-1} B1T) )^{-1} 
 	build_S=tic;
 
-	inv_diag_A = 1.0./(spdiags(A,0)+controls.relax_inv11);
-  inv_Diag_A = sparse(1:Np,1:Np,(inv_diag_A)',Np,Np);
+	%inv_diag_A = 1.0./(spdiags(A,0)+controls.relax_inv11);
+  %inv_Diag_A = sparse(1:Np,1:Np,(inv_diag_A)',Np,Np);
   SCA = (C+B2*inv_Diag_A*B1T);
 
   inv_SCA=sparse_inverse;
@@ -2701,7 +2722,7 @@ elseif (sol==15)
 	
 	% Define action of block preconditoner 
 	prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
-																					 inverse_block22,...
+																					 @(y) PT(inverse_block22(y)),...
 																					 @(y) B1T*PT(y),...
 																					 @(z) B2*z,...
 																					 Np,Nr,...
@@ -2712,9 +2733,9 @@ elseif (sol==15)
 	rhs=[f1;f2];
 	[d,info_J]=...
 	apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,...
-																								 @(y) B1T*PT(y),...
+																								 @(y) B1T*(y),...
 																								 @(z) B2*z,...
-																								 @(z) C*z,...
+																								 @(z) C*(z),...
 																								 Np,Nr), ...
 												 rhs, ...
 												 controls.ctrl_outer, ...
@@ -3657,28 +3678,6 @@ elseif (sol==20)
 	primal=1;
 
 	
-	times_H=0;
-	if (times_H)
-		% A,   B1T*mat_H';
-  	% mat_H*B2, -mat_H*C*mat_H'; 
-		H=speye(ncellrho-1,ncellrho);   
-		H(1:ncellrho-1,ncellrho)=-JF.area2h(1:ncellrho-1)/JF.area2h(ncellrho);
-		
-		% H=block diagonal (P) 
-		mat_H = repmat({H},1,N);
-		mat_H = blkdiag(mat_H{:});
-		
-		B1T_time  = B1T_time * mat_H';
-		B1T_space = B1T_space * mat_H';
-		B1T=B1T_time+B1T_space;
-		B2 = mat_H*B2;
-		C  = mat_H*C*mat_H';
-
-		f1=f1;
-		f2=mat_H*f2;
-		rhsR=[f1;f2];
-		Nr=size(f2,1);
-	end
 
 	ground=controls.ground;
 	if (ground)
@@ -3772,67 +3771,7 @@ elseif (sol==20)
 	cpu_assembly_inverseA=toc(time_A);
 
 
-	if (0)
-		if (times_H)
-			[Stt,Stx,Sxx]=assemble_dual_schur_components(A,size(B1T_time,2),N,...
-																									 @(y) B1T_time*y,...
-																									 @(y) B1T_space*y,...
-																									 @(x) B1T_time'*x,...
-																									 @(x) B1T_space'*x);
-			PCP=C;
-		else
-			[Stt,Stx,Sxx]=assemble_dual_schur_components(A,size(B1T_time,2),N,...
-																									 @(y) B1T_time*P(y),...
-																									 @(y) B1T_space*P(y),...
-																									 @(x) P(B1T_time'*x),...
-																									 @(x) P(B1T_space'*x));
-			
-			CP=matrix_times_prec(C,P);
-			PCP=apply_prec_matrix(P,CP);
-		end
-		S=PCP+Stt+Sxx+Stx+Stx';
-
-		[real,imag,eigenvec,perm]= study_eigenvalues(S,'prec_S');
-		figure
-		semilogy(abs(real))
-
-		fprintf('%1.1e, %1.1e (min,max) max/min %1.1e \n', real(N+1), real(Nr),	real(Nr)/		real(N+1))
-
-		rho=-spdiags(JF.ss);
-		min(abs(rho))
-		return
-
-		T=prec_times_matrix(@(x) S\x,speye(Nr));
-		
-
-		[real,imag,eigenvec,perm]= study_eigenvalues(T,'prec_S');
-		figure
-		semilogy(abs(real))
-
-		imagesc(log(abs(T)))
-		return
-			
-
-
-		if (1)
-			[real,imag,eigenvec,perm]= study_eigenvalues(S,'prec_S');
-			real(Nr)/real(N+1)
-			figure
-			plot(real,imag,'o')
-			title('precJ')
-			figure
-			semilogy(abs(real))
-
-			prec=Stt+1e-10*speye(Nr);
-			precS=prec_times_matrix(@(x) Stt\x,S);
-			[real,imag,eigenvec,perm]= study_eigenvalues(precS,'prec_S');
-			figure
-			semilogy(abs(real))
-			return
-		end
-		
-	end
-
+	% define implitely action of the Schur complement
 	apply_schur=@(x) P(C*PT(x)+B2*invA(B1T*PT(x)));
 
 	
@@ -3882,7 +3821,15 @@ elseif (sol==20)
 		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
 		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
 
-
+		if (0)
+			nei=size(JF.gradphi,1)/(N+1);
+			for i=1:Nt
+				lapl_phi_i=JF.div*JF.gradphi((i-1)*nei+1:i*nei);
+				fprintf('%1.1e <= Laplacian phi %d <= %1.1e\n ', min(lapl_phi_i), i, max(lapl_phi_i))
+			end
+		end
+		
+		
 		if (controls.mode_inverse22==1)
 			approx_S =  inv_Mrho*C*A_rho + B2*inv_Mphi*B1T;
 		elseif (controls.mode_inverse22==2)
@@ -3930,24 +3877,12 @@ elseif (sol==20)
 
 		inverseS=@(y) inv_Schur.apply(y);
 
-		% test=zeros(Nr,1);
-		% norms=zeros(N,1);
-		% for i = 1:N
-		% 	test(:)=0;
-		% 	test((i-1)*ncellrho+1:i*ncellrho)=area2h;
-		% 	x=inv_Schur.apply(test);
-		% 	disp('res')
-		% 	res=(apply_schur(x))-test;
-		% 	norms(i)=norm(res);
-		% end
-		% norms
-		% return
 		
 	elseif(strcmp(controls.inverse22,'lsc'))
 		
-		invQ = sparse(1:Np,1:Np,(1./spdiags(JF.Mxt,0))',Np,Np);
-		%invQ = sparse(1:Np,1:Np,((1./spdiags(JF.Mxt,0)).^2)',Np,Np);
-		%invQ = sparse(1:Np,1:Np,(spdiags(JF.Mxt,0))',Np,Np);
+		invQ = inv_Mphi;
+		%invQ = inv_Mphi*inv_Mphi;
+		%invQ = Mphi;
 		%invQ = speye(Np);
 		% parameters
 		gamma=1.0;
@@ -4036,195 +3971,86 @@ elseif (sol==20)
 	end
 	
 
-	% Define action of block preconditoner
-	if(times_H)
-		B1T=B1T_time+B1T_space;
-		prec = @(x) SchurCA_based_preconditioner(x, @(y) ort_proj(invA(y),A_kernels),...
-																						 inverse_S,...
-																						 @(y) B1T*(y),...
-																						 @(z) B2*z,...
+	if (ground)
+		prec = @(x) SchurCA_based_preconditioner(x, @(y) invA(y),...
+																						 @(y) inverse_S(y),...
+																						 @(y) B1T*y,...
+																						 @(z) P(B2*z),...
 																						 Np,Nr,...
-																						 controls.outer_prec,ncellphi);
-
-	
-
+																						 controls.outer_prec,ncellphi,P,PT);%,@(y) SCA*y);
 		
+	else
+		prec = @(x) SchurCA_based_preconditioner(x, @(y) ort_proj(invA(y),A_kernels),...
+																						 @(y) PT(inverse_S(y)),...
+																						 @(y) B1T*PT(y),...
+																						 @(z) P(B2*z),...
+																						 Np,Nr,...
+																						 controls.outer_prec,ncellphi,P,PT);%,@(y) SCA*y);
+		
+	end
+	outer_cpu=tic;
+	compute_eigen=0;
+	if (compute_eigen)
+		J=[
+			 A, B1T;
+			 prec_times_matrix(P,B2), -prec_times_matrix(P,C)
+		];
+		temp=prec_times_matrix(prec,J);
+		%temp=matrix_times_prec(J,prec);
+
+		[real,imag,eigenvec,perm]= study_eigenvalues(temp,'never gonna works');
+		
+		figure
+		plot(abs(real))
+		title('prec S')
+		%return
+	end
+		
+		
+	if (ground)
+		rhsR=[f1;P(f2)];
 		[d,info_J]=apply_iterative_solver(@(v) ...
 																			 apply_saddle_point(v,@(x) A*x ,...
-																													@(y) B1T*y,...
-																													@(x) B2*x,...
-																													@(y) C*y,...
+																													@(y) B1T*(y),...
+																													@(x) P(B2*x),...
+																													@(y) P(C*(y)),...
 																													Np,Nr,N), ...
 																			rhsR, controls.ctrl_outer, ...
 																			@(z) prec(z),[],controls.left_right );
-
-		disp(info_J.res)
-
-		d = blkdiag(speye(Np,Np),mat_H')*d;
-		Nr = Nr+N;
-		% get s increment
-		d(Np+1:Np+Nr)=P(d(Np+1:Np+Nr));
-		ds = JF.ss\(-F.s-JF.sr*d(Np+1:Np+Nr));
-		d = [d; ds];
 	else
-		if (ground)
-			prec = @(x) SchurCA_based_preconditioner(x, @(y) invA(y),...
-																							 @(y) inverse_S(y),...
-																							 @(y) B1T*y,...
-																							 @(z) P(B2*z),...
-																							 Np,Nr,...
-																							 controls.outer_prec,ncellphi,P,PT);%,@(y) SCA*y);
-
-		else
-			prec = @(x) SchurCA_based_preconditioner(x, @(y) ort_proj(invA(y),A_kernels),...
-																							 @(y) PT(inverse_S(y)),...
-																							 @(y) B1T*PT(y),...
-																							 @(z) P(B2*z),...
-																							 Np,Nr,...
-																							 controls.outer_prec,ncellphi,P,PT);%,@(y) SCA*y);
-
-		end
-		outer_cpu=tic;
-		compute_eigen=0;
-		if (compute_eigen)
-			J=[
-				 A, B1T;
-				 prec_times_matrix(P,B2), -prec_times_matrix(P,C)
-			];
-			temp=prec_times_matrix(prec,J);
-			%temp=matrix_times_prec(J,prec);
-
-			[real,imag,eigenvec,perm]= study_eigenvalues(temp,'never gonna works');
-			
-			figure
-			plot(abs(real))
-			title('prec S')
-			%return
-		end
+		rhsR=[f1;P(f2)];
+		[d,info_J]=apply_iterative_solver(@(v) ...
+																			 apply_saddle_point(v,@(x) A*x ,...
+																													@(y) B1T*PT(y),...
+																													@(x) P(B2*x),...
+																													@(y) P(C*PT(y)),...
+																													Np,Nr,N), ...
+																			rhsR, controls.ctrl_outer, ...
+																			@(z) prec(z),[],controls.left_right );
+	end
+	
+	% get s increment
+	d(Np+1:Np+Nr)=PT(d(Np+1:Np+Nr));
+	
+	if (controls.diagonal_scaling == 1)
+		d(1:Np)      = inv_sqrt_diagA * d(1:Np);
+		d(1+Np:Np+Nr)= inv_sqrt_diagC * d(1+Np:Np+Nr);
 		
-		
-		if (reduced)
-			if (ground)
-				rhsR=[f1;P(f2)];
-				[d,info_J]=apply_iterative_solver(@(v) ...
-																					 apply_saddle_point(v,@(x) A*x ,...
-																															@(y) B1T*(y),...
-																															@(x) P(B2*x),...
-																															@(y) P(C*(y)),...
-																															Np,Nr,N), ...
-																					rhsR, controls.ctrl_outer, ...
-																					@(z) prec(z),[],controls.left_right );
-			else
-				rhsR=[f1;P(f2)];
-				[d,info_J]=apply_iterative_solver(@(v) ...
-																					 apply_saddle_point(v,@(x) A*x ,...
-																															@(y) B1T*PT(y),...
-																															@(x) P(B2*x),...
-																															@(y) P(C*PT(y)),...
-																															Np,Nr,N), ...
-																					rhsR, controls.ctrl_outer, ...
-																					@(z) prec(z),[],controls.left_right );
-			end
-
-			% get s increment
-			d(Np+1:Np+Nr)=PT(d(Np+1:Np+Nr));
-			
-			if (controls.diagonal_scaling == 1)
-				d(1:Np)      = inv_sqrt_diagA * d(1:Np);
-				d(1+Np:Np+Nr)= inv_sqrt_diagC * d(1+Np:Np+Nr);
-
-				[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
-				B1T_time=-JF.B1T_time;
-				B1T_space=-JF.B1T_space;
-				P = @(y) ort_proj(y,W_mat);
-				rhsR=[f1;P(f2)];
-				disp('fix diagonal scaling')
-				return 
-			end
-
-			
-			ds = JF.ss\(-F.s-JF.sr*d(Np+1:Np+Nr));
-			d = [d; ds];
-			
-		else
-			% get other components
-			M  = -sparse(JF.rs);
-			Ds = -sparse(JF.sr);
-			Dr = -sparse(JF.ss);
-			R  = -sparse(JF.rr);
-			R  = -R;
-			
-			global_C=-Dr;
-
-			invM = sparse(1:Nr,1:Nr,(1./spdiags(M,0))',Nr,Nr);			
-			inv_global_C = sparse(1:Nr,1:Nr,(1./spdiags(global_C,0))',Nr,Nr);
-			
-			
-			global_A = @(x) apply_saddle_point(x,@(y) A*y ,...
-																					@(y) B1T*PT(y),...
-																					@(z) P(B2*z),...
-																					@(z) P(-R*PT(z)),...
-																					Np,Nr);
-
-			global_B1T = @(y) [zeros(Np,1);P(M*y)];
-			global_B2  = @(x) Ds*P(x(Np+1:Np+Nr));
-
-			operator=@(d) apply_saddle_point(d,...
-																			 global_A ,...
-																			 global_B1T,...
-																			 global_B2,...
-																			 @(y) global_C*y,...
-																			 Np+Nr,Nr);
-
-			
-			% operator=@(d) full_system_times_vector(d, ...
-			% 																				 @(x) A*x,...
-			% 																				 @(y) B1T*P(y),...
-			% 																				 @(x) P(B2*x),...
-			% 																				 @(y) P(R*P(y)),...
-			% 																				 @(z) M*z,...
-			% 																				 @(y) Ds*P(y),...
-			% 																				 @(z) Dr*z,...
-			% 																				 Np,Nr)
-			rhs=[f;P(g);h];
-
-			if (primal)
-				prec_global = @(x) SchurAC_based_preconditioner(x, ...
-																												prec, ...
-																												@(y) inv_global_C*y,...
-																												global_B1T,...
-																												global_B2,...
-																												Np+Nr,Nr,...
-																												controls.outer_prec,ncellphi);
-			
-				[d,info_J]=apply_iterative_solver(@(x) operator(x),...
-																					rhs, controls.ctrl_outer, ...
-																					@(y) prec_global(y) ,[],controls.left_right );
-			else
-				
-				% SS  = GC+Ds*S^{-1}*M = (GC*invM*S+Ds)*(S^{-1}*M) ;
-				approxS=(B2*invDiagA*B1T);
-				SSS = (-global_C+Ds);
-				inverse_SS=@(z) -(invM*inverse_S(SSS\z));
-				
-				
-				prec_global = @(x) SchurCA_based_preconditioner(x, prec,...
-																												inverse_SS,...
-																												global_B1T,...
-																												global_B2,...
-																												Np+Nr,Nr,...
-																												controls.outer_prec,ncellphi);
-
-				[d,info_J]=apply_iterative_solver(@(x) operator(x),...
-																					rhs, controls.ctrl_outer, ...
-																					@(z) prec_global(z),[],controls.left_right );
-
-			end
-		end
-		outer_cpu=toc(outer_cpu);
+		[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
+		B1T_time=-JF.B1T_time;
+		B1T_space=-JF.B1T_space;
+		P = @(y) ort_proj(y,W_mat);
+		rhsR=[f1;P(f2)];
+		disp('fix diagonal scaling')
+		return 
 	end
 
-
+	outer_cpu=toc(outer_cpu);
+	
+	% get ds
+	ds = JF.ss\(-F.s-JF.sr*d(Np+1:Np+Nr));
+	d = [d; ds];
+	
 	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
   dl=get_dl(JF,F,d);
   
@@ -4316,7 +4142,15 @@ elseif (sol==20)
 	% sww
 	% return
 elseif sol==220
-	% SIMPLE preconditioenr to the full system 
+	% SIMPLE preconditioenr to the full system
+
+	% weights
+	Mphi=JF.Mxt;
+	Mrho=-JF.rs;
+	inv_Mphi  = sparse(1:Np,1:Np,(1./spdiags(Mphi,0))',Np,Np);
+	inv_Mrho  = sparse(1:Nr,1:Nr,(1./spdiags(Mrho,0))',Nr,Nr);
+	P = @(y) P_apply(y,area2h);
+	PT = @(y) PT_apply(y,area2h);
 	
   % copy controls
   indc=controls.indc;
@@ -4358,12 +4192,11 @@ elseif sol==220
   inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
 	cpu_assembly_inverseA=toc(time_A);
 
+	% define implitely action of the Schur complement
+	apply_schur=@(x) P(C*PT(x)+B2*inv_A(B1T*PT(x)));
 
-	% weights
-	Mphi=JF.Mxt;
-	Mrho=-JF.rs;
-	inv_Mphi  = sparse(1:Np,1:Np,(1./spdiags(Mphi,0))',Np,Np);
-	inv_Mrho  = sparse(1:Nr,1:Nr,(1./spdiags(Mrho,0))',Nr,Nr);
+
+	
 
 	build_S=tic;
 	
@@ -4404,8 +4237,10 @@ elseif sol==220
 		inv_S33.cumulative_cpu=0;
 		if ( verbose >= 2)
 			fprintf('DONE inverse S\n') 
-		end 
+		end
 		inverse_block33 = @(x) inv_Mrho*S22*(inv_S33.apply(x));
+		%inverse_block33 = @(x) inv_Mrho*apply_schur(inv_Mrho*S22*(inv_S33.apply(x)));		
+		%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, ctrl_inner33, @(z) z);
 	elseif (strcmp(controls.approach_Schur_rho,'diagA'))
 		
 		S22 = (B2*invDiagA*B1T);
@@ -4432,6 +4267,7 @@ elseif sol==220
 			fprintf('DONE inverse S\n') 
 		end 
 		inverse_block33 = @(x) inv_Mrho*(S22*(inv_S33.apply(x)));
+		%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, ctrl_inner33, @(z) z);
 	elseif (strcmp(controls.approach_Schur_rho,'lsc'))
 		% S^{-1} = (B2 M^-1 B1T)^{-1} B2 M^{-1} A M^{-1} B1T (B2 M^-1 B1T)^{-1}
 		S22 = (B2*inv_Mphi*B1T);
@@ -4458,6 +4294,7 @@ elseif sol==220
 			fprintf('DONE inverse S\n') 
 		end 
 		inverse_block33 = @(x) inv_S33.apply(x);
+		%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, controls.ctrl_inner33, @(z) z);
 	end
 
 
@@ -4472,8 +4309,7 @@ elseif sol==220
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   % END DUAL SCHUR COMPLEMENT
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	P = @(y) P_apply(y,area2h);
-	PT = @(y) PT_apply(y,area2h);
+	
 
 	
 	% Define action of block preconditoner 

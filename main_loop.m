@@ -18,7 +18,7 @@ for kk=1
 	rec = recs{kk};
 
 
-	eps_0 = 1e-3; % tolerance for the IPM
+	eps_0 = 1e-4; % tolerance for the IPM
 	eps_mu = 1e-6; % tolerance Newton
 	k2max = 15; % maximum number of inner (Newton) iterations
 	k1max = 13; % maximum number of outer iterations
@@ -82,7 +82,7 @@ for kk=1
 		for h_i = 5
 	    % INCRESING TIME STEP
 	    % set here 1:5
-			for dt_i = 3:6
+			for dt_i = 4
 				N=4*(2^(dt_i-1))
 				Nt = N+1;
 
@@ -760,13 +760,13 @@ for kk=1
 						% external prec appraoch
 						outer_prec='full'
 						%outer_prec='lower_triang'
-						%outer_prec='upper_triang'						
+						 outer_prec='upper_triang'						
 						left_right='right';
 						
 						% inverse A
 						relax_inv11=0e-12;
 						ctrl_inner11 = ctrl_solver;
-						ctrl_inner11.init('agmg',1e-1,10,1.0,1);
+						ctrl_inner11.init('agmg',1e-1,10,1.0,0);
 						
 						
 						% set grounded_node>0 to gorund the potential in grounded node
@@ -1194,7 +1194,7 @@ for kk=1
 						% inverse A with its diagonal
 						relax4_inv11=1e-12;
 						ctrl_inner11=ctrl_solver;
-						ctrl_inner11.init('agmg',1e-1,11,1.0,0,'A');
+						ctrl_inner11.init('agmg',1e-5,11,1.0,0,'A');
 
 						%approach_Schur_rho='diagA';
 						approach_Schur_rho='commute';
@@ -1203,12 +1203,13 @@ for kk=1
 						% inverse schur_rho 
 						relax4_inv22=1e-12;
 						ctrl_inner22=ctrl_solver;
-						ctrl_inner22.init('agmg',1e-1,12,1.0,0,'S22');
+						ctrl_inner22.init('agmg',1e-2,12,1.0,0,'S22');
 
 						% inverse schur_s 
 						relax4_inv33=1e-12;
 						ctrl_inner33=ctrl_solver;
-						ctrl_inner33.init('agmg',1e-1,13,1.0,0,'S33');
+						%ctrl_inner33.init('agmg',1e-1,13,1.0,0,'S33');
+						ctrl_inner33.init('fgmres',1e-1,10,1.0,1,'S33');
 
 
 						controls = struct('save_data',save_data,...
