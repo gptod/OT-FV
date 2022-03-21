@@ -5,7 +5,6 @@ function [d, sol_stat, normd,resume_msg] = solvesys(JF,F,controls)
 % constant of the potential dp
   
 sol=controls.sol;
-indc=controls.indc;
 
 resume_msg='';
 
@@ -45,9 +44,9 @@ g=-F.r;
 h=-F.s;
 
 % Solve with the Schur complement A|C, using Matlab's backslash (or agmg)
-swap_sign=controls.swap_sign;
+swap_sign=1;
 
-if (controls.swap_sign)
+if (swap_sign)
   sign=-1;
 else
   sign=1;
@@ -116,7 +115,6 @@ area2h=JF.area2h;
 deltat=1/(N+1);
   
 if sol==1
-  disp(sol)
   % Solve using Matlab's backslash  
 	if (controls.ground == 1)
 		% Ground matrix A, B1T and f1.
@@ -124,9 +122,9 @@ if sol==1
 		% "grounding" all blocks. 
 		for iblock = 1:1
 			irow = controls.ground_node+(iblock-1)*ncellphi;
-			A(irow,:) = sparse(Np,0);
+			A(irow,:) = sparse(Np,1);
 			A(irow,irow)= 1.0;
-			B1T(irow,:) = sparse(Nr,0);
+			B1T(irow,:) = sparse(Nr,1);
 		end
 	else
 		% Other relaxation type
@@ -134,6 +132,7 @@ if sol==1
 	end
 
 	% we can solve the full, the partially reduce or the fully reduced system
+	outer_cpu=tic;
 	if (controls.reduced == 0)
 		% form the full matrix and solve it
 		Sys = sparse([A B1T sparse(Np,Nr); B2 R M; sparse(Nr,Nr) Ds Dr]);
@@ -143,11 +142,15 @@ if sol==1
 	elseif (controls.reduced == 1)
 		% form the saddle point system removing the slackness variable
 		Sys = sparse([A B1T; B2 -C ]);
-		rhs = [f;f2]
+		rhs = [f;f2];
 		d = Sys\rhs;
 		% get the ds 
 		ds = Dr\(h-Ds*d(Np+1:Np+Nr));
 		d=[d;ds];
+
+		outer_iter=0;
+		inner_iter=0;
+		
 		
 	elseif (controls.reduced == 2)
 		% form the primal Schur Complement, solve w.r.t to dp
@@ -160,6 +163,9 @@ if sol==1
     ds = Dr\(h-Ds*dr);
     d = [dp; dr; ds];
 	end
+	prec_cpu=0;
+	normd=norm(d);
+	outer_cpu=toc(outer_cpu);
 
 
 % elseif sol==100
@@ -723,7 +729,6 @@ elseif sol==10
   % + 
   % use P=( SAC B1T ) as preconditoner 
   %       ( 0    -C )
-
   % cpu time preprocessing main solver
   time_prep=tic;
 
@@ -733,12 +738,12 @@ elseif sol==10
 	if (controls.ground == 1)
 		for iblock = 1:1
 			irow = controls.ground_node+(iblock-1)*ncellphi;
-			A(irow,:) = sparse(Np,0);
+			A(irow,:) = sparse(Np,1);
 			A(irow,irow)= 1.0;
-			B1T_time(irow,:) = sparse(Nr,0);
-			B1T_space(irow,:) = sparse(Nr,0);
-			B1T(irow,:) = sparse(Nr,0);
-			f1(irow)=0.0
+			B1T_time(irow,:) = sparse(Nr,1);
+			B1T_space(irow,:) = sparse(Nr,1);
+			B1T(irow,:) = sparse(Nr,1);
+			f1(irow)=0.0;
 		end
 	end
 
@@ -790,8 +795,9 @@ elseif sol==10
 	Sxx = B1T_space*(inv_diag_C*B1T_space');
 
 	
-	% select 
+	% select
 	if ( strcmp(controls.assembly_S,'full') )
+		%disp('here')
 		S = Stt+Stx+Stx'+Sxx;
   elseif ( strcmp(controls.assembly_S,'tt') ) 
     S = Stt;
@@ -811,7 +817,7 @@ elseif sol==10
     % Rst = blkdiag(Rst{:});
 		rec_time = assembleRHt(N-1,ncellrho);
 		nei=size(JF.grad,2);
-		gradt = assembleGradt(N,ncellphi,nei,JF.grad);
+		gradt = assembleGradt(N,ncellphi,nei,JF.div');
 
 		
 		% crhos=spdiags(inv_diag_C,0);
@@ -856,7 +862,6 @@ elseif sol==10
 
 		S=Stt+Stx+Sxt+Sxx;
 
-		disp('harmonic')
 	elseif ( strcmp(controls.assembly_S,'tt_xx_lamped') ) 
     S = Stt
 		% using a sort of mass lamping since weight in the mxx matrix
@@ -929,6 +934,7 @@ elseif sol==10
   timeS=tic;
   if (strcmp(approach,'full'))
     % init inverse of full S
+		%disp('here')
 		Nsys=1;
     inv_S=sparse_inverse;
 
@@ -939,8 +945,7 @@ elseif sol==10
 		  ctrl_inner11.itermax,...
 		  ctrl_inner11.omega,...
 		  ctrl_inner11.verbose,...
-		  'SAC',index_agmg,...
-		  controls.logID);
+		  'SAC',index_agmg);
     inv_S.init(S+relax4prec*speye(Np,Np),ctrl_loc);
     inv_S.dimblock=ncellphi;
 		%inv_S.info();
@@ -1412,11 +1417,6 @@ elseif sol==12
   
   cpu_manipulate=toc(time_manipulate);
   msg=sprintf('MANIPULATE LIN. SYS= %1.4e',cpu_manipulate);
-  if (verbose>1)
-    fprintf('%s\n',msg);
-    fprintf(controls.logID,'%s\n',msg);
-  end
-
   time_prec=tic;
 
 
@@ -1794,7 +1794,7 @@ elseif sol==12
     B2_time=JF.B1T_time';
     B2_space=JF.B1T_space';
     
-    if (controls.swap_sign)
+    if (swap_sign)
       B1T_time=-B1T_time;
       B1T_space=-B1T_space;
       B2_time=-B2_time;
@@ -2791,7 +2791,6 @@ elseif (sol==16)
   msg=sprintf('MANIPULATE LIN. SYS= %1.4e',cpu_manipulate);
   if (verbose>1)
     fprintf('%s\n',msg);
-    fprintf(controls.logID,'%s\n',msg);
   end
 
   % prec assembly
@@ -2905,7 +2904,7 @@ elseif (sol==16)
 
     prec_matrix=prec_times_matrix(inverse22,-denseS);
 
-    eigenvalues=study_eigenvalues(prec_matrix,'~S^{-1} S',1);%controls.logID);
+    eigenvalues=study_eigenvalues(prec_matrix,'~S^{-1} S',1);
 
     figure
     plot(eigenvalues,'o')
@@ -3816,10 +3815,23 @@ elseif (sol==20)
 		%[pr,A_rho, approx_S,start]=...
 		%build_approx_Schur_components( A,B1T,B2,C,invC,lrb,JF,controls.inverse22,controls.mode_Arho);
 
+		inv_Dr = sparse(1:Nr,1:Nr,(1./spdiags(Dr,0))',Nr,Nr);
+		
 		neit=size(JF.divt_rho,2);
 		rho=spdiags(-JF.ss,0);
 		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
 		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
+
+		
+		% rho defined on cells
+		RHt = assembleRHt(N,ncellphi);
+		vect_rho_on_h = RHt*(JF.It*[F.rho_in;rho;F.rho_f]);
+		rho_h =  sparse(1:Np,1:Np,(vect_rho_on_h)',Np,Np);
+		inv_rho_h =  sparse(1:Np,1:Np,(1./vect_rho_on_h)',Np,Np);
+		
+		
+		
+		
 
 		if (0)
 			nei=size(JF.gradphi,1)/(N+1);
@@ -3828,12 +3840,14 @@ elseif (sol==20)
 				fprintf('%1.1e <= Laplacian phi %d <= %1.1e\n ', min(lapl_phi_i), i, max(lapl_phi_i))
 			end
 		end
-		
+
+		%S22=B1T_time'*inv_Mphi*B1T_time;
+		S22=B2*inv_Mphi*B1T;
 		
 		if (controls.mode_inverse22==1)
-			approx_S =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T;
+			approx_S =  C*inv_Mrho*A_rho + S22;
 		elseif (controls.mode_inverse22==2)
-			approx_S =  Ds*inv_Mrho*A_rho + Dr*inv_Mrho* B2*inv_Mphi*B1T;
+			approx_S =  Ds*inv_Mrho*A_rho + Dr*inv_Mrho* S22;
 		end
 		
 		ctrl_inner22 = controls.ctrl_inner22;
@@ -4178,8 +4192,8 @@ elseif sol==220
     							ctrl_inner11.itermax,...
     							ctrl_inner11.omega,...
     							ctrl_inner11.verbose,...
-    							sprintf('B%sA%d',ctrl_inner11.label,i));
-    diag_block_invA(i).name=sprintf('inverse A%d',i);
+    							sprintf('A%d',i));
+    diag_block_invA(i).name=sprintf('invA%d',i);
 
     % create local block and passing to solver
     % with a potential relaxation
@@ -4196,11 +4210,11 @@ elseif sol==220
 	apply_schur=@(x) P(C*PT(x)+B2*inv_A(B1T*PT(x)));
 
 
-	
+
 
 	build_S=tic;
 	
-	if (strcmp(controls.approach_Schur_rho,'commute'))
+	if (contains(controls.approach_Schur_rho,'commute'))
 		%
 		% assembly Schur_rho=(B2 *inv_Mphi*B1T)*A_rho^{-1}*Mrho
 		%                   = S22*A_rho^{-1}*Mrho
@@ -4208,6 +4222,13 @@ elseif sol==220
 		rho=spdiags(-JF.ss,0);
 		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
 		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
+		%A_rho = - JF.divt_rho*JF.gradt_rho;
+
+		% rho defined on cells
+		RHt = assembleRHt(N,ncellphi);
+		vect_rho_on_h = RHt*(JF.It*[F.rho_in;rho;F.rho_f]);
+		rho_h =  sparse(1:Np,1:Np,(vect_rho_on_h)',Np,Np);
+		inv_rho_h =  sparse(1:Np,1:Np,(1./vect_rho_on_h)',Np,Np);
 
 		if strcmp( controls.approach_Schur_slack,'dual')
 			S22 = (B2*inv_Mphi*B1T);
@@ -4238,16 +4259,44 @@ elseif sol==220
 			%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, ctrl_inner33, @(z) z);
 	
 		elseif (strcmp( controls.approach_Schur_slack,'primal'))
-			S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T;
-			
+			if contains(controls.approach_Schur_rho,'Btilde')
+				rec_time = assembleRHt(N-1,ncellrho);
+				nei=size(JF.grad,2);
+				gradt = assembleGradt(N,ncellphi,nei,JF.div');
+				te = size(gradt,1);
+				Rst = repmat({JF.Rs},1,N+1);
+				Rst = blkdiag(Rst{:});
+				I_cellphi_cellrho = assembleIt(N-1,ncellphi,ncellrho,JF.I);
+				%  (N+1)*Kh<-(N+1)*e<-(N+1)*e<-(N+1)*Kh <-(N+1)*K2h <- N*K2h
+				new_B1T_space = Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
+				
+				S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*(B1T_time+new_B1T_space); %right
+
+			elseif contains(controls.approach_Schur_rho,'right')
+				S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T; %right
+			elseif contains(controls.approach_Schur_rho,'left')				
+				S22 =  A_rho*inv_Mrho*C + B2*inv_Mphi*B1T; %left
+			elseif contains(controls.approach_Schur_rho,'both')
+				S22 =  A_rho*inv_Mrho*C*inv_Mrho*A_rho + B2*inv_Mphi*A*inv_Mphi*B1T; %both
+			end
+			%S22 =  C*inv_Mrho*A_rho + B1T_time'*inv_Mphi*B1T_time;
+			%S22 =  C*inv_Mrho*A_rho + B1T_time'*inv_Mphi*B1T_time + B1T_space'*inv_Mphi*B1T_space;;
 			% init inverse of full S
 			inv_S22=sparse_inverse;
 			inv_S22.init( S22 + controls.relax4inv22 * speye(Nr,Nr),ctrl_inner22);
 			inv_S22.info_inverse.label='schur22';
 			inv_S22.cumulative_iter=0;
 			inv_S22.cumulative_cpu=0;
-			inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x);
 
+			if contains(controls.approach_Schur_rho,'right')
+				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); %right
+			elseif contains(controls.approach_Schur_rho,'Btilde')
+				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); %right
+			elseif contains(controls.approach_Schur_rho,'left')				
+				inverse_block22 = @(x) - inv_S22.apply(A_rho *inv_Mrho * x);
+			elseif contains(controls.approach_Schur_rho,'both')
+				inverse_block22 = @(x) - inv_Mrho * A_rho*inv_S22.apply(A_rho *inv_Mrho * x);  %both
+			end
 			
 			
 			ctrl_inner33=controls.ctrl_inner33;
@@ -4290,30 +4339,33 @@ elseif sol==220
 	elseif (strcmp(controls.approach_Schur_rho,'lsc'))
 		% S^{-1} = (B2 M^-1 B1T)^{-1} B2 M^{-1} A M^{-1} B1T (B2 M^-1 B1T)^{-1}
 		S22 = (B2*inv_Mphi*B1T);
-
+		middle_factor=B2*inv_Mphi*A*inv_Mphi*B1T;
+		
 		inv_S22=sparse_inverse;
 		inv_S22.init( S22 + controls.relax4inv22 * speye(Nr,Nr),ctrl_inner22);
 		inv_S22.info_inverse.label='Schur_r';
 		inv_S22.cumulative_iter=0;
 		inv_S22.cumulative_cpu=0;
-		inverse_block22 = @(x) - inv_S22.apply(B2*inv_Mphi*A*inv_Mphi*B1T*(inv_S22.apply(x)));
+		inverse_block22 = @(x) -PT(inv_S22.apply(middle_factor*(inv_S22.apply(x))));
 
 		% S33^{-1}=(Dr                  +Ds*S^{-1}*M)^{-1}
 		%         =(Dr*M^{-1}*S*S^{-1}*M+Ds*S^{-1}*M)^{-1}
 		%         =M^{-1} S * (Dr*M^{-1}*S+Ds)^{-1}
-		S33  = (Dr + Ds);
-
+		%S33  = (Dr + Ds);
+		inv_Ds  = sparse(1:Nr,1:Nr,(1./spdiags(Ds,0))',Nr,Nr);
+		invC = inv_Ds * Dr * inv_Mrho;
+		S33 = S22*(invC)*S22+middle_factor;
 		
 		inv_S33=sparse_inverse;
-		inv_S33.init(S33+controls.relax4inv22*speye(Nr,Nr),ctrl_inner22);
+		inv_S33.init(S33+controls.relax4inv33*speye(Nr,Nr),controls.ctrl_inner33);
 		inv_S33.info_inverse.label='Schur_s';
 		inv_S3.cumulative_iter=0;
 		inv_S33.cumulative_cpu=0;
 		if ( verbose >= 2)
 			fprintf('DONE inverse S\n') 
-		end 
-		inverse_block33 = @(x) inv_S33.apply(x);
-		%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, controls.ctrl_inner33, @(z) z);
+		end
+		inverse_block33 = @(y) apply_iterative_solver( @(x) Ds*apply_schur(Mrho*x)+Dr*x, y, controls.ctrl_inner33, @(z) z);
+		%inverse_block33 = @(x) -inv_Mrho * (inv_S22.apply(inv_S33.apply(inv_S22.apply(inv_Ds*x))));
 	end
 
 
@@ -4337,7 +4389,7 @@ elseif sol==220
 																								@(y) B1T*PT(y),...
 																								@(z) P(B2*z),...
 																								Np,Nr,...
-																								'full',ncellphi);
+																								controls.outer_prec_J,ncellphi);
 
 	
 	% global operator
@@ -4377,10 +4429,24 @@ elseif sol==220
 																						 global_B1T,...
 																						 global_B2,...
 																						 Np+Nr,Nr,...
-																						 'full',ncellphi);
+																						 controls.outer_prec,ncellphi);
 		
 	end
 
+	if (0)
+		temp1=prec_times_matrix(J,speye(Np+2*Nr));
+		temp=matrix_times_prec(temp1,prec);
+		
+		figure
+		[real,imag,eigenvec,perm]= study_eigenvalues(temp,'never gonna works');
+		plot(real,imag,'o')
+		
+		figure
+		semilogy(real)
+		title('S')
+		return
+	end
+	
 	outer_timing=tic;
 
 	[d,info_J]=apply_iterative_solver(J, rhs, ctrl_outer, @(z) prec(z),[],controls.left_right );

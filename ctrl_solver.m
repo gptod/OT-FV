@@ -17,21 +17,27 @@ classdef ctrl_solver <handle
        obj.itermax=itermax;
        
        if (~exist('omega','var') )
-	 obj.omega=1;
+				 obj.omega=1;
        else
-	 obj.omega=omega;
+				 obj.omega=omega;
        end
        if (~exist('verbose','var') )
-	 obj.verbose=0;
+				 obj.verbose=0;
        else
-	 obj.verbose=verbose;
+				 obj.verbose=verbose;
        end
        if (~exist('label','var') )
-	 obj.label=sprintf('%s%1.1e',approach,tolerance);
-       else
-	 obj.label=label;
-       end
-       
+				 obj.label=sprintf('%s%1.1e',approach,tolerance);
+				 if ( strcmp(obj.approach,'diag'))
+					 obj.label='diag';
+				 end
+				 if strcmp( obj.approach , 'direct')
+					 obj.label='direct';
+				 end
+			 else
+				 obj.label=label;
+			 end
+		 
 
        if (~exist('preprocess_agmg','var') )
 	 obj.preprocess_agmg=0;

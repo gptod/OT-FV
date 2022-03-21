@@ -18,7 +18,7 @@ for kk=1
 	rec = recs{kk};
 
 
-	eps_0 = 1e-4; % tolerance for the IPM
+	eps_0 = 1e-6; % tolerance for the IPM
 	eps_mu = 1e-6; % tolerance Newton
 	k2max = 15; % maximum number of inner (Newton) iterations
 	k1max = 13; % maximum number of outer iterations
@@ -37,7 +37,7 @@ for kk=1
 
 	compute_err = 1;
 
-	plot_figures=0;
+	plot_figures=1;
 
 
 	save_data=1;
@@ -79,10 +79,10 @@ for kk=1
 		% For each mesh, five levels of refinement h_i, 1->5, are available.
 
 		% set here for 1 to 4
-		for h_i = 5
+		for h_i = 1
 	    % INCRESING TIME STEP
 	    % set here 1:5
-			for dt_i = 4
+			for dt_i = 2
 				N=4*(2^(dt_i-1))
 				Nt = N+1;
 
@@ -119,16 +119,20 @@ for kk=1
 				%  (~SCA)^{-1}= approx. inverse
 				
 				%set here [9,10,11]
-				for sol=[20,220];
+				for sol=[11];
+
+					folder_run='./runs/'
+					if ~exist(folder_run,'dir')
+						mkdir(folder_run)
+					end
 
 					if ~isfolder('runs')
 						mkdir 'runs'
 					end
 						
-					folder_run=sprintf('runs/sol%d',sol)
-					if ~isfolder(folder_run)
-						% File exists.
-						mkdir folder_run
+					folder_run=sprintf('./runs/sol%d',sol)
+					if ~exist(folder_run,'dir')
+						mkdir(folder_run)
 					end
 					% Mesh structure:
 					% nodutees -> array of nodes coordinates [x y]
@@ -264,7 +268,7 @@ for kk=1
 						% select assembly of S=A+Mtt+(Mtx+Mtx')+Mxx
 						assembly_S='full'
 						%assembly_S='A_Mtt'
-						assembly_S='harmonic';
+						%assembly_S='harmonic';
 						%assembly_S='A_Mtt_Mxx'
 						%assembly_S='A_Mtt_Mxx_lamped'
 						%assembly_S='A_Mtx_Mxt'
@@ -396,7 +400,7 @@ for kk=1
 																		'relax_inv22',relax_inv22);
 									
 
-									approach_string=strcat('SIMPLE_',ground',num2str(ground),...
+									approach_string=strcat('SIMPLE_','ground',num2str(ground),...
 																				 '_diagscal',num2str(diagonal_scaling),...
 																				 ctrl_outer.approach,'_',...
 																				 left_right,'_',outer_prec,'_prec_',...
@@ -1055,10 +1059,9 @@ for kk=1
 								null_space=0;
 								lrb='r';
 								ground=0;
-								mode_Arho=2; 
 
 								% for commute approach
-								mode_inverse22=2;
+								mode_inverse22=1;
 								
 								
 								for ia = [8];
@@ -1087,7 +1090,6 @@ for kk=1
 																			'sol',sol,...
 																			'null_space',null_space,...
 																			'lrb',lrb,...
-																			'mode_Arho',mode_Arho,...
 																			'diagonal_scaling',diagonal_scaling,...
 																			'outer_prec',outer_prec,...
 																			'left_right',left_right,...
@@ -1178,11 +1180,11 @@ for kk=1
 						
 						% set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 						ctrl_outer=ctrl_solver;
-						ctrl_outer.init('fgmres',1e-05,4000,0.0,0);
+						ctrl_outer.init('fgmres',1e-05,400,0.0,0);
 						left_right='right';
 						
 						% external prec appraoch
-						%outer_prec='full'
+						outer_prec='full'
 						%outer_prec='lower_triang'
 						outer_prec='upper_triang'
 
@@ -1197,22 +1199,28 @@ for kk=1
 						ctrl_inner11.init('agmg',1e-1,10,1.0,0,'A');
 
 						%approach_Schur_rho='diagA';
-						approach_Schur_rho='commute';
+						for approach_Schur_rho=["commute_right"]
+							disp(approach_Schur_rho)
+						%approach_Schur_rho='commute_Btilde';
+						%approach_Schur_rho='commute_right';
+						%approach_Schur_rho='commute_left';
+						%approach_Schur_rho='commute_both';
 						%approach_Schur_rho='lsc';
+
 						
 						% inverse schur_rho 
 						relax4_inv22=1e-12;
 						ctrl_inner22=ctrl_solver;
-						ctrl_inner22.init('agmg',1e-1,12,1.0,0,'S22');
+						ctrl_inner22.init('agmg',1e-1,20,1.0,0,'S22');
 
+						approach_Schur_slack='dual';
 						approach_Schur_slack='primal';
-
 						
 						% inverse schur_s 
 						relax4_inv33=1e-12;
 						ctrl_inner33=ctrl_solver;
-						%ctrl_inner33.init('agmg',1e-1,13,1.0,0,'S33');
-						ctrl_inner33.init('fgmres',1e-1,10,1.0,0,'S33');
+						ctrl_inner33.init('agmg',1e-1,10,1.0,0,'S33');
+						ctrl_inner33.init('bicgstab',1e-1,100,1.0,1,'S33');
 
 
 						controls = struct('save_data',save_data,...
@@ -1235,7 +1243,7 @@ for kk=1
 
 						approach_string=strcat('grounded',num2str(grounded_node),...
 																	 '_diagscal',num2str(diagonal_scaling),...
-																	 '_full_schurCA_with_diagA_',...
+																	 '_full_',...
 																	 approach_Schur_rho,'_',...
 																	 ctrl_outer.approach,'_',...
 																	 left_right,'_',outer_prec,'_prec_',...
@@ -1243,7 +1251,7 @@ for kk=1
 																	 'inv33',ctrl_inner33.label);
 						
 						geod;
-						return
+						end
 					end
 				end
 			end

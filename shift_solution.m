@@ -1,6 +1,7 @@
 function x_new = shift_solution(x,vectors,alphas)
   % we shift (x2,...,xN) but not x1
   % x=(x1; x2; ...x(N+1)) so that
+	% v1^t x^1 = 0.0
   % v1^t x_1 + v2^t x2 =a1
   % v3^t x_2 + v4^t x3 =a2
   % ....

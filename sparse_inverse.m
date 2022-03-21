@@ -44,6 +44,10 @@ classdef sparse_inverse <handle
       if ( contains(ctrl.approach,'direct'))
 				obj.matrix_decomposed = decomposition(obj.matrix); 
       elseif ( contains(ctrl.approach,'agmg') )
+				%include agmg folder
+				addpath(genpath('./agmg/'));
+
+				% check symmetry
 				if (obj.is_symmetric)
 					icg=1;
 				else
