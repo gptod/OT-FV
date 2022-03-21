@@ -3,27 +3,28 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
 																									 rho_initial,rho_final, phi_rho_slack_initial_guess)
 
 	% SPATIAL AND TEMPORAL DISCRETIZATION
-	% grid_rho :: grid where the problem is discreted
-	% grid_phi :: grid where potential phi is defined
-	% I :: interpolatore from grid_rho to grid_phi (it may be the identity)
-	% rec :: rec==1 : linear recostruction
-	%     :: rec==2 : harmonic recostruction
-	% Ntime :: number of time steps. Deltat=1/Ntime
+	% grid_rho (class in TPFA_grid.m) ::  grid where the problem is discreted
+	% grid_phi (class in TPFA_grid.m) ::  grid where potential phi is defined
+	% I (sparse matrix) ::  interpolator from grid_rho to grid_phi (it may be the identity)
+	% rec (integer) :: rec==1 : linear recostruction
+	%               :: rec==2 : harmonic recostruction
+	% Ntime(integer):: number of time steps. Deltat=1/Ntime
 
 	% ALGORITHM CONTROLS
-	% IP_ctrl :: IP algorithm controls
-	% linear_solver_ctrl :: structire containg controls for solving Newton system JF dx = - F 
+	% IP_ctrl (class in IP_controls.m) :: IP algorithm controls
+	% linear_solver_ctrl (structure defined in set_linear_algebra_controls.m ) :: structire
+	%      containg controls for solving Newton system JF dx = - F 
 	
 	% PROBLEM DATA
-	% rho_initial, rho_final :: non negative arrays of size grid_rho.ncell
+	% rho_initial, rho_final (real arrays of grid_rho.ncell) :: non negative arrays of size grid_rho.ncell
 	%                           described initial and final density distribution
-	% phi_rho_slack_initial_guess :: initial guess of the problem
+	% phi_rho_slack_initial_guess (real arrays) :: initial guess of the problem
 
 	% returns:
-	% phi :: real array of size grid_phi.ncell*(Ntime+1) with the potential 
-	% rho :: real array of sixe grid_rho.ncell*(Ntime) density defined on the mesh grid_rho 
-	% slack :: real array of sixe grid_rho.ncell*(Ntime) with slackness varaible defined on the mesh grid_rho 
-	% info_solve :: info solver (IP iterations, linear algebra iteration, etc)
+	% phi (real array of size grid_phi.ncell*(Ntime+1) ) with the potential 
+	% rho (real array of sixe grid_rho.ncell*(Ntime)) density defined on the mesh grid_rho 
+	% slack (real array of sixe grid_rho.ncell*(Ntime) ) with slackness varaible defined on the mesh grid_rho 
+	% info_solve (structure created at te end) :: info solver (IP iterations, linear algebra iteration, etc)
 	
 	% open file to store algorithm info
 	if (IP_ctrl.save_csv)
