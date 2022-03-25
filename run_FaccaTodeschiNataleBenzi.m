@@ -1,10 +1,18 @@
 clear all
 close all
 
+
+
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_case = 'sin';
+test_case = 'compression';
 
+folder_runs='FTNB_runs';
+if ~isfolder(folder_runs)
+	mkdir(folder_runs);
+end
+
+folder_restart='initial_solution'
 
 %
 % set some globals controls for reproducing experiments
@@ -18,8 +26,20 @@ compute_err = 1;
 % SPATIAL DISCRETIZATION
 %
 for mesh_type = 5;
-	for h_i = 4:5;
+	for h_i = 1;
 		rec = 1;
+
+		% create folder storing data for test case
+		folder=sprintf('%s/%s_rec%d/',folder_runs,test_case,rec);
+		if ~isfolder(folder)
+			mkdir(folder);
+		end
+		folder=sprintf('%s/%s_rec%d/initial_solution/',folder_runs,test_case,rec);
+		if ~isfolder(folder)
+			mkdir(folder);
+		end
+
+		
 		
 		% grids for rho and phi (see TPFA_grid class)
 		% are read from file
@@ -47,6 +67,19 @@ for mesh_type = 5;
 			 mass,midpoint,exact_phi,exact_rho,exact_W2,bc_sol] = ...
 			bc_density(test_case,grid_rho.cc,grid_rho.area);
 
+			
+
+
+			test_case_label = sprintf('%s_rec%d_mesh%d_h%d_N%0.5d_',test_case,rec,mesh_type,h_i,N);
+
+
+						%
+			% ALGORITHM CONTROLS
+			%
+			% Init Interior Point controls.
+			% Defalt values are set in IP_controls class
+			IP_ctrl=IP_controls;
+			
 			% Set initial data
 			% Default (phi, rho, s ) = 1,1,mu0
 			if ( read_from_file == 0)
@@ -57,10 +90,10 @@ for mesh_type = 5;
 				uk = [phi0;rho0;s0]; 
 			else
 				% this option can be used to restart the IP algorithm form a certain solution
-				str_folder=sprintf('%s_mesh%d_rec%d',test_case,mesh_type,rec)
-				str_test=sprintf('%s_mesh%d_h%d_rec%d_N%0.5d_',test_case,mesh_type,h_i,rec,N)
-				h5_file2read = strcat('runs/',str_folder,...
-															'/PhiRhoSMuTheta',...
+				% str_folder=sprintf('%s_mesh%d_rec%d',test_case,mesh_type,rec)
+				folder=sprintf('%s/%s_rec%d/initial_solution/',folder_runs,test_case,rec);
+				str_test=sprintf('%s_rec%d_mesh%d_h%d_N%0.5d_',test_case,rec,mesh_type,h_i,N);
+				h5_file2read = strcat(folder,...
 															str_test(1:strlength(str_test)-1),'.h5')
 				data_name=sprintf('/DS%d',read_from_file);
 				data = h5read(h5_file2read,data_name);
@@ -69,53 +102,47 @@ for mesh_type = 5;
 				s0   = data(1+Np+Nr:Np+2*Nr);
 				mu0  = data(Np+2*Nr+1);
 				theta0 = data(Np+2*Nr+2);
-				fprintf('norm initial %1.2e\n',norm(get_slice(phi0,1,ncell,N+1)))
+				%fprintf('norm initial %1.2e\n',norm(get_slice(phi0,1,ncell_phi,N+1)))
 				uk = [phi0;rho0;s0];
+				test_case_label=sprintf('restart%d_%s', read_from_file,test_case_label)
+				IP_ctrl.mu=mu0;
+				IP_ctrl.theta0=theta0;
 			end
 
-			%
-			% ALGORITHM CONTROLS
-			%
-			% Init Interior Point controls.
-			% Defalt values are set in IP_controls class
-			IP_ctrl=IP_controls;
+			
 
 
-			for solver_approach=[220];
+
+
+			for solver_approach=[20];
 				% set controls
 				[ctrls,labels]=set_linear_algebra_ctrl(solver_approach,rec);
 
 				% cycle all linear algrabra controls genreted with set_linear_algebra_ctrl
 				for i_ctrl=1:size(ctrls,2)
 					linear_algebra_ctrl=ctrls(i_ctrl);
-					linear_algebra_label=labels(i_ctrl);
+					linear_algebra_label=labels(i_ctrl,:);
+					disp(test_case_label)
 					disp(linear_algebra_label)
-
+				
 					
 					% create directories to store data
-					folder_runs='FTNB_runs';
-					if ~isfolder(folder_runs)
-						mkdir(folder_runs);
-					end
-					folder_run=sprintf('%s/%s_rec%d/',folder_runs,test_case,rec);
-					if ~isfolder(folder_run)
-						mkdir(folder_run);
-					end
-					folder_run=sprintf('%s/%s_rec%d/sol%d/',folder_runs,test_case,rec,linear_algebra_ctrl.sol);
-					if ~isfolder(folder_run)
-						mkdir(folder_run);
+					folder=sprintf('%s/%s_rec%d/sol%d/',folder_runs,test_case,rec,linear_algebra_ctrl.sol);
+					if ~isfolder(folder)
+						mkdir(folder);
 					end
 
 					%
 					% set filename for files with discrtetizatio and liear algebra info
 					%
-					test_case_label = sprintf('%s_rec%d_mesh%d_h%d_N%0.5d_',test_case,rec,mesh_type,h_i,N);
-					experiment_label = strcat(test_case_label,linear_algebra_label);
-					if read_from_file > 0
-						pre = sprintf('restard%d_',read_from_file)
-						experiment_label = strcat(pre,experiment_label)
+					if read_from_file == 0
+						experiment_label = strcat(test_case_label,linear_algebra_label);
+					else
+						experiment_label = strcat(test_case_label,linear_algebra_label);
+						pre = sprintf('restar%d_',read_from_file);
+						experiment_label = strcat(pre,experiment_label);
 					end
-					filename = strcat(folder_run,experiment_label);
+					filename = strcat(folder,experiment_label);
 
 					
 					% log file, writing a small resume of test case
