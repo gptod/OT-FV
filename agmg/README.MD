@@ -12,6 +12,6 @@ zmtlagmg.mexmaci64
 # user guide for more details).
 # 
 # Example of use the following to create multiple copy
-#
-# for i in `seq 1 129`; do ./make_copy.sh ${i}; done 
-#
+
+for i in `seq 1 129`; do ./make_copy.sh ${i}; done 
+

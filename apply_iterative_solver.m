@@ -1,4 +1,4 @@
-function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, solini,left_right,prec_right)
+function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, solini,left_right,scaling,prec_right)
 
   if (exist('solini','var') )
     x0=solini;
@@ -18,6 +18,10 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, so
       return
     end
   end
+
+	if (~exist('scaling','var') )
+    scaling=1;
+  else
   
   if (strcmp(ctrl.approach,'bicgstab'))
 		if (exist('prec_right','var') )
@@ -67,7 +71,8 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, so
 				   'x0',x0,...
 				   'verb',ctrl.verbose,...
 					 'tol_exit',ctrl.tolerance,...
-				   'P',@(x,tol) prec(x)); %should be right prec
+				   'P',@(x,tol) prec(x),... %should be right prec
+					 'scaling',scaling);
 
     info.iter=iter_total;
     info.flag = (info.res >= ctrl.tolerance);

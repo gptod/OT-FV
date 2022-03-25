@@ -19,7 +19,7 @@ gradphi = gradt*phi;
 
 % derivatives of the optimality conditions in phi
 JOCpp = divt*spdiags(rhos,0,te,te)*gradt;
-JOCpr = Mxt*Nt*Dt*It*I_all+divt*spdiags(gradphi,0,te,te)*drhos;
+JOCpr = Mxt*Nt*Dt*It*I_all+divt*spdiags(gradphi,0,te,te)*drhos; %drhos=Rst*RHt*It*I_all
 JOC.Dt = Mxt*Nt*Dt*It*I_all;
 JOCps = sparse(tnp,tnr2h);
 

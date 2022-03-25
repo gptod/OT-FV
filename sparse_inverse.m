@@ -75,11 +75,11 @@ classdef sparse_inverse <handle
 				% nothing to do
       elseif( strcmp(obj.ctrl.approach , 'incomplete') )
 				if ( obj.is_symmetric)
-					obj.IL = ichol(matrix, struct('type','ict','droptol',1e-5));
+					obj.IL = ichol(matrix,struct('type','ict','droptol',1e-2));
 				else
 					setup.type = 'crout';
 					setup.milu = 'row';
-					setup.droptol = 1e-5;
+					setup.droptol = 1e-2;
 					[obj.IL,obj.IU] = ilu(matrix,setup);
 				end
       elseif ( strcmp(obj.ctrl.approach, 'gs') )

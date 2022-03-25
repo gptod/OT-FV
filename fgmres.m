@@ -81,6 +81,8 @@ tol_exit = tol;
 % Prec 
 P = [];
 
+scaling=1.0;
+
 for i=1:2:length(varargin)-1
     switch lower(varargin{i})
         case 'relaxation'
@@ -96,7 +98,9 @@ for i=1:2:length(varargin)-1
         case 'tol_exit'
             tol_exit = varargin{i+1};            
         case 'p'
-            P = varargin{i+1};
+          P = varargin{i+1};
+				case 'scaling'
+          scaling = varargin{i+1};
         otherwise
             error('Unknown tuning parameter "%s"', varargin{i});
     end;
@@ -120,6 +124,7 @@ end;
 
 % Norm of the RHS
 beta0 = norm(b);
+beta0=beta0*scaling;
 if (beta0==0)
     x = zeros(n,1);
     iter = 0;
