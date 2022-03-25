@@ -3829,6 +3829,16 @@ elseif (sol==20)
 		rho_h =  sparse(1:Np,1:Np,(vect_rho_on_h)',Np,Np);
 		inv_rho_h =  sparse(1:Np,1:Np,(1./vect_rho_on_h)',Np,Np);
 		
+
+		rec_time = assembleRHt(N-1,ncellrho);
+		nei=size(JF.grad,2);
+		gradt = assembleGradt(N,ncellphi,nei,JF.div');
+		te = size(gradt,1);
+		Rst = repmat({JF.Rs},1,N+1);
+		Rst = blkdiag(Rst{:});
+		I_cellphi_cellrho = assembleIt(N-1,ncellphi,ncellrho,JF.I);
+		%  (N+1)*Kh<-(N+1)*e<-(N+1)*e<-(N+1)*Kh <-(N+1)*K2h <- N*K2h
+		new_B1T_space = Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
 		
 		
 		
@@ -3842,7 +3852,7 @@ elseif (sol==20)
 		end
 
 		%S22=B1T_time'*inv_Mphi*B1T_time;
-		S22=B2*inv_Mphi*B1T;
+		S22=B2*inv_Mphi*(B1T_time+new_B1T_space);
 		
 		if (controls.mode_inverse22==1)
 			approx_S =  C*inv_Mrho*A_rho + S22;
@@ -3927,62 +3937,22 @@ elseif (sol==20)
 		inverse_bbt=@(y) P(inv_SCA.apply(PT(y)));
 		
 		inverseS=@(y) inverse_bbt(P(central_block*PT(inverse_bbt(y))))+alpha*inv_diag_SCA*y;
-		
+
+	elseif(strcmp(controls.inverse22,'stationary'))
+		diagC = spdiags(C,0);
+		invC = sparse(1:Nr,1:Nr,(1.0./spdiags(C,0))',Nr,Nr);
+		inverseS=@(y) stationary_iterative_methods(apply_schur,y,zeros(Nr,1),...
+																							 controls.ctrl_inner22.tolerance,...
+																							 controls.ctrl_inner22.itermax,...
+																							 controls.ctrl_inner22.verbose,...
+																							 @(x) controls.ctrl_inner22.omega*invC*x);
 	end
 	cpu_assembly_S=toc(timeS);
 
 	%
 	% PREPROCESS NULL SPACE METHOD
 	%
-	cpu_assembly_null_space=0;
-	if (controls.null_space)
-		time_null=tic;
-		inv_SCA.ctrl.tolerance=controls.tolerance_preprocess;
-		%inv_SCA.ctrl.verbose=1;
-		invS_Wmat=prec_times_matrix(inverseS,W_mat'); %S^{-1}Z
-
-		inv_SCA.ctrl.tolerance=controls.ctrl_inner22.tolerance;
-		inv_SCA.ctrl.verbose=controls.ctrl_inner22.verbose;
-		
-		% for i=1:N
-		% 	res = SCA*invS_Wmat(:,i)-W_mat(i,:)';
-		% 	norm(res)
-		% end
-	
-		
-		MS=W_mat*(invS_Wmat);	 %MS=Z^TA^{-1} Z				
-		inverse_MS=sparse_inverse; % create LU factorization of MS
-		ctrl_loc=ctrl_solver;
-		ctrl_loc.init('direct',...
-					 				1e-14,...
-					 				200,...
-					 				0,...
-					 				0,...
-					 				'MS',...
-					 				84);
-		inverse_MS.init(MS,ctrl_loc);
-		cpu_assembly_null_space=toc(time_null);
-
-		
-		fprintf('preprocess A=%1.1e S=%1.1e NullSpace=%1.1e\n',...
-						cpu_assembly_inverseA,cpu_assembly_S,cpu_assembly_null_space) 
-
-		
-		%
-		% Define action of schur complement
-		%
-		inv_SCA.ctrl.tolerance=controls.ctrl_inner22.tolerance;	
-	
-		
-		
-		null_space_application=@(y) null_space_method(y,P,PT,...
-																									inverseS,...
-																									W_mat,invS_Wmat,...
-																									@(x) inverse_MS.apply(x));
-		inverse_S=@(y) -apply_Schur_inverse(y,null_space_application,apply_schur);
-	else
-		inverse_S=@(y) -PT(apply_Schur_inverse(y,inverseS,apply_schur));
-	end
+	inverse_S=@(y) -PT(apply_Schur_inverse(y,inverseS,apply_schur));
 	
 
 	if (ground)
@@ -4020,9 +3990,15 @@ elseif (sol==20)
 		%return
 	end
 		
-		
+	if (controls.scaling_rhs)
+		scaling=1.0/(norm(rhsR)/norm([f;P(g);h]))
+	else
+		scaling=1.0;
+	end
+	
 	if (ground)
 		rhsR=[f1;P(f2)];
+		
 		[d,info_J]=apply_iterative_solver(@(v) ...
 																			 apply_saddle_point(v,@(x) A*x ,...
 																													@(y) B1T*(y),...
@@ -4030,7 +4006,7 @@ elseif (sol==20)
 																													@(y) P(C*(y)),...
 																													Np,Nr,N), ...
 																			rhsR, controls.ctrl_outer, ...
-																			@(z) prec(z),[],controls.left_right );
+																			@(z) prec(z),[],controls.left_right,scaling );
 	else
 		rhsR=[f1;P(f2)];
 		[d,info_J]=apply_iterative_solver(@(v) ...
@@ -4040,7 +4016,7 @@ elseif (sol==20)
 																													@(y) P(C*PT(y)),...
 																													Np,Nr,N), ...
 																			rhsR, controls.ctrl_outer, ...
-																			@(z) prec(z),[],controls.left_right );
+																			@(z) prec(z),[],controls.left_right,scaling);
 	end
 	
 	% get s increment
@@ -4106,7 +4082,7 @@ elseif (sol==20)
 		inv_SCA.kill();
 	end
 	
-	cpu_assembly_inverseS=cpu_assembly_S+cpu_assembly_null_space;
+	cpu_assembly_inverseS=cpu_assembly_S;
 	prec_cpu=cpu_assembly_inverseA+cpu_assembly_inverseS;
 	% check res
   [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
@@ -4271,6 +4247,15 @@ elseif sol==220
 				new_B1T_space = Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
 				
 				S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*(B1T_time+new_B1T_space); %right
+			elseif contains(controls.approach_Schur_rho,'Btilde2')
+				% define interpolator of rho-functions on phi space
+				rec_time = assembleRHt(N,ncellphi);
+				It = assembleIt(N,ncell_rho,ncell_phi,JF.I);
+				I_all = [sparse(ncell_rho,Nr);speye(Nr,Nr);sparse(ncell_rho,Nr)];
+				project_rho2phi = rec_time*It*I_all;
+
+				A_rho = project_rho2phi*A*project_rho2phi;
+				S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T; %right
 
 			elseif contains(controls.approach_Schur_rho,'right')
 				S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T; %right
@@ -4292,6 +4277,8 @@ elseif sol==220
 				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); %right
 			elseif contains(controls.approach_Schur_rho,'Btilde')
 				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); %right
+			elseif contains(controls.approach_Schur_rho,'Btilde2')
+				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); %right
 			elseif contains(controls.approach_Schur_rho,'left')				
 				inverse_block22 = @(x) - inv_S22.apply(A_rho *inv_Mrho * x);
 			elseif contains(controls.approach_Schur_rho,'both')
@@ -4303,7 +4290,7 @@ elseif sol==220
 			ctrl_inner33.approach='diag';
 			ctrl_inner33.verbose=0;
 			inv_S33 = sparse_inverse;
-			inv_S33.init(-Dr,ctrl_inner33);
+			inv_S33.init(-Dr-controls.relax4inv33*speye(Nr,Nr),ctrl_inner33);
 			inv_S33.info_inverse.label='schur_ss';
 			inv_S33.cumulative_iter=0;
 			inv_S33.cumulative_cpu=0;
@@ -4385,7 +4372,7 @@ elseif sol==220
 	
 	% Define action of block preconditoner 
 	prec11_22 = @(x) SchurCA_based_preconditioner(x,  @(y) ort_proj(inv_A(y),A_kernels),...
-																								@(y) PT(inverse_block22(y)),...
+																								@(y) PT(inverse_block22(P(y))),...
 																								@(y) B1T*PT(y),...
 																								@(z) P(B2*z),...
 																								Np,Nr,...

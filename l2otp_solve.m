@@ -178,9 +178,7 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
     itk2 = 0;
     flag2 = 0;
 
-    resvar = set_resval;
-
-
+		resvar = set_resval;
 		
 		% save before update
     if (IP_ctrl.save_h5 > 0)
@@ -286,6 +284,9 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
         fprintf('CPU ASSEMBLY: TOTAL %1.4e - FOC=%1.4e -JOC=%1.4e \n',toc(assembly),FOCtime,JFOCtime)
       end
 
+			resvar.set(IP_ctrl.kel,IP_ctrl.min_outer_tol,delta_mu,Np+2*Nr);
+			ctrl_outer.tolerance=resvar.etak;
+
 			% solve linear system J d = -F 
 			timelinsys=tic;
 			[omegak, linear_solver_info,norm_ddd,resume_msg] = solvesys(JOC,OC, linear_solver_ctrl);
@@ -298,10 +299,11 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
 				fprintf('%s\n',resume_msg);
 				fprintf(logID,'%s\n',resume_msg);
 			end
-
+			
 			if (~ (linear_solver_info.flag == 0) )
-				disp('ERROR LINEAR SOLVER')
-				if (linear_solver_info.relres>1.0e-1)
+				disp('ERROR')
+				fprintf(logID,'%s\n','ERROR');
+				if (linear_solver_info.relres > 5*resvar.etamax)
 					ierr=3;
 					uk=uk_before;
 					break
