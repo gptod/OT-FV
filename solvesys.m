@@ -3991,7 +3991,7 @@ elseif (sol==20)
 	end
 		
 	if (controls.scaling_rhs)
-		scaling=1.0/(norm(rhsR)/norm([f;P(g);h]))
+		scaling=1.0/(norm(rhsR)/norm([f;P(g);h]));
 	else
 		scaling=1.0;
 	end
@@ -4047,6 +4047,8 @@ elseif (sol==20)
   % correction of phi increment 
 	d(1:Np) = dp_correction(d(1:Np),JF,dl);
 
+	%info_J.print();
+	
 	%
 	% STORE INFO
 	%
@@ -4086,6 +4088,7 @@ elseif (sol==20)
 	prec_cpu=cpu_assembly_inverseA+cpu_assembly_inverseS;
 	% check res
   [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
+	relres=resnorm; 
 	resume_msg=sprintf('outer: %d res=%1.1e [%1.1e,%1.1e,%1.1e] iter=%d cpu=%1.1e| A %s : in/out=%0.1f bt=%1.1e  | S : in/out=%d bt=%1.1e',...
    									 info_J.flag,resnorm,resp,resr,ress,outer_iter,outer_cpu,...
 										 controls.inverse11,(inner_iter/outer_iter)/nsysA,cpu_assembly_inverseA,...

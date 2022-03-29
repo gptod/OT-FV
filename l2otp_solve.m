@@ -300,14 +300,12 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
 				fprintf(logID,'%s\n',resume_msg);
 			end
 			
-			if (~ (linear_solver_info.flag == 0) )
+			if (linear_solver_info.relres > 5*resvar.etamax)
 				disp('ERROR')
 				fprintf(logID,'%s\n','ERROR');
-				if (linear_solver_info.relres > 5*resvar.etamax)
-					ierr=3;
-					uk=uk_before;
-					break
-				end
+				ierr=3;
+				uk=uk_before;
+				break
 			end
 
 			%

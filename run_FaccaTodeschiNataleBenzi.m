@@ -5,7 +5,11 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_case = 'compression';
+test_cases = ["sin", "compression"];
+for  test_case = test_cases;
+	%test_case = 'compression';
+	test_case = test_case;
+	disp(test_case)
 
 folder_runs='FTNB_runs';
 if ~isfolder(folder_runs)
@@ -26,7 +30,7 @@ compute_err = 1;
 % SPATIAL DISCRETIZATION
 %
 for mesh_type = 5;
-	for h_i = 1;
+	for h_i = 1:2;
 		rec = 1;
 
 		% create folder storing data for test case
@@ -48,7 +52,7 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = h_i+1
+		for dt_i = 2:3
 			N=4*(2^(dt_i-1));
 
 			% set problem dimension
@@ -217,5 +221,6 @@ for mesh_type = 5;
 		end  % end mesh type
 	end % mesh size
 end % time size
+end  % test case
 
 
