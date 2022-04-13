@@ -1,7 +1,7 @@
 % class spatial information of grid
 classdef IP_controls <handle
   properties
-		eps_0  = 1e-5; % tolerance for the IPM
+		eps_0  = 1e-6; % tolerance for the IPM
 		eps_mu = 1e-6; % tolerance Newton
 		k2max = 15; % maximum number of inner (Newton) iterations
 		k1max = 13; % maximum number of outer iterations

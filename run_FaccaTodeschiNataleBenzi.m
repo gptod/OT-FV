@@ -5,9 +5,8 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin", "compression"];
+test_cases = ["gauss"];%,"sin", "compression"];
 for  test_case = test_cases;
-	%test_case = 'compression';
 	test_case = test_case;
 	disp(test_case)
 
@@ -16,7 +15,7 @@ if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
 
-folder_restart='initial_solution'
+folder_restart='initial_solution';
 
 %
 % set some globals controls for reproducing experiments
@@ -30,7 +29,7 @@ compute_err = 1;
 % SPATIAL DISCRETIZATION
 %
 for mesh_type = 5;
-	for h_i = 1:2;
+	for h_i = 1:4;
 		rec = 1;
 
 		% create folder storing data for test case
@@ -52,7 +51,7 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 2:3
+		for dt_i = 2:5
 			N=4*(2^(dt_i-1));
 
 			% set problem dimension
@@ -114,8 +113,6 @@ for mesh_type = 5;
 			end
 
 			
-
-
 
 
 			for solver_approach=[20];

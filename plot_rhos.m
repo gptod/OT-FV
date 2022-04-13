@@ -25,7 +25,7 @@ function [] = plot_rhos(grid_rho,rho_in,rho,rho_f)
 	%saveas(fig,outname)
 	%dsp = 2;
 	dsp = ceil(N/2);
-	for k=dsp:dsp:N-dsp+1
+	for k=1:N
 		%k=4;
 		rhok = rho((k-1)*ncell_rho+1:k*ncell_rho);
 		figure
@@ -36,9 +36,9 @@ function [] = plot_rhos(grid_rho,rho_in,rho,rho_f)
 		axis square
 		axis off
 		caxis([0 max(rho)])
-		%str =num2str(k);
-		%outname=strcat('gauss_linear_rhok',str,'.jpg');
-		%saveas(fig,outname)
+		str =num2str(k);
+		outname=strcat('gauss_linear_rhok',str,'.jpg');
+		saveas(fig,outname)
 	end
 
 end

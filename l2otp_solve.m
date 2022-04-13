@@ -214,8 +214,13 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
 																N,rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
 
       ctime=tic;
-			% note the we relax the rho_in and rho_f. 
-      OC = Fkgeod(N,(rho_final+mu)/(1+mu),(rho_initial+mu)/(1+mu),...
+			% note the we relax the rho_in and rho_f.
+			relaxed_rho_final = (rho_final+mu)/(1+mu);
+			relaxed_rho_final = relaxed_rho_final/(grid_rho.area'*relaxed_rho_final);
+			relaxed_rho_initial = (rho_initial+mu)/(1+mu);
+			relaxed_rho_initial = relaxed_rho_initial/(grid_rho.area'*relaxed_rho_initial);			
+			
+      OC = Fkgeod(N,relaxed_rho_final,relaxed_rho_initial,...
 									Dt,divt,M_phi,M_rho,Mst,gradt,It,rhosk,drhosk,uk,mu);
       FOCtime=toc(ctime);
       delta_mu = norm([OC.p;OC.r;OC.s]);
