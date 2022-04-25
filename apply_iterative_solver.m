@@ -1,5 +1,7 @@
 function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, solini,left_right,scaling,prec_right)
 
+
+	
   if (exist('solini','var') )
     x0=solini;
   else
@@ -21,8 +23,9 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, so
 
 	if (~exist('scaling','var') )
     scaling=1;
-  else
-  
+	end
+
+	
   if (strcmp(ctrl.approach,'bicgstab'))
 		if (exist('prec_right','var') )
 			'left_and_right'

@@ -44,6 +44,7 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
 			delete(IP_ctrl.file_h5);
 		end
 	end
+	%linear_algebra_ctrl.logID=logID
 	
 
 	% Short-hand of IP parameters:
@@ -226,8 +227,8 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
       delta_mu = norm([OC.p;OC.r;OC.s]);
 
 			% print info on optimality condition
-      state_message=sprintf('%d - |OC.p|=%1.4e |OC.r|=%1.4e |OC.s|=%1.4e - CPU %1.4e' ,...
-														itk2+1, norm(OC.p),norm(OC.r),norm(OC.s),FOCtime);		
+      state_message=sprintf('%d - |OC|=%1.1e  -  |OC.p|=%1.1e |OC.r|=%1.1e |OC.s|=%1.1e - CPU %1.2e' ,...
+														itk2+1, norm([OC.p;OC.r;OC.s]),norm(OC.p),norm(OC.r),norm(OC.s),FOCtime);		
       if (IP_ctrl.verbose >= 2)
 				fprintf('%s \n',state_message);
       end

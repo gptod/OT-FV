@@ -153,7 +153,7 @@ function [ctrls, approach_descriptions] = ...
 			%                    (    S   )
 			% identity     :: no preconditioner
 			outer_precs= ["full" ,"lower_triang"  ,"upper_triang","identity"];
-			for outer_prec=outer_precs([1,3])
+			for outer_prec=outer_precs([1])
 				
 				% relax A
 				relax_inv11=0e-12;
@@ -167,7 +167,10 @@ function [ctrls, approach_descriptions] = ...
 				iters  ={20,1      ,1        ,10       ,0           };
 				label  ={'agmg1e-1','direct','krylov10','incomplete'};
 				relax_inv22=0;				
+
+				study_eigen=0;
 				for isol=[1];%1:length(solvers)
+					
 					ctrl_inner22=ctrl_solver;
 					ctrl_inner22.init(solvers{isol},1e-1,iters{isol},1.0,0,...
 														sprintf('%s%1.1e',solvers{isol},1e-1));
@@ -180,7 +183,8 @@ function [ctrls, approach_descriptions] = ...
 														'ctrl_outer',ctrl_outer,...
 														'verbose',verbose,...
 														'relax_inv11',relax_inv11,...
-														'relax_inv22',relax_inv22);
+														'relax_inv22',relax_inv22,...
+														'study_eigen',study_eigen);
 
 					ctrls=[ctrls,controls];
 					
@@ -287,7 +291,7 @@ function [ctrls, approach_descriptions] = ...
 				end
 			end
 		end
-	elseif (solver_approach == 20)
+	elseif (solver_approach==20)
 		% globals controls
 		verbose=0;
 		

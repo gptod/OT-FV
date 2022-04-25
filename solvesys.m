@@ -1170,8 +1170,23 @@ elseif sol==11
 	inv_diag_A = 1.0./(spdiags(A,0)+controls.relax_inv11);
   inv_Diag_A = sparse(1:Np,1:Np,(inv_diag_A)',Np,Np);
 	inv_A=@(x) inv_Diag_A*x;
-	
 
+
+	if (controls.study_eigen)
+
+		for i=1:N
+			nAi=ncellphi;
+			matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
+			inv_Diag_Ai = sparse(1:nAi,1:nAi,...
+													 (inv_diag_A((i-1)*nAi+1 :     i*nAi))',...
+													 nAi,nAi);
+			eigenvalues=study_eigenvalues(matrixAi*inv_Diag_Ai, '(S)^{-1}droped',1);
+			fprintf('eig(2)=%1.2e, eig(max)=%1.2e cond=%1.2e\n',...
+							eigenvalues(2),eigenvalues(nAi),eigenvalues(nAi)/eigenvalues(2))
+		end
+	end
+
+	
  
   % assembly (~S)^{-1} = ( -(C+B2 * diag(A)^{-1} B1T) )^{-1} 
 	build_S=tic;
@@ -1205,6 +1220,7 @@ elseif sol==11
 	% call iterative solver
 	outer_timing=tic;
 	rhs=[f1;f2];
+
 	[d,info_J]=apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,...
 																														@(y) B1T*y,...
 																														@(z) B2*z,...

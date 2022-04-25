@@ -5,7 +5,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin"];%,"gauss" "compression"];
+test_cases = ["sin","gauss" "compression"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
@@ -29,7 +29,7 @@ compute_err = 1;
 % SPATIAL DISCRETIZATION
 %
 for mesh_type = 5;
-	for h_i = 5;
+	for h_i = 1:4;
 		rec = 1;
 
 		% create folder storing data for test case
@@ -51,7 +51,7 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 6
+		for dt_i = 2:5
 			N=4*(2^(dt_i-1));
 
 			% set problem dimension
@@ -115,14 +115,15 @@ for mesh_type = 5;
 			
 
 
-			for solver_approach=[20];
+			for solver_approach=[20,11];
 				% set controls
 				[ctrls,labels]=set_linear_algebra_ctrl(solver_approach,rec);
 
 				% cycle all linear algrabra controls genreted with set_linear_algebra_ctrl
+				
 				for i_ctrl=1:size(ctrls,2)
-					linear_algebra_ctrl=ctrls(i_ctrl);
-					linear_algebra_label=labels(i_ctrl,:);
+					linear_algebra_ctrl=ctrls(1,i_ctrl);
+					linear_algebra_label=labels(1,i_ctrl);
 					disp(test_case_label)
 					disp(linear_algebra_label)
 				
@@ -146,6 +147,7 @@ for mesh_type = 5;
 					filename = strcat(folder,experiment_label);
 
 					
+					
 					% log file, writing a small resume of test case
 					IP_ctrl.save_log = 1;
 					IP_ctrl.file_log = strcat(filename,'.log');
@@ -166,7 +168,7 @@ for mesh_type = 5;
 					IP_ctrl.save_h5=1;
 					IP_ctrl.file_h5=strcat(filename,'.h5');
 
-					if (1)
+					
 					% solve with interior point
 					[phi,rho,slack,info_solver] = ...                   % solver output and info
 					l2otp_solve(grid_rho, grid_phi,I, rec, N,...        % discretization 
@@ -210,7 +212,6 @@ for mesh_type = 5;
 					% plot
 					if (plot_figures)
 						plot_rhos(grid_rho,rho_in,rho,rho_f)
-					end
 					end
 				end	
 			end
