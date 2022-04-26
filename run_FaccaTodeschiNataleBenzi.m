@@ -115,7 +115,7 @@ for mesh_type = 5;
 			
 
 
-			for solver_approach=[20,11];
+			for solver_approach=[20,11,10,13];
 				% set controls
 				[ctrls,labels]=set_linear_algebra_ctrl(solver_approach,rec);
 
@@ -165,7 +165,7 @@ for mesh_type = 5;
 					IP_ctrl.file_csv=strcat(filename,'.csv');
 
 					% h5 with approximate solutions
-					IP_ctrl.save_h5=1;
+					IP_ctrl.save_h5=0;
 					IP_ctrl.file_h5=strcat(filename,'.h5');
 
 					
