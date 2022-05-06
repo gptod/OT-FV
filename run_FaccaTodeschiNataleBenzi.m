@@ -2,10 +2,9 @@ clear all
 close all
 
 
-
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin","gauss" "compression"];
+test_cases = ["sin"];%,"gauss" "compression"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
@@ -115,17 +114,23 @@ for mesh_type = 5;
 			
 
 
-			for solver_approach=[20,11,10,13];
+			for solver_approach=[20,11,13,10];
 				% set controls
 				[ctrls,labels]=set_linear_algebra_ctrl(solver_approach,rec);
 
+				%labels
+
+				
 				% cycle all linear algrabra controls genreted with set_linear_algebra_ctrl
+				%size(ctrls,2)
 				
 				for i_ctrl=1:size(ctrls,2)
 					linear_algebra_ctrl=ctrls(1,i_ctrl);
+					
 					linear_algebra_label=labels(1,i_ctrl);
-					disp(test_case_label)
+					%disp(test_case_label)
 					disp(linear_algebra_label)
+
 				
 					
 					% create directories to store data
@@ -138,13 +143,13 @@ for mesh_type = 5;
 					% set filename for files with discrtetizatio and liear algebra info
 					%
 					if read_from_file == 0
-						experiment_label = strcat(test_case_label,linear_algebra_label);
+						experiment_label = strcat(test_case_label,linear_algebra_label)
 					else
 						experiment_label = strcat(test_case_label,linear_algebra_label);
 						pre = sprintf('restar%d_',read_from_file);
-						experiment_label = strcat(pre,experiment_label);
+						experiment_label = strcat(pre,experiment_label)
 					end
-					filename = strcat(folder,experiment_label);
+					filename = strcat(folder,experiment_label)
 
 					
 					

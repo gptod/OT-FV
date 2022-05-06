@@ -1139,13 +1139,13 @@ elseif sol==11
 	% "grounding" all blocks. 
 	if (controls.ground == 1)
 		for iblock = 1:1
-			irow = controls.ground_node+(iblock-1)*ncellphi;
-			A(irow,:) = sparse(Np,0);
+			irow = 1+(iblock-1)*ncellphi;
+			A(irow,:) = sparse(Np,1);
 			A(irow,irow)= 1.0;
-			B1T_time(irow,:) = sparse(Nr,0);
-			B1T_space(irow,:) = sparse(Nr,0);
-			B1T(irow,:) = sparse(Nr,0);
-			f1(irow)=0.0
+			B1T_time(irow,:) = sparse(Nr,1);
+			B1T_space(irow,:) = sparse(Nr,1);
+			B1T(irow,:) = sparse(Nr,1);
+			f1(irow)=0.0;
 		end
 	end
 
@@ -3698,7 +3698,7 @@ elseif (sol==20)
 	if (ground)
 		% ground system 
 		[A,B1T_time,B1T_space,B2_time,B2_space,f1]=ground_saddle(A,B1T_time,B1T_space,f1,N);
-		B1T=B1T_time+B1T_space;
+		B1T= B1T_time+B1T_space;
 		B2 = B2_time+B2_space;
 		rhsR=[f1;P(f2)];
 	end
@@ -3868,7 +3868,7 @@ elseif (sol==20)
 		end
 
 		%S22=B1T_time'*inv_Mphi*B1T_time;
-		S22=B2*inv_Mphi*(B1T_time+new_B1T_space);
+		S22=B2*inv_Mphi*(-JF.B1T_time+new_B1T_space);
 		
 		if (controls.mode_inverse22==1)
 			approx_S =  C*inv_Mrho*A_rho + S22;
@@ -4013,6 +4013,7 @@ elseif (sol==20)
 	end
 	
 	if (ground)
+		disp('grounded')
 		rhsR=[f1;P(f2)];
 		
 		[d,info_J]=apply_iterative_solver(@(v) ...
