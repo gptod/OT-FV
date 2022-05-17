@@ -1219,7 +1219,7 @@ elseif sol==11
 																					 controls.outer_prec,ncellphi);
 
 	if (controls.scaling_rhs)
-		scaling=1.0/(norm(rhsR)/norm([f;P(g);h]));
+		scaling=1.0/(norm(rhs)/norm([f;g;h]));
 	else
 		scaling=1.0;
 	end

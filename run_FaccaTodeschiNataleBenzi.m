@@ -4,7 +4,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin"];%,"gauss" "compression"];
+test_cases = ["sin","gauss","compression"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
@@ -114,7 +114,7 @@ for mesh_type = 5;
 			
 
 
-			for solver_approach=[20,11,13,10];
+			for solver_approach=[11];
 				% set controls
 				[ctrls,labels]=set_linear_algebra_ctrl(solver_approach,rec);
 

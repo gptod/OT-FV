@@ -109,12 +109,6 @@ for i=1:2:length(varargin)-1
     end;
 end;
 
-disp('dim')
-disp(dim)
-
-disp('scaling')
-disp(scaling)
-
 
 % If we are given a single matrix, just use exact MV
 if (isa(A, 'double'))
@@ -142,7 +136,6 @@ if (beta0==0)
     return;
 end;
 
-disp('dim5')
 
 % Check for the initial guess
 if (isempty(x))
