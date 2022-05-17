@@ -1,4 +1,4 @@
-function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, solini,left_right,scaling,prec_right)
+function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, solini,left_right,scaling,prec_right,dim)
 
 
 	
@@ -23,6 +23,10 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, so
 
 	if (~exist('scaling','var') )
     scaling=1;
+	end
+
+	if (~exist('dim','var') )
+    dim=0;
 	end
 
 	
@@ -65,7 +69,7 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, so
     info.approach_used='PCG';
     
   elseif (strcmp(ctrl.approach,'fgmres'))
-    nrestart=min(15,ctrl.itermax);
+    nrestart=min(40,ctrl.itermax);
 		max_iters=max(int64(ctrl.itermax/nrestart),1);
     [sol,infos,res,iter_total] = fgmres(@(y,tol) matrix_operator(y),...
 				   rhs,ctrl.tolerance,...
@@ -75,7 +79,8 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, so
 				   'verb',ctrl.verbose,...
 					 'tol_exit',ctrl.tolerance,...
 				   'P',@(x,tol) prec(x),... %should be right prec
-					 'scaling',scaling);
+					 'scaling',scaling,...
+					 'dim',dim);
 
     info.iter=iter_total;
     info.flag = (info.res >= ctrl.tolerance);

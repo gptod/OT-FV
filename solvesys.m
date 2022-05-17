@@ -57,6 +57,7 @@ A = sparse(JF.pp);
 B1T = sparse(JF.pr-JF.ps*(JF.ss\JF.sr));
 B1T_time  = JF.B1T_time;
 B1T_space = JF.B1T_space;
+B1T = B1T_time + B1T_space;
 B2 = sparse(JF.rp);
 R = sparse(JF.rr);
 M   = sparse(JF.rs);
@@ -1217,16 +1218,23 @@ elseif sol==11
 																					 Np,Nr,...
 																					 controls.outer_prec,ncellphi);
 
+	if (controls.scaling_rhs)
+		scaling=1.0/(norm(rhsR)/norm([f;P(g);h]));
+	else
+		scaling=1.0;
+	end
+	
 	% call iterative solver
 	outer_timing=tic;
 	rhs=[f1;f2];
-
+	check=0;
 	[d,info_J]=apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,...
 																														@(y) B1T*y,...
 																														@(z) B2*z,...
 																														@(z) C*z,...
 																														Np,Nr), ...
-																		rhs, controls.ctrl_outer, @(z) prec(z),[],controls.left_right );
+																		rhs, controls.ctrl_outer, @(z) prec(z),...
+																		[],controls.left_right,scaling,[],check);
 	outer_cpu=toc(outer_timing);
 	
 	if (controls.diagonal_scaling)
@@ -1363,7 +1371,7 @@ elseif sol==110
 	
 	outer_timing=tic;
 	rhs=[f;g;h];
-	[d,info_J]=apply_iterative_solver(J, rhs, ctrl_outer, @(z) prec(z),[],controls.left_right );
+	[d,info_J]=apply_iterative_solver(J, rhs, ctrl_outer, @(z) prec(z),[],controls.left_right);
 	outer_cpu=toc(outer_timing);
 	
 	

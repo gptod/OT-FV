@@ -82,6 +82,7 @@ tol_exit = tol;
 P = [];
 
 scaling=1.0;
+dim=0;
 
 for i=1:2:length(varargin)-1
     switch lower(varargin{i})
@@ -101,10 +102,18 @@ for i=1:2:length(varargin)-1
           P = varargin{i+1};
 				case 'scaling'
           scaling = varargin{i+1};
+				case 'dim'
+          dim = varargin{i+1};
         otherwise
             error('Unknown tuning parameter "%s"', varargin{i});
     end;
 end;
+
+disp('dim')
+disp(dim)
+
+disp('scaling')
+disp(scaling)
 
 
 % If we are given a single matrix, just use exact MV
@@ -117,6 +126,7 @@ if (~isempty(P))&&(isa(P, 'double'))
 end;
 
 n = size(b,1);
+
 
 if (restart>n)
     restart = n;
@@ -131,6 +141,8 @@ if (beta0==0)
     resids = 0;
     return;
 end;
+
+disp('dim5')
 
 % Check for the initial guess
 if (isempty(x))
@@ -284,6 +296,10 @@ for it=1:max_iters
         end;
     end;
     x = x+dx;
+
+		if (dim>0)
+			x(1:dim)=ort_proj(x(1:dim),ones(1,dim));
+		end
     
     if (resid<tol_exit); break; end;
 		%real_resid=norm(A(x, tol_kryl)-b)/beta0;
