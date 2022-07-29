@@ -168,274 +168,8 @@ if sol==1
 	normd=norm(d);
 	outer_cpu=toc(outer_cpu);
 
-
-% elseif sol==100
-	
-		
-	
-%   if (0)
-%     Sys = [A B1T; B2 -C];
-%     fp=f1;
-
-% 		indc=1;
-% 		%[dmax,indc]=max(spdiags(A(1:ncellphi:1:ncellphi),0));
-%     Sys(indc,:) = sparse(1,Np+Nr);
-% 		Sys(:,indc) = sparse(Np+Nr,1);
-% 		Sys(indc,indc) = 1;
-% 		fp(indc)=0; 
-%     d = Sys\[fp;f2];
-
-		
-
-% 		[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
-% 		B1T_time=-JF.B1T_time;
-% 		B1T_space=-JF.B1T_space;
-
-% 		P = @(rho) ort_proj(rho,W_mat);
-% 		B1T_time=matrix_times_prec(B1T_time,P);
-% 		B1T_space=matrix_times_prec(B1T_space,P);
-% 		%C=matrix_times_prec(C,P)+1e-12*speye(Nr,Nr);
-% 		[A,B1T_time,B1T_space,B2,f1]=ground_saddle(A,B1T_time,B1T_space,B2,f1,N);
-% 		B1T=B1T_time+B1T_space;
-
-
-		
-% 		diagonal_scaling=0;
-% 		if (diagonal_scaling)
-% 			% scale system by its diagonal
-% 			[sqrt_diagA,sqrt_diagC,inv_sqrt_diagA,inv_sqrt_diagC] = get_diagonal_scaling (A,C);
-			
-% 			[A,B1T,B2,C,fp,f2,W_mat]=scale_saddle_point(A,B1T,B2,C,...
-% 																									fp,f2,W_mat,...
-% 																									inv_sqrt_diagA,...
-% 																									inv_sqrt_diagC);
-% 		end
-% 		Sys = [A B1T; B2 -C];
-% 		d_new=Sys\[fp;f2];
-		
-		
-
-% 		if (diagonal_scaling)
-% 			d_new(1:Np)=inv_sqrt_diagA*d_new(1:Np);
-% 			d_new(1+Np:Np+Nr)=inv_sqrt_diagC*d_new(1+Np:Np+Nr);
-% 		end
-% 		%d_new(1+Np:Np+Nr)=P(d_new(1+Np:Np+Nr));
-	
-
-	
-
-% 		 E=zeros(Np,N);
-% 		 for k=1:N
-% 		 	E(k*ncellphi+1:(k+1)*ncellphi,k)=1.0;
-% 		 end
-	
-
-% 		 W_mat=zeros(N,Nr);
-% 		 for k = 1:N
-% 		 	 W_mat(k,1+(k-1)*ncellrho:k*ncellrho) = JF.area2h';
-% 		 end
-
-% 		 MM=B2*E;
-		 
-% 		 matrix=C\(MM);
-% 		 %figure;
-% 		 %spy(matrix)
-% 		 matrix_r=W_mat*(matrix)
-% 		 rhs_r=W_mat*d_new(Np+1:Np+Nr)
-% 		 W_mat*d(Np+1:Np+Nr)
-		
-% 		 alphas=matrix_r\rhs_r
-
-% 		 figure
-% 		 plot(d_new(Np+1:Np+Nr)-d(Np+1:Np+Nr))
-
-% 		 dp=d_new(1:Np)+E*alphas;
-% 		 dr=d_new(Np+1:Np+Nr)+matrix*alphas;
-
-		 
-
-% 		 ds = Dr\(h-Ds*d_new(Np+1:Np+Nr));
-%      d_new = [d_new;ds];
-% 		 [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d_new)
-
-% 		 return
-
-		 
-	
-%     res=norm(Sys*d-[f1;f2])/norm([f1;f2]);
-%     dp = d(1:Np); dr = d(Np+1:end);
-%     ds = Dr\(h-Ds*dr);
-%     d = [dp; dr; ds];
-
-%     normd = norm(d);
-%     resume_msg=sprintf('direct solver res=%1.2e',norm(res));
     
-    
-%   else
-%     Sys = sparse(...
-% 		  [JF.pp,        JF.pr, JF.ps;
-% 		   JF.rp,        JF.rr, JF.rs;
-% 		   sparse(Nr,Np), JF.sr, JF.ss]...
-% 	    );
-    
-%     rhs=-[f;g;h];
-%     Sys(indc,:) = sparse(1,Np+Nr+Nr); Sys(:,indc) = sparse(Np+Nr+Nr,1); Sys(indc,indc) = 1; rhs(indc)=0.0;
-%     d = Sys\rhs;
-%     res=norm(Sys*d-rhs)/norm(rhs);
-
-
-    
-%     %eigenvalues= study_eigenvalues(full(Sys),'J_Full');
-%     %figure
-%     %plot(eigenvalues,'o')
-%     %return
-
-% 				%dp = d(1:Np); dr = d(Np+1:end);
-%     %ds = Dr\(h-Ds*dr);
-%     %d = [dp; dr; ds];
-
-%   end
-
-%   if (0)
-%     % we enforse the rho increment to have zero mass
-
-    
-%     % P=  (I_{m-1}
-%     %    -(a1 -a2 -a_{m-1})/a_m 
-%     mat_P=speye(ncellrho,ncellrho-1);   
-%     mat_P(ncellrho,1:ncellrho-1)=-area2h(1:ncellrho-1)'/area2h(ncellrho);
-
-%     % H=block diagonal (P) 
-%     mat_H = repmat({mat_P},1,N);
-%     mat_H = blkdiag(mat_H{:});
-
-
-%     s_B1T = B1T * mat_H;
-%     s_B2 = mat_H' * B2;
-%     s_C  = mat_H' * C * mat_H;
-
-%     s_rhs = [f1; mat_H' * f2];
-
-    
-%     J_short=[A, s_B1T; s_B2, -s_C];
-
-%     d_short = J_short\s_rhs;
-
-%     dp = d_short(1:Np);
-%     dr = mat_H*d_short(Np+1:size(d_short,1));    
-%     ds = Dr\(h-Ds*dr);
-
-
-
-%     res_r=-(JF.rp * dp + JF.rr * dr + JF.rs * ds + F.r);
-%     dl=zeros(N,1);
-
-%     deltat=1/(N+1);
-%     factor=1/(deltat*norm(area2h))^2;
-%     for k = 1:N    
-%       dl(k)= factor * (area2h'* (res_r(1+(k-1)*ncellrho:k*ncellrho))) ;
-%       fprintf('dlambda(%d)=%1.2e\n',k,dl(k)) 
-%     end
-    
-%     sum_dl=0;
-
-% 		disp(i)
-%     for k = 1:N
-%       sum_dl=sum_dl+dl(k);
-%       dp(1+(k-1)*ncellphi:k*ncellphi)=dp(1+(k-1)*ncellphi:k*ncellphi)+deltat*sum_dl;
-%     end
-    
-%     d = [dp; dr; ds];
-
-%     [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
-      
-    
-% 				% redefine rho dimension 
-
-%   end
-
-
-%   [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
-%   normd = norm(d);
-%   resume_msg = sprintf('direct solver res=%1.2e',resnorm);
-
-%   %figure
-%   %spy(Sys)
-%   %return
-    
-%     inner_nequ=0;
-%     inner_iter=0;
-%     outer_iter=0;
-%     outer_cpu=0;
-%     prec_cpu=0;
-%     inner_nequ2;
-%     inner_iter2=0;
-%     inner_nequ3=0;
-%     inner_iter3=0;
-    
-elseif sol==2
-    
-    % Solve with the Schur complement A|C, using Matlab's backslash (or agmg)
-  bs=tic;
-    A = JF.pp; B1 = JF.pr; B2 = JF.rp; inv_C = -((JF.sr*JF.rs)\JF.ss);
-    f1 = F.p;
-    f2 = F.r-JF.rs*(JF.ss\F.s);
-    S = -A+B1*(inv_C*B2); S = S(2:end,2:end);
-    fp = f1-B1*(inv_C*f2); fp = fp(2:end);
-    dp = S\fp;
-    outer_cpu=toc(bs);
-    outer_iter=0;
-    sol_stat = struct('flag',0,'relres',[],'iter',[]);
-    
-    %[dp,flag,res,iter] = agmg(S,fp,0,1e-6,100,0,[],0);
-    %sol_stat = struct('flag',flag,'relres',res,'iter',iter);
-
-    inner_iter=0;
-    dp = [0; dp];
-    dr = inv_C*(-f2-B2*dp);
-    ds = JF.ss\(-F.s-JF.sr*dr);
-    d = [dp; dr; ds];
-    
-    normd = norm(d);
-    
-elseif sol==3
-    
-    eta = 1e-5;
-    
-    % Solve the system with the flexible GMRES and the left (right) block
-    % preconditioner P given by P=[S 0; B Cp] (P=[S B'; 0 Cp]),
-    % with S=A-B^T*Cp^{-1}*B and Cp=diag(C)
-    
-    C = JF.rr-JF.rs*(JF.ss\JF.sr);
-    Sys = [JF.pp JF.pr; JF.rp C];
-    Sys(indc,:) = sparse(1,Np+Nr); Sys(:,indc) = sparse(Np+Nr,1); Sys(indc,indc) = 1;
-    b = [-F.p; -F.r+JF.rs*(JF.ss\F.s)]; b(indc) = 0;
-    
-    % % scaling
-    % diagSys = abs(diag(Sys)).^(-0.5); diagSys(diagSys<1e-6) = 1;
-    % diagSys = spdiags(diagSys,0,Np+Nr,Np+Nr);
-    % Sys = diagSys*Sys*diagSys; b = diagSys*b;
-    
-    Ap = Sys(1:Np,1:Np);
-    B1p = Sys(1:Np,Np+1:Np+Nr);
-    B2p = Sys(Np+1:Np+Nr,1:Np); 
-    Cp = spdiags(diag(C),0,Nr,Nr);
-    
-    % Solve the system
-    [d,iter] = fgmres(Sys,b,eta,'max_iters',1,'restart',ceil(sqrt(size(Sys,1))),...
-        'verb',0,'P',@(x,tol) blockP(x,tol,Ap,B1p,B2p,Cp));
-        
-    %d = diagSys*d;
-    
-    dp = d(1:Np); dr = d(Np+1:end);
-    ds = JF.ss\(-F.s-JF.sr*dr);
-    d = [dp; dr; ds];
-    
-    normd = norm(d);
-    
-    sol_stat = struct('flag',0,'relres',[],'iter',iter);
-    
-elseif sol==4
+elseif sol=="augmented_lagrangian"
       
     % Solve the augmented system of equations with the flexible GMRES and the
     % left (right) block preconditioner P given by P=[S 0; B2 CS]
@@ -469,7 +203,7 @@ elseif sol==4
     sol_stat = struct('flag',flag,'relres',relres,'iter',iter);
     
     
-elseif sol==5
+elseif sol=="ilu"
     
     % Solve the system with the GMRES and the sparse ilu decomposition as
     % preconditioner
@@ -490,252 +224,18 @@ elseif sol==5
     
     sol_stat = struct('flag',flag,'relres',relres,'iter',iter);
 
-elseif sol==6
-  % rhs
-  f=-F.p;
-  g=-F.r;
-  h=-F.s;
-  
-  % Solve with the Schur complement A|C, using Matlab's backslash (or agmg)
-  swap_sign=1;
-
-  % reduced system to phi rho variables
-  A = JF.pp; B1T = JF.pr; B2 = JF.rp;
-  C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
-  f1 = f;
-  f2 = g-JF.rs*(JF.ss\h);
-  
-  % swap C sign for having standard saddle point notation 
-  C = -C;
-  if (swap_sign)
-    A=-A;
-    B1T=-B1T;
-    B2=-B2;
-    C=-C;
-    f1=-f1;
-    f2=-f2;
-  end
-
-  %J=[A, B1T;  B2, -C];
-  %norm(J*d(1:Np+Nr)-[f1;f2])
-
-  % start solution
-  % invert C
-  fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
-  inv_C = sparse(1:Nr,1:Nr,(1.0./spdiags(C))',Nr,Nr);
- 
-  % assembly schur AC S=A+B1
-  % reduced to system only in phi
-  S = A+B1T*(inv_C*B2);
-  fp = f1+B1T*(inv_C*f2);
-
-  %norm(S*d(1:Np)-fp)
-  
-  % ground the solution
-  S(indc,:) = sparse(1,Np);
-  S(:,indc) = sparse(Np,1);
-  S(indc,indc) = 1;
-  fp(indc)     = 0;
-  
-    
-  % solve with multigrid
-  %[dp,flag,res,iter] = agmg(S,fp,0,ctrl.tolerance,ctrl.itermax,0,[],0);
-  inv_S=sparse_inverse;
-  inv_S.init(S,ctrl_inner11);
-  dp=inv_S.apply(fp);
-  %inv_S.info.print();
-  flag=inv_S.info.flag;
-  relres=inv_S.info.res;
-  iter=inv_S.info.iter;
-  %inv_S.kill();
-
-  %res;norm(S*dp-fp)
-
-  % get solution of system JF d  = F  
-  dr = inv_C*(B2*dp-f2);
-
-  %J=[A, B1T;  B2, -C];
-  %norm(J*[dp;dr]-[f1;f2])
-
-  ds = JF.ss\(h-JF.sr*dr);
-  d = [dp; dr; ds];
-    
-  normd = norm(d);
-
-% elseif sol==7
-%   % rhs
-%   f=-F.p;
-%   g=-F.r;
-%   h=-F.s;
-  
-%   % Solve wsith the Schur complement A|C, using Matlab's backslash (or agmg)
-%   swap_sign=1;
-
-%   % reduced system to phi rho variables
-%   A = JF.pp; B1T = JF.pr; B2 = JF.rp;
-%   C = sparse(JF.rr - JF.rs*(JF.ss\JF.sr));
-%   f1 = f;
-%   f2 = g-JF.rs*(JF.ss\h);
-  
-%   % swap C sign for having standard saddle point notation 
-%   C = -C;
-%   if (swap_sign)
-%     A=-A;
-%     B1T=-B1T;
-%     B2=-B2;
-%     C=-C;
-%     f1=-f1;
-%     f2=-f2;
-%   end
-
-%   %S=compute_SchurCA(A,B1T,B2,C,Nt,ncellrho,ncellphi)
-%   %S=A+B1T*(C\B2);
-  
-%   %J=[A, B1T;  B2, -C];
-%   %norm(J*d(1:Np+Nr)-[f1;f2])
-
-%   % start solution
-%   % invert C
-%   diagC=spdiags(C);
-%   %fprintf('(%9.4e <= C <= %18.12e) \n',min(diagC),max(diagC))
-%   inv_diagC = sparse(1:Nr,1:Nr,(1.0./diagC)',Nr,Nr);
- 
-%   % grounding
-%   A(indc,:)= sparse(1,Np); %A(:,indc)= sparse(Np,1);
-%   A(indc,indc)=1;
-%   B1T(indc,:)= sparse(1,Nr);
-%   rhs(indc)=0;
-
-  
-%   % assembly schur AC S=A+B1
-%   % reduced to system only in phi
-%   S = A+B1T*(inv_diagC*B2);
-%   fp = rhs(1:Np)+B1T*(inv_diagC*rhs(1+Np:Np+Nr));
-
-%   if ( compute_eigen )
-%     disp("START EIG")
-%     eigenvalues=eig(full(S));
-%     disp("END EIG")
-%     for i=1:4
-%       fprintf('(%9.4e <= eigvalues <= %18.12e) \n',eigenvalues(i),eigenvalues(Np-i+1))
-%     end
-%   end
-    
-%   % solve
-
-%   % init solver
-%   inv_S=sparse_inverse;
-%   inv_S.init(S,ctrl_inner11);
-% 				% apply inverse
-%   dp=inv_S.apply(fp);
-%   inner_nequ=inv_S.nequ;
-  
-%   % copy info
-%   flag=inv_S.info_inverse.flag;
-%   relres=inv_S.info_inverse.res;
-%   inner_iter=inv_S.info_inverse.iter;
-%   outer_iter=0;
-%   outer_cpu=0.0;
-%   %inv_S.kill();
-  
-%   % get solution of system JF d  = F  
-%   dr = invdiagC*(B2*dp-rhs(1+Np:Np+Nr));
-
-%   %J=[A, B1T;  B2, -C];
-%   %norm(J*[dp;dr]-[f1;f2])
-
-%   ds = JF.ss\(h-JF.sr*dr);
-%   d = [dp; dr; ds];
-    
-%   normd = norm(d);
-
-% elseif sol==8
-%   % Invert with respect to C block and try to "invert" S=A+BT*C^{-1} B
- 
-%   % start solution
-%   % invert C
-%   fprintf('(%9.4e <= C <= %18.12e) \n',min(spdiags(C)),max(spdiags(C)))
-%   inv_C = sparse(1:Nr,1:Nr,(1.0./spdiags(C))',Nr,Nr);
-
-%   % grounding
-%   A(indc,:)= sparse(1,Np);
-%   A(indc,indc)=1;
-%   B1T(indc,:)= sparse(1,Nr);
-%   rhs(indc)=0;
-
-  
-%   % assembly schur AC S=A+B1
-%   % reduced to system only in phi
-%   S = A+B1T*(inv_C*B2);
-%   fp = rhs(1:Np)+B1T*(inv_C*rhs(1+Np:Np+Nr));
-
-%   %
-%   % partion diagonal and upper diagonal blocks
-%   %
-%   diag_block_S       = cell(Nt, 1);
-%   below_diag_block_S= cell(Nt-1, 1);
-%   nAi=ncellphi;
-%   for i=1:Nt-1
-%     diag_block_S{i}      =S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
-%     below_diag_block_S{i}=S(i    *nAi+1 : (i+1)*nAi , (i-1)*nAi+1 : i*nAi);
-%   end
-%   i=Nt;
-%   diag_block_S{i}=S((i-1)*nAi+1:i*nAi,(i-1)*nAi+1:i*nAi);
-
-%   %				
-%   % create define inverse on diagonal block
-%   % relax diagonal by a factor 1/omega 0<omega<1
-%   %
-%   diag_block_inv_S(1:Nt,1)=sparse_inverse;
-%   for i=1:Nt
-%     diag_block_inv_S(i).init((1/ctrl_inner11.omega)*diag_block_S{i},ctrl_inner11);
-%   end
-
-%   % set initial solution
-%   x0=zeros(Np,1);
-%   info_S=info_solver;
-
-%   approach=controls.extra_info;
-% 			       %approach="stationary_block_triangular"
-%   if ( strcmp(approach, 'block_diag')) 
-%     prec = @(x) apply_block_triangular_inverse(diag_block_inv_S,below_diag_block_S,'L',x);
-%   elseif ( strcmp(approach, 'block_triangular') )
-%     prec = @(x) apply_block_diag_inverse(diag_block_inv_S,x);
-%   end
-
-%   % solve 
-%   tic;
-%   [dp,info_S] = apply_iterative_solver(@(y) S*y, fp, ctrl_outer, prec,x0);
-%   outer_cpu = toc;
-  
-  
-%   % get solution of system JF d  = F  
-%   dr = inv_C*(B2*dp-rhs(Np+1:Np+Nr));
-%   ds = JF.ss\(h-JF.sr*dr);
-%   d = [dp; dr; ds];
-
-%   % store info
-%   inner_nequ=diag_block_inv_S(1).nequ;
-%   inner_iter=0;
-%   for i  = 1:Nt
-%     inner_iter=inner_iter+diag_block_inv_S(i).cumulative_iter;
-%   end
-%   outer_iter=info_S.iter
-
-    
-%   normd = norm(d);
 
 elseif sol==10
-  % Krylov method for full system
-  % + 
-  % use P=( SAC B1T ) as preconditoner 
-  %       ( 0    -C )
-  % cpu time preprocessing main solver
-  time_prep=tic;
+	% Krylov method for full system
+	% + 
+	% prec. based on primal Schur complement A + BT C^{-1} B
+
+	% cpu time preprocessing main solver
+	time_prep=tic;
 
 	% Ground matrix A, B1T and f1.
-	% Change the upper bound cycle to see the effect of
-	% "grounding" all blocks. 
+	% Change the limit of cycle in iblock
+	% to see the effect of "grounding" all blocks.
 	if (controls.ground == 1)
 		for iblock = 1:1
 			irow = controls.ground_node+(iblock-1)*ncellphi;
@@ -748,11 +248,6 @@ elseif sol==10
 		end
 	end
 
-	W_mat=zeros(N,Nr);
-	for k = 1:N
-	  W_mat(k,1+(k-1)*ncellrho:k*ncellrho) = JF.area2h';
-  end
-	
 
   % scale system by diag(M)^{-1/2} M  diag(M)^{-1/2} diag(M)^{1/2} x = diag(M)^{-1/2}
   if (controls.diagonal_scaling)
@@ -768,10 +263,11 @@ elseif sol==10
   end
   
 	
-  % init diag(C)^{-1}
+	% init diag(C)^{-1}
 	diag_C = spdiags(C,0);
   %fprintf('(%9.4e <= C <= %18.12e) \n',min(diag_C),max(diag_C))
   inv_diag_C = sparse(1:Nr,1:Nr,(1.0./diag_C)',Nr,Nr);
+
 	% if C is diagonal we can invert easily. Otherwise we use agmg
 	if ( nnz(C)==Nr)
 		inverseC = @(x) inv_diag_C*x;
@@ -784,78 +280,44 @@ elseif sol==10
 		inverseC = @(x) inverse_sparse_C.apply(x);
 	end
 
-	P_mat=W_mat*inv_diag_C*B2;
-	alphas=W_mat*inv_diag_C*f2;
-
-		
 	
-	% Extra term B1T*inv_C*B2 of the primal schur complemenent
-	% Form time-time, time-space and space-space component
+	% Form time-time, time-space and space-space component of the primal Schur 
 	Stt = B1T_time* (inv_diag_C*B1T_time' );
 	Stx = B1T_time* (inv_diag_C*B1T_space');
 	Sxx = B1T_space*(inv_diag_C*B1T_space');
 
 	
-	% select
+	% select different assemble of the schur complement used
+	% in the preconditioner
 	if ( strcmp(controls.assembly_S,'full') )
-		%disp('here')
 		S = Stt+Stx+Stx'+Sxx;
-  elseif ( strcmp(controls.assembly_S,'tt') ) 
-    S = Stt;
-  elseif ( strcmp(controls.assembly_S,'tt_xx') ) 
-    S = Stt+Sxx;
+  	elseif ( strcmp(controls.assembly_S,'tt') )
+    	S = Stt;
+  	elseif ( strcmp(controls.assembly_S,'tt_xx') )
+    	S = Stt+Sxx;
 	elseif ( strcmp(controls.assembly_S,'tx_xt') )
-    S = Stx+Stx';
-  elseif ( strcmp(controls.assembly_S,'tt_tx_xt') )
-    S = Stt+Stx+Stx';
+    	S = Stx+Stx';
+  	elseif ( strcmp(controls.assembly_S,'tt_tx_xt') )
+    	S = Stt+Stx+Stx';
 	elseif ( strcmp(controls.assembly_S,'harmonic') )
 		% assume that phi is harmonic and use chain rule on
-		% div(g\grad phi)=g*div(\gradphi) + grad phi * grad rho=grad phi * grad rho
-		% BT~B
-		% div invC B~= B
-		%rhos = Rst*RHt*It*rho_all;
-		% Rst = repmat({JF.Rs},1,N+1);
-    % Rst = blkdiag(Rst{:});
+		% div(g\grad phi)=g*div(\gradphi) + grad phi * grad
+		% rho=grad phi * grad rho BT~B div invC B~= B rhos =
+		% Rst*RHt*It*rho_all; Rst = repmat({JF.Rs},1,N+1); Rst =
+		% blkdiag(Rst{:});
 		rec_time = assembleRHt(N-1,ncellrho);
 		nei=size(JF.grad,2);
 		gradt = assembleGradt(N,ncellphi,nei,JF.div');
-
-		
-		% crhos=spdiags(inv_diag_C,0);
-		% assume slack is zeros for t=0 t=1,
-		%rhos_all=[F.rho_in;spdiags(Dr,0);F.rho_f];
-		%s_all  = [zeros(ncellrho,1);spdiags(Ds,0);zeros(ncellrho,1)];
-		%m_all  = [area2h; spdiags(Mrho);area2h];
-
-		%c_all  = s_all.*m_all./rhos_all;
 		
 		% avg in time and project to edges h
 		te = size(gradt,1);
-		%inv_C_cell = spdiags(RHt*JF.It*c_all,0,Np,Np);
-
-		% G from edge to cellphi
-	
-		%JF.gradphi;
-		%G= Rst'*spdiags(JF.gradphi,0,te,te);
 
 		%		S=-JF.B1T_spaceG*gradt*inv_C*G*gradt;
 		Rst = repmat({JF.Rs},1,N+1);
-    Rst = blkdiag(Rst{:});
+    	Rst = blkdiag(Rst{:});
 		I_cellphi_cellrho = assembleIt(N-1,ncellphi,ncellrho,JF.I);
 		%  (N+1)*Kh<-(N+1)*e<-(N+1)*e<-(N+1)*Kh <-(N+1)*K2h <- N*K2h
 		new_B1T_space= Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
-
-		if (0)
-			nei=size(JF.grad,2);
-			gradt = assembleGradt(N-1,ncellphi,nei,JF.grad);
-			Nr
-			size(gradt)
-			size(JF.G')
-			size(rec_time')
-			size(I_cellphi_cellrho)
-			rec_time = assembleRHt(N-2,size(JF.grad,1));
-			new_B1T_space= - I_cellphi_cellrho *  JF.G'*rec_time'* gradt ;
-		end
 
 		Stx = B1T_time* (inv_diag_C*B1T_space');
 		Sxt = new_B1T_space*(inv_diag_C*B1T_time');
@@ -864,7 +326,7 @@ elseif sol==10
 		S=Stt+Stx+Sxt+Sxx;
 
 	elseif ( strcmp(controls.assembly_S,'tt_xx_lamped') ) 
-    S = Stt
+   	S = Stt
 		% using a sort of mass lamping since weight in the mxx matrix
 		% have the following structure
 		% g1**2 g1*g2
@@ -891,7 +353,7 @@ elseif sol==10
 		Sxx((i-2)*ncellphi+1:(i-1)*ncellphi,(i-2)*ncellphi+1:(i-1)*ncellphi);
 
 	elseif ( strcmp(controls.assembly_S,'blockdiagMxx') )
-    block=sparse(Np,Np);
+   	block=sparse(Np,Np);
     for i=1:Nt
 			block(1+(i-1)*ncellphi:i*ncellphi,1+(i-1)*ncellphi:i*ncellphi)=...
 			Sxx(1+(i-1)*ncellphi:i*ncellphi,1+(i-1)*ncellphi:i*ncellphi);
@@ -907,57 +369,58 @@ elseif sol==10
     S = Stt+Stx+Stx'+block;
   end 
 
-  % form Primal Schur complement (possibly approximated)
+	% form Primal Schur complement (possibly approximated)
 	S=A+S;
 
 
-	% permute indeces primal block tominimize bandwidth
-  if ( controls.permute == 1)
-    % define permutation
-    perm = symrcm(S);
-    iperm(perm)=(1:Np)';
-    
-    A=A(perm,perm);
-    B1T=B1T(perm,:);
+	% permute indeces primal block to minimize bandwidth
+	if ( controls.permute == 1)
+		% define permutation
+		perm = symrcm(S);
+		iperm(perm)=(1:Np)';
+		
+		A=A(perm,perm);
+		B1T=B1T(perm,:);
 		B1T_time=B1T_time(perm,:);
 		B1T_space=B1T_space(perm,:);
-    B2=B2(:,perm);
+		B2=B2(:,perm);
 		f1=f1(perm);
 		S=S(perm,perm);
-  end
-  
+	end
+	
 
-  % define (approximate) inverse of SAC=A+B1T diag(C)^{-1} B2 
-  approach=controls.inverse11;  
+  % define (approximate) inverse of S
+	% We can use the following options:
+	% 1) invertion of the full S
+	% 2) invertion of the diagonal blocks only
+	% 3) invertion of the lower triangular blocks only
+  approach=controls.inverse11;
   relax4prec=controls.relax_inv11;
 	ctrl_inner11=controls.ctrl_inner11;
-
   timeS=tic;
   if (strcmp(approach,'full'))
-    % init inverse of full S
-		%disp('here')
 		Nsys=1;
-    inv_S=sparse_inverse;
+		inv_S=sparse_inverse;
 
-    ctrl_loc=ctrl_solver;
-    index_agmg=index_agmg+1;
-    ctrl_loc.init(ctrl_inner11.approach,...
-		  ctrl_inner11.tolerance,...
-		  ctrl_inner11.itermax,...
-		  ctrl_inner11.omega,...
-		  ctrl_inner11.verbose,...
-		  'SAC',index_agmg);
-    inv_S.init(S+relax4prec*speye(Np,Np),ctrl_loc);
-    inv_S.dimblock=ncellphi;
+		ctrl_loc=ctrl_solver;
+		index_agmg=index_agmg+1;
+		ctrl_loc.init(ctrl_inner11.approach,...
+									ctrl_inner11.tolerance,...
+									ctrl_inner11.itermax,...
+									ctrl_inner11.omega,...
+									ctrl_inner11.verbose,...
+									'SAC',index_agmg);
+		inv_S.init(S+relax4prec*speye(Np,Np),ctrl_loc);
+		inv_S.dimblock=ncellphi;
 		%inv_S.info();
-    inverse_cpu=inv_S.init_cpu;
+		inverse_cpu=inv_S.init_cpu;
 		
     inverse_block11 = @(x) inv_S.apply(x);
     inner_nequ=Np;
   elseif(strcmp(approach,'block_triang'))
-    %
-    % partion diagonal and upper diagonal blocks
-    %
+		%
+		% partion diagonal and upper diagonal blocks
+		%
 		Nsys=Nt;
     diag_block_S       = cell(Nt, 1);
     below_diag_block_S = cell(Nt-1, 1);
@@ -978,11 +441,11 @@ elseif sol==10
       index_agmg=index_agmg+1;
       ctrl_loc=ctrl_solver;
       ctrl_loc.init(ctrl_inner11.approach,...
-		    ctrl_inner11.tolerance,...
-		    ctrl_inner11.itermax,...
-		    ctrl_inner11.omega,...
-		    ctrl_inner11.verbose,...
-		    sprintf('%sA%d%d',ctrl_inner11.label,i,i),index_agmg);
+										ctrl_inner11.tolerance,...
+										ctrl_inner11.itermax,...
+										ctrl_inner11.omega,...
+										ctrl_inner11.verbose,...
+										sprintf('%sA%d%d',ctrl_inner11.label,i,i),index_agmg);
       diag_block_invA(i).name=sprintf('inverse A%d%d',i,i);
       diag_block_invS(i).init(diag_block_S{i}+relax4prec*speye(nAi,nAi),ctrl_loc);
     end
@@ -1006,17 +469,17 @@ elseif sol==10
       index_agmg=index_agmg+1;
       ctrl_loc=ctrl_solver;
       ctrl_loc.init(ctrl_inner11.approach,...
-		    ctrl_inner11.tolerance,...
-		    ctrl_inner11.itermax,...
-		    ctrl_inner11.omega,...
-		    ctrl_inner11.verbose,...
-		    sprintf('%s_SAC%d%d',ctrl_inner11.label,i,i),index_agmg);
-      diag_block_inv_S(i).init(S((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi)+...
-			      relax4prec*speye(nAi,nAi),ctrl_loc);
-      diag_block_inv_S(i).name=sprintf('inverse_SAC%d%d',ctrl_inner11.label,i,i);
+										ctrl_inner11.tolerance,...
+										ctrl_inner11.itermax,...
+										ctrl_inner11.omega,...
+										ctrl_inner11.verbose,...
+										sprintf('%s_SAC%d%d',ctrl_inner11.label,i,i),index_agmg);
+      diag_block_inv_S(i).init(S((i-1)*nAi+1 :     i*nAi ,...
+																 (i-1)*nAi+1 : i*nAi)+...
+															 relax4prec*speye(nAi,nAi),ctrl_loc);
+      diag_block_inv_S(i).name=sprintf('inverse_SAC%d%d',...
+																			 ctrl_inner11.label,i,i);
     end
-
-    
     inverse_block11  = @(x) apply_block_diag_inverse(diag_block_inv_S,x);
   end
 	preprocess_S=toc(timeS);
@@ -1025,6 +488,7 @@ elseif sol==10
   preprocess_cpu=toc(time_prep);
 	
   if( controls.solve_primal)
+		% solve the fully reduced sytem, not the saddle point
 		if ( strcmp(controls.assembly_S,'full') & ...
 				 controls.ctrl_inner11.tolerance<= controls.ctrl_outer.tolerance)
 			
@@ -1053,12 +517,13 @@ elseif sol==10
 		% solve with fgmres or bicgstab if prec is linear
 		outer_timing=tic;
 		rhs=[f1;f2];
-		[d,info_J]=apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,...
-																															@(y) B1T*y,...
-																															@(z) B2*z,...
-																															@(z) C*z,...
-																															Np,Nr),...
-																			rhs, controls.ctrl_outer, prec );
+		[d,info_J]=...
+		apply_iterative_solver( @(x) apply_saddle_point(x,@(y) A*y ,...
+																										@(y) B1T*y,...
+																										@(z) B2*z,...
+																										@(z) C*z,...
+																										Np,Nr),...
+														rhs, controls.ctrl_outer, prec );
 		outer_iter=uint64(info_J.iter);
 		outer_cpu=toc(outer_timing);		
 	
@@ -1098,7 +563,7 @@ elseif sol==10
 			end
 		end
 		
-
+		
 		info_J.flag=1;
 		if (info_J.res <= controls.ctrl_outer.tolerance)
 			info_J.flag=0;
