@@ -169,7 +169,7 @@ if sol==1
 	outer_cpu=toc(outer_cpu);
 
     
-elseif sol=="augmented_lagrangian"
+elseif sol==3 %"augmented_lagrangian"
       
     % Solve the augmented system of equations with the flexible GMRES and the
     % left (right) block preconditioner P given by P=[S 0; B2 CS]
@@ -203,7 +203,7 @@ elseif sol=="augmented_lagrangian"
     sol_stat = struct('flag',flag,'relres',relres,'iter',iter);
     
     
-elseif sol=="ilu"
+elseif sol==4%"ilu"
     
     % Solve the system with the GMRES and the sparse ilu decomposition as
     % preconditioner
@@ -3148,24 +3148,24 @@ elseif (sol==19)
   inner_iter3=0;
 
 elseif (sol==20)
-	index_agmg=0;
+	% seed for agmg solver 
+ 	index_agmg=0;
 
-	
+	% create saddle point components
 	[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
 	B1T_time=-JF.B1T_time;
 	B1T_space=-JF.B1T_space;
+	
+	% define projectors actions
 	P = @(y) P_apply(y,area2h);
 	PT = @(y) PT_apply(y,area2h);
-	
+
+	% assemble project rhs
 	rhsR=[f1;P(f2)];
-	% assembly SAC=-(C+B2 * diag(A)^{-1} B1T) 
-  % reduced to system only in rho
-	invDiagA=sparse(1:Np,1:Np,(1./spdiags(A,0))',Np,Np);
-
-	reduced=1;
-	primal=1;
 
 	
+	% assembly Diag(A)^{-1}
+	invDiagA=sparse(1:Np,1:Np,(1./spdiags(A,0))',Np,Np);
 
 	ground=controls.ground;
 	if (ground)
@@ -3176,29 +3176,16 @@ elseif (sol==20)
 		rhsR=[f1;P(f2)];
 	end
 
-	if (controls.diagonal_scaling)
-		% scale system by its diagonal
-		[sqrt_diagA,sqrt_diagC,inv_sqrt_diagA,inv_sqrt_diagC] = get_diagonal_scaling (A,C);
-		
-		[A,B1T,B2,C,f1,f2,W_mat]=scale_saddle_point(A,B1T,B2,C,...
-																								f1,f2,W_mat,...
-																								inv_sqrt_diagA,...
-																								inv_sqrt_diagC);
-		B1T_time =inv_sqrt_diagA* B1T_time *inv_sqrt_diagC;
-		B1T_space=inv_sqrt_diagA* B1T_space *inv_sqrt_diagC;
-		B1T=B1T_time+B1T_space;
-		invDiagA=sparse(1:Np,1:Np,(1./spdiags(A,0))',Np,Np);
-
-		disp('fix diagonal scaling')
-		return
-		rhsR=[f1;P(f2)];
-	end
+	% cpu for preprocessing A
 	time_A=tic;
 	
   % define approxiamte inverse of (~A)^{-1}  
   inverseA_approach=controls.inverse11;
 	ctrl_inner11 = controls.ctrl_inner11;
-	
+
+	% full: invert the matrix as one single matrix
+	% diag: invert each block separetely
+	% full is left essential for debug purpose
   if ( strcmp(inverseA_approach,'full'))
     % set inverse
     inverseA=sparse_inverse;
@@ -3260,6 +3247,7 @@ elseif (sol==20)
 
 
 	% define implitely action of the Schur complement
+	% It my be used by some prec.
 	apply_schur=@(x) P(C*PT(x)+B2*invA(B1T*PT(x)));
 
 	
@@ -3268,10 +3256,9 @@ elseif (sol==20)
 	%
 	timeS=tic;
 	if (strcmp(controls.inverse22,'diagA'))
-		SCA = (B2*invDiagA*B1T);
-		if (reduced)
-			SCA=SCA+C;
-		end
+		% like the simple approach
+		SCA = (B2*invDiagA*B1T)+C;
+
 		inv_SCA=sparse_inverse;
 		ctrl_inner22 = controls.ctrl_inner22;
 		index_agmg=index_agmg+1;
@@ -3293,62 +3280,63 @@ elseif (sol==20)
 		inverseS=	@(z) inv_SCA.apply(z);
 		
 	elseif (contains(controls.inverse22,'commute'))
+		% from BTA=-AB we can get
+		% BA^{-1}BT=A (-BB)^{-1}=-(B^TB^T)^{-1} A
+		% lrb
 		lrb=controls.lrb;
+
+		% inverse of C
 		diagC = spdiags(C,0);
 		invC = sparse(1:Nr,1:Nr,(1.0./spdiags(C,0))',Nr,Nr);
+
+		% masses matrices and their inverses
 		Mphi=JF.Mxt;
 		Mrho=-JF.rs;
 		inv_Mphi  = sparse(1:Np,1:Np,(1./spdiags(Mphi,0))',Np,Np);
 		inv_Mrho  = sparse(1:Nr,1:Nr,(1./spdiags(Mrho,0))',Nr,Nr);
 		
-		%[pr,A_rho, approx_S,start]=...
-		%build_approx_Schur_components( A,B1T,B2,C,invC,lrb,JF,controls.inverse22,controls.mode_Arho);
-
+		% inverse of Diag(rho)
 		inv_Dr = sparse(1:Nr,1:Nr,(1./spdiags(Dr,0))',Nr,Nr);
-		
+
+		% definition of A_rho=Atitle
+		% A_rho = rho-weighted Laplacian with N blocks and defiend on rho cells 
 		neit=size(JF.divt_rho,2);
 		rho=spdiags(-JF.ss,0);
 		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
 		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
-
 		
-		% rho defined on cells
+		% matrix H
 		RHt = assembleRHt(N,ncellphi);
-		vect_rho_on_h = RHt*(JF.It*[F.rho_in;rho;F.rho_f]);
-		rho_h =  sparse(1:Np,1:Np,(vect_rho_on_h)',Np,Np);
-		inv_rho_h =  sparse(1:Np,1:Np,(1./vect_rho_on_h)',Np,Np);
+		% vect_rho_on_h = RHt*(JF.It*[F.rho_in;rho;F.rho_f]);
+		% rho_h =  sparse(1:Np,1:Np,(vect_rho_on_h)',Np,Np);
+		% inv_rho_h =  sparse(1:Np,1:Np,(1./vect_rho_on_h)',Np,Np);
 		
-
+		% matrix J
 		rec_time = assembleRHt(N-1,ncellrho);
 		nei=size(JF.grad,2);
+
+		% matrix grad tilde
 		gradt = assembleGradt(N,ncellphi,nei,JF.div');
 		te = size(gradt,1);
 		Rst = repmat({JF.Rs},1,N+1);
 		Rst = blkdiag(Rst{:});
 		I_cellphi_cellrho = assembleIt(N-1,ncellphi,ncellrho,JF.I);
-		%  (N+1)*Kh<-(N+1)*e<-(N+1)*e<-(N+1)*Kh <-(N+1)*K2h <- N*K2h
-		new_B1T_space = Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
-		
-		
-		
 
-		if (0)
-			nei=size(JF.gradphi,1)/(N+1);
-			for i=1:Nt
-				lapl_phi_i=JF.div*JF.gradphi((i-1)*nei+1:i*nei);
-				fprintf('%1.1e <= Laplacian phi %d <= %1.1e\n ', min(lapl_phi_i), i, max(lapl_phi_i))
-			end
-		end
+		% spatial component of B tilde matrix
+		new_B_space = Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
+		
 
 		%S22=B1T_time'*inv_Mphi*B1T_time;
-		S22=B2*inv_Mphi*(-JF.B1T_time+new_B1T_space);
-		
+		S22=B2*inv_Mphi*(-JF.B1T_time+new_B_space);
+
+		% sue different factorization to invert S=(CA-BB)A^{-1}
 		if (controls.mode_inverse22==1)
 			approx_S =  C*inv_Mrho*A_rho + S22;
 		elseif (controls.mode_inverse22==2)
 			approx_S =  Ds*inv_Mrho*A_rho + Dr*inv_Mrho* S22;
 		end
-		
+
+		% set inverse 
 		ctrl_inner22 = controls.ctrl_inner22;
 		inv_SCA=sparse_inverse;
 		ctrl_loc=ctrl_solver;
@@ -3374,6 +3362,8 @@ elseif (sol==20)
 		end
 		
 	elseif (strcmp(controls.inverse22,'full'))
+		% form explicitely the Schur complement
+		% just for debug and study purpose
 		schur=prec_times_matrix(apply_schur,speye(Nr,Nr));
 
 		inv_Schur=sparse_inverse;
@@ -3392,11 +3382,14 @@ elseif (sol==20)
 
 		
 	elseif(strcmp(controls.inverse22,'lsc'))
-		
+		% Algebraically stabilized Least Square Commutator
+
+		% different option for the Q weight
 		invQ = inv_Mphi;
 		%invQ = inv_Mphi*inv_Mphi;
 		%invQ = Mphi;
 		%invQ = speye(Np);
+
 		% parameters
 		gamma=1.0;
 		alpha=0e-2;
@@ -3426,15 +3419,6 @@ elseif (sol==20)
 		inverse_bbt=@(y) P(inv_SCA.apply(PT(y)));
 		
 		inverseS=@(y) inverse_bbt(P(central_block*PT(inverse_bbt(y))))+alpha*inv_diag_SCA*y;
-
-	elseif(strcmp(controls.inverse22,'stationary'))
-		diagC = spdiags(C,0);
-		invC = sparse(1:Nr,1:Nr,(1.0./spdiags(C,0))',Nr,Nr);
-		inverseS=@(y) stationary_iterative_methods(apply_schur,y,zeros(Nr,1),...
-																							 controls.ctrl_inner22.tolerance,...
-																							 controls.ctrl_inner22.itermax,...
-																							 controls.ctrl_inner22.verbose,...
-																							 @(x) controls.ctrl_inner22.omega*invC*x);
 	end
 	cpu_assembly_S=toc(timeS);
 
@@ -3511,20 +3495,6 @@ elseif (sol==20)
 	
 	% get s increment
 	d(Np+1:Np+Nr)=PT(d(Np+1:Np+Nr));
-	
-	if (controls.diagonal_scaling == 1)
-		d(1:Np)      = inv_sqrt_diagA * d(1:Np);
-		d(1+Np:Np+Nr)= inv_sqrt_diagC * d(1+Np:Np+Nr);
-		
-		[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
-		B1T_time=-JF.B1T_time;
-		B1T_space=-JF.B1T_space;
-		P = @(y) ort_proj(y,W_mat);
-		rhsR=[f1;P(f2)];
-		disp('fix diagonal scaling')
-		return 
-	end
-
 	outer_cpu=toc(outer_cpu);
 	
 	% get ds
@@ -3537,8 +3507,6 @@ elseif (sol==20)
   % correction of phi increment 
 	d(1:Np) = dp_correction(d(1:Np),JF,dl);
 
-	%info_J.print();
-	
 	%
 	% STORE INFO
 	%
@@ -3585,45 +3553,6 @@ elseif (sol==20)
    									 inner_iter2/outer_iter,cpu_assembly_inverseS);
 
 
-	if (0)
-		[A,B1T,B2,C,f1,f2,W_mat]=get_saddle_point(JF,F);
-		Sys = [A B1T; B2 -C];
-		fp=f1;
-
-		indc=1;
-		%[dmax,indc]=max(spdiags(A(1:ncellphi:1:ncellphi),0));
-		Sys(indc,:) = sparse(1,Np+Nr);
-		Sys(:,indc) = sparse(Np+Nr,1);
-		Sys(indc,indc) = 1;
-		fp(indc)=0;
-		
-		d_exact = Sys\[fp;f2];
-
-		d_exact(1:Np)=ort_proj(	d_exact(1:Np),A_kernels);
-		d(1:Np)=ort_proj(	d(1:Np),A_kernels);
-		d(1+Np:Np+Nr)=ort_proj(	d(1+Np:Np+Nr),W_mat);
-
-		
-		figure
-		
-		plot (d(1:Np+Nr)-d_exact)
-		return
-	end	
-	% grounded_node=400;
-	% controls_loc = struct('save_data',0,...
-	% 									'indc',grounded_node,...
-	% 									'sol',1,...
-	% 									'swap_sign',1)
-	% approach_string='direct';
-	% [omegak, info_solver_newton,norm_ddd,resume_msg] = solvesys(JF,F, controls_loc);
-
-
-	% figure
-	% plot(omegak-d)
-
-
-	% sww
-	% return
 elseif sol==220
 	% SIMPLE preconditioenr to the full system
 
@@ -3695,9 +3624,9 @@ elseif sol==220
 
 		% rho defined on cells
 		RHt = assembleRHt(N,ncellphi);
-		vect_rho_on_h = RHt*(JF.It*[F.rho_in;rho;F.rho_f]);
-		rho_h =  sparse(1:Np,1:Np,(vect_rho_on_h)',Np,Np);
-		inv_rho_h =  sparse(1:Np,1:Np,(1./vect_rho_on_h)',Np,Np);
+		%vect_rho_on_h = RHt*(JF.It*[F.rho_in;rho;F.rho_f]);
+		%rho_h =  sparse(1:Np,1:Np,(vect_rho_on_h)',Np,Np);
+		%inv_rho_h =  sparse(1:Np,1:Np,(1./vect_rho_on_h)',Np,Np);
 
 		if strcmp( controls.approach_Schur_slack,'dual')
 			S22 = (B2*inv_Mphi*B1T);
@@ -3728,19 +3657,29 @@ elseif sol==220
 			%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, ctrl_inner33, @(z) z);
 	
 		elseif (strcmp( controls.approach_Schur_slack,'primal'))
+			
 			if contains(controls.approach_Schur_rho,'Btilde')
+				% we refer to the aper for the definition of the component of Btitle
+				% rec_time = matrix H in the paper 
 				rec_time = assembleRHt(N-1,ncellrho);
+
+				% buidl matrix G tilde in the paper
 				nei=size(JF.grad,2);
 				gradt = assembleGradt(N,ncellphi,nei,JF.div');
 				te = size(gradt,1);
+
+				% build matrix H 
 				Rst = repmat({JF.Rs},1,N+1);
 				Rst = blkdiag(Rst{:});
 				I_cellphi_cellrho = assembleIt(N-1,ncellphi,ncellrho,JF.I);
-				%  (N+1)*Kh<-(N+1)*e<-(N+1)*e<-(N+1)*Kh <-(N+1)*K2h <- N*K2h
+
+				% space parte of B_tilde   
 				new_B1T_space = Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
-				
+
+				% 
 				S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*(B1T_time+new_B1T_space); %right
 			elseif contains(controls.approach_Schur_rho,'Btilde2')
+				% second appraoch that did not works well
 				% define interpolator of rho-functions on phi space
 				rec_time = assembleRHt(N,ncellphi);
 				It = assembleIt(N,ncell_rho,ncell_phi,JF.I);
@@ -3750,35 +3689,23 @@ elseif sol==220
 				A_rho = project_rho2phi*A*project_rho2phi;
 				S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T; %right
 
-			elseif contains(controls.approach_Schur_rho,'right')
-				S22 =  C*inv_Mrho*A_rho + B2*inv_Mphi*B1T; %right
-			elseif contains(controls.approach_Schur_rho,'left')				
-				S22 =  A_rho*inv_Mrho*C + B2*inv_Mphi*B1T; %left
-			elseif contains(controls.approach_Schur_rho,'both')
-				S22 =  A_rho*inv_Mrho*C*inv_Mrho*A_rho + B2*inv_Mphi*A*inv_Mphi*B1T; %both
 			end
-			%S22 =  C*inv_Mrho*A_rho + B1T_time'*inv_Mphi*B1T_time;
-			%S22 =  C*inv_Mrho*A_rho + B1T_time'*inv_Mphi*B1T_time + B1T_space'*inv_Mphi*B1T_space;;
-			% init inverse of full S
+			
+			% define the action of init inverse of S
+			% S^{-1} ~ M^{-1} A S22^{-1} 
 			inv_S22=sparse_inverse;
 			inv_S22.init( S22 + controls.relax4inv22 * speye(Nr,Nr),ctrl_inner22);
 			inv_S22.info_inverse.label='schur22';
 			inv_S22.cumulative_iter=0;
 			inv_S22.cumulative_cpu=0;
 
-			if contains(controls.approach_Schur_rho,'right')
-				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); %right
-			elseif contains(controls.approach_Schur_rho,'Btilde')
-				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); %right
+			if contains(controls.approach_Schur_rho,'Btilde')
+				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); 
 			elseif contains(controls.approach_Schur_rho,'Btilde2')
-				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); %right
-			elseif contains(controls.approach_Schur_rho,'left')				
-				inverse_block22 = @(x) - inv_S22.apply(A_rho *inv_Mrho * x);
-			elseif contains(controls.approach_Schur_rho,'both')
-				inverse_block22 = @(x) - inv_Mrho * A_rho*inv_S22.apply(A_rho *inv_Mrho * x);  %both
+				inverse_block22 = @(x) - inv_Mrho * A_rho * inv_S22.apply(x); 
 			end
 			
-			
+			% inverse for diag of rho
 			ctrl_inner33=controls.ctrl_inner33;
 			ctrl_inner33.approach='diag';
 			ctrl_inner33.verbose=0;
@@ -3789,33 +3716,6 @@ elseif sol==220
 			inv_S33.cumulative_cpu=0;
 			inverse_block33 = @(x) inv_S33.apply(x);
 		end
-	elseif (strcmp(controls.approach_Schur_rho,'diagA'))
-		
-		S22 = (B2*invDiagA*B1T);
-
-		inv_S22=sparse_inverse;
-		inv_S22.init( S22 + controls.relax4inv22 * speye(Nr,Nr),ctrl_inner22);
-		inv_S22.info_inverse.label='schur22';
-		inv_S22.cumulative_iter=0;
-		inv_S22.cumulative_cpu=0;
-		inverse_block22 = @(x) - inv_S22.apply(x);
-
-		% S33^{-1}=(Dr                  +Ds*S^{-1}*M)^{-1}
-		%         =(Dr*M^{-1}*S*S^{-1}*M+Ds*S^{-1}*M)^{-1}
-		%         =M^{-1} S * (Dr*M^{-1}*S+Ds)^{-1}
-		S33  = (Dr*inv_Mrho*S22 + Ds);
-
-		
-		inv_S33=sparse_inverse;
-		inv_S33.init(S33+controls.relax4inv22*speye(Nr,Nr),ctrl_inner22);
-		inv_S33.info_inverse.label='schur_ca';
-		inv_S3.cumulative_iter=0;
-		inv_S33.cumulative_cpu=0;
-		if ( verbose >= 2)
-			fprintf('DONE inverse S\n') 
-		end 
-		inverse_block33 = @(x) inv_Mrho*(S22*(inv_S33.apply(x)));
-		%inverse_block33 = @(y) apply_iterative_solver( @(x) Dr*apply_schur(Mrho*x)+Ds*x, y, ctrl_inner33, @(z) z);
 	elseif (strcmp(controls.approach_Schur_rho,'lsc'))
 		% S^{-1} = (B2 M^-1 B1T)^{-1} B2 M^{-1} A M^{-1} B1T (B2 M^-1 B1T)^{-1}
 		S22 = (B2*inv_Mphi*B1T);

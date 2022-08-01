@@ -9,26 +9,44 @@ for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
 
-folder_runs='FTNB_runs';
+% select the directory where to store the results
+folder_runs='FTNB_runs_submission';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
 
-folder_restart='initial_solution';
+
+
+%
+% start the solution from prebuilt initial guess
+% 
+read_from_file = 0; % 0 : standard initial guess >0: start from the corresponding IP iterations
+folder_restart='initial_solution'; % location of initial solution. See more below
 
 %
 % set some globals controls for reproducing experiments
 %
-read_from_file = 0;
-plot_figures = 0;
-compute_err = 1;
+plot_figures = 0; % print rho evolutions
+compute_err = 1; % compute errors with respect to exact solutions
 
 
 %
 % SPATIAL DISCRETIZATION
 %
+
+% Different type of meshes
+% 1: 
+% 2:
+% 3:
+% 4,5,6: like 1,2,3 but with two grid level
 for mesh_type = 5;
-	for h_i = 1:4;
+	
+	% refine level. Available from 1 to 5 
+	for h_i = 1;
+
+		% recostruction used
+		% rec == 1 : linear
+		% rec == 2 : harmonic (some prec.s do not support it)
 		rec = 1;
 
 		% create folder storing data for test case
@@ -50,7 +68,8 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 2:5
+		for dt_i = 2
+			% number of time steps
 			N=4*(2^(dt_i-1));
 
 			% set problem dimension
@@ -69,21 +88,18 @@ for mesh_type = 5;
 			 mass,midpoint,exact_phi,exact_rho,exact_W2,bc_sol] = ...
 			bc_density(test_case,grid_rho.cc,grid_rho.area);
 
-			
-
-
+			% set test case label
 			test_case_label = sprintf('%s_rec%d_mesh%d_h%d_N%0.5d_',test_case,rec,mesh_type,h_i,N);
 
 
-						%
+			%
 			% ALGORITHM CONTROLS
 			%
 			% Init Interior Point controls.
 			% Defalt values are set in IP_controls class
 			IP_ctrl=IP_controls;
 			
-			% Set initial data
-			% Default (phi, rho, s ) = 1,1,mu0
+			% Set initial data. Default (phi, rho, s ) = 1,1,mu0
 			if ( read_from_file == 0)
 				mu0 = 1;
 				phi0 = ones(Np,1);
@@ -93,7 +109,7 @@ for mesh_type = 5;
 			else
 				% this option can be used to restart the IP algorithm form a certain solution
 				% str_folder=sprintf('%s_mesh%d_rec%d',test_case,mesh_type,rec)
-				folder=sprintf('%s/%s_rec%d/initial_solution/',folder_runs,test_case,rec);
+				folder=sprintf('%s/%s_rec%d/%s/',folder_runs,test_case,rec,folder_restart);
 				str_test=sprintf('%s_rec%d_mesh%d_h%d_N%0.5d_',test_case,rec,mesh_type,h_i,N);
 				h5_file2read = strcat(folder,...
 															str_test(1:strlength(str_test)-1),'.h5')
@@ -113,26 +129,25 @@ for mesh_type = 5;
 
 			
 
+			% select a list of the approch we can use
+			% 10 :: Primal
+			% 11 :: Simple
+			% 13 :: HSS
+			% 20 :: Commute
+			for solver_approach=[20];
 
-			for solver_approach=[11];
-				% set controls
+				% for each solver approach this funciton generate a list
+				% of linear solve configurations. 
 				[ctrls,labels]=set_linear_algebra_ctrl(solver_approach,rec);
 
-				%labels
-
 				
-				% cycle all linear algrabra controls genreted with set_linear_algebra_ctrl
-				%size(ctrls,2)
-				
+				% cycle all linear algrabra controls genete with set_linear_algebra_ctrl
 				for i_ctrl=1:size(ctrls,2)
-					linear_algebra_ctrl=ctrls(1,i_ctrl);
-					
+					linear_algebra_ctrl=ctrls(1,i_ctrl);					
 					linear_algebra_label=labels(1,i_ctrl);
-					%disp(test_case_label)
 					disp(linear_algebra_label)
 
 				
-					
 					% create directories to store data
 					folder=sprintf('%s/%s_rec%d/sol%d/',folder_runs,test_case,rec,linear_algebra_ctrl.sol);
 					if ~isfolder(folder)
@@ -140,7 +155,7 @@ for mesh_type = 5;
 					end
 
 					%
-					% set filename for files with discrtetizatio and liear algebra info
+					% set filename for log file
 					%
 					if read_from_file == 0
 						experiment_label = strcat(test_case_label,linear_algebra_label)
@@ -151,9 +166,7 @@ for mesh_type = 5;
 					end
 					filename = strcat(folder,experiment_label)
 
-					
-					
-					% log file, writing a small resume of test case
+					% write a head with a resume of test case
 					IP_ctrl.save_log = 1;
 					IP_ctrl.file_log = strcat(filename,'.log');
 					if exist(IP_ctrl.file_log, 'file') == 2
@@ -166,6 +179,7 @@ for mesh_type = 5;
 					fclose(logID);	
 
 					% csv file with performance resume
+					% check in l2otp_solve the quantities saved
 					IP_ctrl.save_csv=1;
 					IP_ctrl.file_csv=strcat(filename,'.csv');
 
