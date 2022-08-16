@@ -1,19 +1,24 @@
 function [ctrls, approach_descriptions] = ...
 				 set_linear_algebra_ctrl(solver_approach,rec)
-	% function return a list of ctrl structures and a string
-	% to lable the approach.
-	% solver_approach supported ::
+	% Given solver_approach value it returns:
+	% -ctrls : a list of structure, each with the controls of
+	% the linear solver approach in solvesys
+	% - approach descriptions:  list of labels describing the approach.
+	
+	% solver_approach supported
 	% 10 :: Based on primal Schur complement S=A+B1T*C^{-1} B2
 	%       inverted with AGMG
 	% 11 :: Based on dual Schur complement factorization with
 	%       ~A=diag(A) ~S=-(C+B2*diag(A)^{-1} B1T)
 	%       with the latter solved with AGMG
 	% 13 :: HSS preconditioner
+	% 20 :: Commute approach
 
-	
+	% empty to list for appeings controls and labels
 	ctrls=struct([]);
 	approach_descriptions=[];
 
+	
 	if (solver_approach == 1)
 		% approach based on direct solver
 		ground=1;
@@ -31,24 +36,24 @@ function [ctrls, approach_descriptions] = ...
 
 		
 	elseif (solver_approach == 10)
-		% approach based on inversion of Primal Schur Complement
-
-		
-		% set here bicgstab,gmres,fgmres (for non stationary prec)
+		% set here outer olver controls
+		% set method (any krylov sovler implemented in matlab and fgmres for non stationary prec)
+		% tolerance
+		% max iterations
 		ctrl_outer = ctrl_solver;
 		ctrl_outer.init('fgmres',1e-5,400,0.0,0);
 
 		% preconditioner approach
+		% full, upper_triang, lower_triang
+		% see SchurAC_based_preconditioner 
 		outer_prec='full';
 
-		% reduce system to the primal schur complement
+		% reduce system to the primal schur complement 0=off, 1=on
 		solve_primal=0;
-
 
 		% permute entries to minimize bandwidth S.
 		% It will destroy its block structure.
 		permute=0;
-
 		
 		% select assembly of S=A+Mtt+(Mtx+Mtx')+Mxx
 		assembly_S_options=[...
@@ -71,7 +76,7 @@ function [ctrls, approach_descriptions] = ...
 			for inverse11=inverses11(1)
 				
 
-				% scale
+				% scale system
 				diagonal_scaling=0;
 
 				% handle singularity of S. 
@@ -80,7 +85,7 @@ function [ctrls, approach_descriptions] = ...
 				ground=0;
 				ground_node=1;
 
-				% S=S+relax*I			
+				% S=S+relax*I	to remove kernel		
 				relax_inv11=1e-10;
 
 				% controls for primal Schur complement
@@ -118,9 +123,10 @@ function [ctrls, approach_descriptions] = ...
 													'ctrl_inner11',ctrl_inner11,...
 													'ctrl_inner22',ctrl_inner22);
 
+				% append controls
 				ctrls=[ctrls,controls];
 				
-				
+				% create strings with main controls
 				approach_string=strcat('SchurPrimal_',...
 															 'ground=',num2str(ground),'_',...
 															 'diagscal=',num2str(diagonal_scaling),'_',...
@@ -129,6 +135,7 @@ function [ctrls, approach_descriptions] = ...
 															 'invS=',inverse11,'_',...
 															 'solverS=',ctrl_inner11.label);
 
+				% append string
 				approach_descriptions=[approach_descriptions,approach_string];
 			end
 		end
