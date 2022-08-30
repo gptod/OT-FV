@@ -10,7 +10,7 @@ for  test_case = test_cases;
 	disp(test_case)
 
 % select the directory where to store the results
-folder_runs='FTNB_runs_submission';
+folder_runs='FTNB_runs';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
@@ -41,7 +41,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 % 4,5,6: like 1,2,3 but with two grid level
 for mesh_type = 5;
 	
-	% refine level. Available from 1 to 5 
+	% refine level. Available from 1 to 5
 	for h_i = 2;
 
 		% recostruction used
@@ -130,12 +130,12 @@ for mesh_type = 5;
 			
 
 			% select a list of the approch we can use
-			% 10 :: Primal
-			% 11 :: Simple
-			% 13 :: HSS
-			% 20 :: Commute
-			for solver_approach=[20];
-
+			% primal
+			% simple
+			% hss
+			% bb
+			for solver_approach=["simple"];%"primal", "simple", "hss","bb"];
+				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
 				[ctrls,labels]=set_linear_algebra_ctrl(solver_approach,rec);
@@ -149,7 +149,7 @@ for mesh_type = 5;
 
 				
 					% create directories to store data
-					folder=sprintf('%s/%s_rec%d/sol%d/',folder_runs,test_case,rec,linear_algebra_ctrl.sol);
+					folder=sprintf('%s/%s_rec%d/%s/',folder_runs,test_case,rec,linear_algebra_ctrl.sol);
 					if ~isfolder(folder)
 						mkdir(folder);
 					end
