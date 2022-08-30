@@ -4,7 +4,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin"];%,"gauss","compression"];
+test_cases = ["sin","gauss","compression"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
@@ -42,7 +42,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 for mesh_type = 5;
 	
 	% refine level. Available from 1 to 5
-	for h_i = 2;
+	for h_i = 1:2;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -58,7 +58,6 @@ for mesh_type = 5;
 		if ~isfolder(folder)
 			mkdir(folder);
 		end
-
 		
 		
 		% grids for rho and phi (see TPFA_grid class)
@@ -68,7 +67,7 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 2
+		for dt_i = 2:3
 			% number of time steps
 			N=4*(2^(dt_i-1));
 
@@ -134,7 +133,7 @@ for mesh_type = 5;
 			% simple
 			% hss
 			% bb
-			for solver_approach=["simple"];%"primal", "simple", "hss","bb"];
+			for solver_approach=["primal", "simple", "hss","bb"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 

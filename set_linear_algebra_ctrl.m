@@ -358,7 +358,7 @@ function [ctrls, approach_descriptions] = ...
 											'stationary'};
 					null_space=0;
 					lrb='r';
-					for ground=[0,1]
+					for ground=[0]
 
 					% for commute approach
 					mode_inverse22=1;
