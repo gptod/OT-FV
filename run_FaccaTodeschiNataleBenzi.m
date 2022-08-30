@@ -1,4 +1,4 @@
-clear all
+clear
 close all
 
 
@@ -42,7 +42,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 for mesh_type = 5;
 	
 	% refine level. Available from 1 to 5 
-	for h_i = 5;
+	for h_i = 2;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -68,7 +68,7 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 6
+		for dt_i = 2
 			% number of time steps
 			N=4*(2^(dt_i-1));
 
@@ -141,7 +141,7 @@ for mesh_type = 5;
 				[ctrls,labels]=set_linear_algebra_ctrl(solver_approach,rec);
 
 				
-				% cycle all linear algrabra controls genete with set_linear_algebra_ctrl
+				% cycle all linear algebra controls generated with set_linear_algebra_ctrl
 				for i_ctrl=1:size(ctrls,2)
 					linear_algebra_ctrl=ctrls(1,i_ctrl);					
 					linear_algebra_label=labels(1,i_ctrl);
@@ -189,11 +189,12 @@ for mesh_type = 5;
 
 					
 					% solve with interior point
-					[phi,rho,slack,info_solver] = ...                   % solver output and info
+					[phi,rho,slack,approx_W2,info_solver] = ...                   % solver output and info
 					l2otp_solve(grid_rho, grid_phi,I, rec, N,...        % discretization 
 											IP_ctrl,linear_algebra_ctrl,...         % controls
 											rho_in,rho_f, uk(1:Np+Nr+Nr)); % inputs
-					
+
+					fprintf('%35s %1.4e \n','Approximated Wasserstein distance: ',approx_W2);
 					
 					% Print errors w.r.t to exact solution
 					if bc_sol==1&&compute_err==1
@@ -208,9 +209,9 @@ for mesh_type = 5;
 						It = assembleIt(N,ncell_phi,ncell_rho,I);
 
 						% compute W2
-						approx_W2 = compute_cost(grid_phi.ind,grid_phi.edges,grid_phi.mid,grid_phi.cc,...
-																		 gradt,Mst,RHt,It,N,rho_all,phi,rec);	
-						fprintf('%35s %1.4e \n','Approximated Wasserstein distance: ',approx_W2);
+						%approx_W2 = compute_cost(grid_phi.ind,grid_phi.edges,grid_phi.mid,grid_phi.cc,...
+						%												 gradt,Mst,RHt,It,N,rho_all,phi,rec);	
+						%fprintf('%35s %1.4e \n','Approximated Wasserstein distance: ',approx_W2);
 						
 						
 						% compare w.r.t. exact solution

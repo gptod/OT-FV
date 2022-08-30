@@ -1,9 +1,9 @@
-function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Ntime,...
+function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Ntime,...
 																									 IP_ctrl,linear_solver_ctrl,... 
 																									 rho_initial,rho_final, phi_rho_slack_initial_guess)
 
 	% SPATIAL AND TEMPORAL DISCRETIZATION
-	% grid_rho (class in TPFA_grid.m) ::  grid where the problem is discreted
+	% grid_rho (class in TPFA_grid.m) ::  grid where the problem is discretized
 	% grid_phi (class in TPFA_grid.m) ::  grid where potential phi is defined
 	% I (sparse matrix) ::  interpolator from grid_rho to grid_phi (it may be the identity)
 	% rec (integer) :: rec==1 : linear recostruction
@@ -437,6 +437,11 @@ function [phi,rho,slack,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Nt
 	phi   = uk(1:Np);
 	rho   = uk(Np+1:Np+Nr);
 	slack = uk(Np+Nr+1:Np+2*Nr);
+
+    % Compute Wasserstein distance
+    rhos=compute_rhosigma(grid_phi.ind,grid_phi.edges,grid_phi.cc,grid_phi.mid,N,...
+                          rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+    W2th = compute_cost(gradt,Mst,N,rhos,phi);
 
 	% set info_solver
 	info_solver=struct('ierr',ierr,...

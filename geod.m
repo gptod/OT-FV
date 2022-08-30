@@ -496,7 +496,8 @@ rho = uk(tnp+1:tnp+tnr2h);
 
 % Compute Wasserstein distance
 rho_all = [rho_in;rho;rho_f];
-W2th = compute_cost(ind,edges,mid,cc,gradt,Mst,RHt,It,N,rho_all,phi,rec);
+rhos=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+W2th = compute_cost(gradt,Mst,N,rhos,phi);
 fprintf(controls.logID,'%35s %1.4e \n','Approximated Wasserstein distance: ',W2th);
 fprintf(controls.logID,'%19s %1.4e %21s %1.4e \n','Total linsys time: ',cpu_linsys,'Total assembly time: ',cpu_assembly);
 
@@ -509,7 +510,7 @@ if bc_sol==1&&compute_err==1
     phi = phi+(potential(0.5,0.5,0)-phi(indc));
     
     rhoa = RHt*It*rho_all;
-    [rhos]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+    %[rhos]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
 
     % Compute the errors
     err_cost = abs(W2-W2th); % cost error
