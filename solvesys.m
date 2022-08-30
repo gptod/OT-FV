@@ -114,8 +114,9 @@ end
 area2h=JF.area2h;
 
 deltat=1/(N+1);
-  
-if sol==1
+
+switch sol
+ case 'direct'
   % Solve using Matlab's backslash  
 	if (controls.ground == 1)
 		% Ground matrix A, B1T and f1.
@@ -169,7 +170,7 @@ if sol==1
 	outer_cpu=toc(outer_cpu);
 
     
-elseif sol==3 %"augmented_lagrangian"
+case 'augmented'  %"augmented_lagrangian"
       
     % Solve the augmented system of equations with the flexible GMRES and the
     % left (right) block preconditioner P given by P=[S 0; B2 CS]
@@ -202,9 +203,9 @@ elseif sol==3 %"augmented_lagrangian"
     
     sol_stat = struct('flag',flag,'relres',relres,'iter',iter);
     
-    
-elseif sol==4%"ilu"
-    
+
+case 'ilu'
+	
     % Solve the system with the GMRES and the sparse ilu decomposition as
     % preconditioner
     
@@ -224,8 +225,7 @@ elseif sol==4%"ilu"
     
     sol_stat = struct('flag',flag,'relres',relres,'iter',iter);
 
-
-elseif sol==10
+case 'primal'
 	% Krylov method for full system
 	% + 
 	% prec. based on primal Schur complement A + BT C^{-1} B
@@ -585,8 +585,7 @@ elseif sol==10
 
 	end
 
-	
-elseif sol==11
+case 'simple'
 	% SIMPLE preconditioenr approach
 	% Krylov method for full system
   % + 
@@ -731,7 +730,9 @@ elseif sol==11
 
 	% free memory of inner solvers
   inv_SCA.kill();
-elseif sol==110
+
+
+case 'simple_full'
 	% SIMPLE preconditioenr to the full system 
 	
   % copy controls
@@ -866,8 +867,7 @@ elseif sol==110
   inv_S22.kill();
 	inv_S33.kill();
 
-	
-elseif sol==12
+case 'manipulate'
   % copy controls
   indc=controls.indc;
   sol=controls.sol;
@@ -1443,8 +1443,8 @@ elseif sol==12
   
   inner_nequ2=inner_nequ_S;
   inner_iter2=total_Sinner;
-  
-elseif sol==13
+
+case 'hss'
 	% The system is partially reduced to a standard saddle point system.
 	% The approach from : "A PRECONDITIONER FOR GENERALIZED SADDLE POINT PROBLEMS"
   % solve M=(A B1T) = H + S
@@ -1668,8 +1668,8 @@ elseif sol==13
 		     approach_inverse_A,inner_nequ_A,inner_iter_A,round(inner_iter_A/(Nt*outer_iter)),cpu_assembly_inverseA, ...
 		     inv_Calpha.ctrl.label,inv_Calpha.cumulative_iter,...
 		     inner_nequ_S, inner_iter_S,cpu_assembly_inverseS);
-  
-elseif sol==14
+
+case 'augmented_bis'
   % copy controls
   indc=controls.indc;
   sol=controls.sol;
@@ -2115,149 +2115,8 @@ elseif sol==14
   end
   inv_S.kill();
 
-elseif (sol==15)
-	% solve full system using recursive function
-	W_mat=zeros(N,Nr);
-	for k = 1:N
-    W_mat(k,1+(k-1)*ncellrho:k*ncellrho) = area2h';
-  end
-	PT = @(y) PT_apply(y,area2h);
 
-	
-	diag_C = spdiags(C,0);
-	inv_diag_C = sparse(1:Nr,1:Nr,(1.0./diag_C)',Nr,Nr);
-	P_mat=W_mat*inv_diag_C*B2;
-	alphas=W_mat*inv_diag_C*f2;
-
-	P_perturbation=sparse(Np,Np);
-	f_perturbation=zeros(Np,1);
-	for i=1:N
-		irow=(i-1)*ncellphi+1;
-		P_perturbation(irow,:)= P_mat(i,:);
-		f_perturbation(irow)  = alphas(i);
-	end
-	i=N+1;
-	irow=(i-1)*ncellphi+1;
-	P_perturbation(irow,Np-ncellphi+1:Np)=P_mat(N,Np-ncellphi+1:Np);
-	f_perturbation(irow)  = 0;
-	
-	inv_diag_A = 1.0./(spdiags(A,0)+controls.relax_inv11);
-  inv_Diag_A = sparse(1:Np,1:Np,(inv_diag_A)',Np,Np);
-	% add perturbation
-	A=A+P_perturbation;
-	f1=f1+f_perturbation;
-
-
-	time_prec=tic;
-	
-	% partion matrix 
-  nAi=ncellphi;
-  
-  % use block inverse
-  diag_block_invA(Nt,1)=sparse_inverse;
-  ctrl_loc=ctrl_solver; 
-  for i=1:Nt
-		ctrl_inner11=controls.ctrl_inner11;
-		index_agmg=index_agmg+1;
-    ctrl_loc=ctrl_solver;
-    ctrl_loc.init(ctrl_inner11.approach,...
-    							ctrl_inner11.tolerance,...
-    							ctrl_inner11.itermax,...
-    							ctrl_inner11.omega,...
-    							ctrl_inner11.verbose,...
-    							sprintf('%sA%d',ctrl_inner11.label,i),...
-									index_agmg);
-    diag_block_invA(i).name=sprintf('inverse A%d',i);
-
-    % create local block and passing to solver
-    % with a potential relaxation
-    matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi) + ...
-						 controls.relax_inv11*speye(nAi,nAi) ;
-    diag_block_invA(i).init(matrixAi,ctrl_loc);
-
-		nsysA=Nt;
-  end
-
-	extra_diagonal=cell(N,1);
-	for i=1:N
-		extra_diagonal_matrices{i}=A((i-1)*nAi+1 :     i*nAi , (i)*nAi+1 : (i+1)*nAi);
-	end
-		
-  % define function
-	inv_A  = @(x) apply_block_triangular_inverse(diag_block_invA,extra_diagonal_matrices,'U',x);
-	
-	% assembly (~S)^{-1} = ( -(C+B2 * diag(A)^{-1} B1T) )^{-1} 
-	build_S=tic;
-
-	%inv_diag_A = 1.0./(spdiags(A,0)+controls.relax_inv11);
-  %inv_Diag_A = sparse(1:Np,1:Np,(inv_diag_A)',Np,Np);
-  SCA = (C+B2*inv_Diag_A*B1T);
-
-  inv_SCA=sparse_inverse;
-  inv_SCA.init(SCA+controls.relax_inv22*speye(Nr,Nr),controls.ctrl_inner22);
-  inv_SCA.info_inverse.label='inv_tildeS';
-  inv_SCA.cumulative_iter=0;
-  inv_SCA.cumulative_cpu=0;
-  inverse_block22 = @(x) -inv_SCA.apply(x);
-  cpu_assembly_inverseS=toc(build_S);
-	  
-	
-  % store time required to build prec
-  prec_cpu=toc(time_prec);
-	
-  % set dimension of inner solver
-  inner_nequ=Nr;
-
-	
-	% Define action of block preconditoner 
-	prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
-																					 @(y) PT(inverse_block22(y)),...
-																					 @(y) B1T*PT(y),...
-																					 @(z) B2*z,...
-																					 Np,Nr,...
-																					 controls.outer_prec,ncellphi);
-
-	% call iterative solver
-	outer_timing=tic;
-	rhs=[f1;f2];
-	[d,info_J]=...
-	apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,...
-																								 @(y) B1T*(y),...
-																								 @(z) B2*z,...
-																								 @(z) C*(z),...
-																								 Np,Nr), ...
-												 rhs, ...
-												 controls.ctrl_outer, ...
-												 @(z) prec(z),[],controls.left_right );
-	outer_cpu=toc(outer_timing);
-	
-
-	% get the ds 
-	ds = Dr\(h-Ds*d(Np+1:Np+Nr));
-	d=[d;ds];
-  
-
-	% get info
-	inner_iter=inv_SCA.cumulative_iter;
-	outer_iter=uint32(info_J.iter);
-	
-  flag=info_J.flag;
-  relres=info_J.res;
-  iter=info_J.iter;
-
-  relres=res;
-  normd = norm(d);
-  [ressys,resp,resr,ress]=compute_linear_system_residuum(JF,F,d);
-
-
-  resume_msg=sprintf('outer: %d ressys=%1.1e [%1.2e,%1.2e,%1.2e] iter=%d cpu=%1.1e| S : nequ=%d inn=%d ass=%1.2e',...
-   		     info_J.flag,ressys,resp,resr,ress,outer_iter,outer_cpu,...
-   		     inv_SCA.nequ, inv_SCA.cumulative_iter,cpu_assembly_inverseS);
-
-	% free memory of inner solvers
-  inv_SCA.kill();
-
-elseif (sol==20)
+case 'bb'
 	% seed for agmg solver 
  	index_agmg=0;
 
@@ -2655,8 +2514,7 @@ elseif (sol==20)
 										 controls.inverse11,(inner_iter/outer_iter)/nsysA,cpu_assembly_inverseA,...
    									 inner_iter2/outer_iter,cpu_assembly_inverseS);
 
-
-elseif sol==220
+case 'bb_full'
 	% preconditioner for the full system 
 	% [A B^T     ]
 	% [B     M   ]
@@ -2975,6 +2833,9 @@ elseif sol==220
   inv_S22.kill();
 	inv_S33.kill();
 
+
+otherwise
+	fprintf('Approch %s not supported',sol)
 end
 
 realres=compute_linear_system_residuum(JF,F,d);

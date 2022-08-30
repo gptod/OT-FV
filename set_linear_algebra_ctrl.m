@@ -18,8 +18,8 @@ function [ctrls, approach_descriptions] = ...
 	ctrls=struct([]);
 	approach_descriptions=[];
 
-	
-	if (solver_approach == 1)
+	switch solver_approach
+		case 'direct'
 		% approach based on direct solver
 		ground=1;
 		ground_node=1;
@@ -34,8 +34,7 @@ function [ctrls, approach_descriptions] = ...
 		approach_descriptions=[approach_descriptions,approach_string];
 		
 
-		
-	elseif (solver_approach == 10)
+	case 'primal'
 		% set here outer olver controls
 		% set method (any krylov sovler implemented in matlab and fgmres for non stationary prec)
 		% tolerance
@@ -139,7 +138,7 @@ function [ctrls, approach_descriptions] = ...
 				approach_descriptions=[approach_descriptions,approach_string];
 			end
 		end
-	elseif (solver_approach==11)
+	case 'simple'
 		% verbosity level in linear solver
 		verbose = 0; 
 		
@@ -198,7 +197,7 @@ function [ctrls, approach_descriptions] = ...
 					ctrls=[ctrls,controls];
 					
 
-					approach_string=strcat('SIMPLE_','ground',num2str(ground),...
+					approach_string=strcat('simple_','ground',num2str(ground),...
 																 '_diagscal',num2str(diagonal_scaling),...
 																 ctrl_outer.approach,'_',...
 																 left_right,'_',outer_prec,'_prec_',...
@@ -208,7 +207,7 @@ function [ctrls, approach_descriptions] = ...
 				end
 			end
 		end
-	elseif (solver_approach == 13)
+	case 'hss'
 		% global controls
 		compute_eigen=0;
 		verbose=0;
@@ -300,7 +299,7 @@ function [ctrls, approach_descriptions] = ...
 				end
 			end
 		end
-	elseif (solver_approach==20)
+	case 'bb'
 		% globals controls
 		verbose=0;
 		
@@ -425,7 +424,7 @@ function [ctrls, approach_descriptions] = ...
 				end
 			end
 		end
-	elseif (solver_approach==220)
+	case 'bb_full'
 		% global controls
 		verbose=0;
 		
