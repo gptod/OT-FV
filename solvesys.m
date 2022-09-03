@@ -1387,11 +1387,6 @@ case 'manipulate'
   
   normd = norm(d);
 
-  if (1)    
-    test_vectors(d,vectors_x,vectors_y,alphas,N,Np,Nr);
-  end
-
-  
 
   
   %if(strcmp(approach_schurCA,'iterative'))
