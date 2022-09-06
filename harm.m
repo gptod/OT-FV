@@ -1,9 +1,8 @@
-function r=harm(rhoK,rhoL,dK,dL,ds)
+function r=harm_vect(rhoK,rhoL,dK,dL,ds)
 
 % weighted harmonic mean
 
-if rhoK==0 && rhoL==0
-    r = 0;
-else   
-    r = (ds.*rhoK.*rhoL)./(rhoL.*dK+rhoK.*dL);
-end
+r=zeros(size(rhoK));
+a = ismember([rhoK rhoL],[0 0],'rows');
+b = ~a;
+r(b)= (ds(b).*rhoK(b).*rhoL(b))./(rhoL(b).*dK(b)+rhoK(b).*dL(b));
