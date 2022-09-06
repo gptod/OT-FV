@@ -11,7 +11,8 @@ and the work on the linear algrebra parts described in:
 The file "l2otp_solve.m" contains the main solver taking the meshes, the initial and the final densities ot be transported, and the solver controls and computing the optimal interpolationg density and the optimal potential.
 Input and output data are enclosed in adhoc structures.
 Examples of usage is contained in the "run_NataleTodeschi.m"  reproducing the experiments in [1] and 
-"run_FaccaTodeschiNataleBenzi.m" file, which reproduces the linear algebra experiments described in [2]. 
+"run_FaccaTodeschiNataleBenzi.m" file, which reproduces the linear algebra experiments described in [2].
+Note that, in order to fully exploit the linear algebra capabilities of the solver, you need to install the multigrid solver [AGMG](http://agmg.eu/) solver (see agmg/README.md first).
 
 The folder "meshes" contains the meshes data structures used by the two aforementioned codes.
 Three types of mesh families are available: \
