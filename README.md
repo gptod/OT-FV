@@ -2,11 +2,11 @@
 
 Approximate solution of the dynamical form of the L2 optimal trasport problem with finite volumes discretization. This code implements the scheme presented in:
 
-[1] A. Natale, G. Todeschi, "Computation of Optimal Transport with Finite Volumes", ESAIM: Mathematical Modelling and Numerical Analysis, 55(5):1847-1871, 2021, https://www.esaim-m2an.org/articles/m2an/abs/2021/06/m2an210008/m2an210008.html.
+[1] A. Natale, G. Todeschi, ["Computation of Optimal Transport with Finite Volumes"](https://www.esaim-m2an.org/articles/m2an/abs/2021/06/m2an210008/m2an210008.html.), ESAIM: Mathematical Modelling and Numerical Analysis, 55(5):1847-1871, 2021, 
 
 and the work on the linear algrebra parts described in:
 
-[2] E. Facca, G. Todeschi, A. Natale, M. Benzi "Efficient preconditioners for solving dynamical optimal transport via interior point methods". Preprint available arXiv https://arxiv.org/abs/2209.00315.
+[2] E. Facca, G. Todeschi, A. Natale, M. Benzi "Efficient preconditioners for solving dynamical optimal transport via interior point methods". [Preprint available arXiv](https://arxiv.org/abs/2209.00315.)
 
 The file "l2otp_solve.m" contains the main solver taking the meshes, the initial and the final densities ot be transported, and the solver controls and computing the optimal interpolationg density and the optimal potential.
 Input and output data are enclosed in adhoc structures.
