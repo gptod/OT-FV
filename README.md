@@ -15,6 +15,7 @@ The file "l2otp_solve.m" contains the IP solver and takes as inputs (enclosed in
 - the meshes for the discretization of the density and the potential
 - the initial and the final densities to be transported
 - the solver controls
+
 and it returns
 - the optimal interpolationg density
 - the optimal potential
