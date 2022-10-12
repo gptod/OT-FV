@@ -1,10 +1,22 @@
 % class spatial information of grid
 classdef IP_controls <handle
   properties
-		eps_0  = 1e-6; % tolerance for the IPM
-		eps_mu = 1e-6; % tolerance Newton
+		% tolerance for the IPM
+		eps_0  = 1e-6; 
+		% maximum number of IP iterations
+		k1max = 13;    
+		
+		% mode for update x^k,mu^k to x^{k+1},mu^{k+1}
+		% newton: we solve the relaxed solution at a eps_mu tolerance.
+		%         The mu is reduced and further newton cycle is preformed
+		update_approach="newton"
+
+		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		% newton controls
+		% tolerance Newton
+		eps_mu = 1e-6; 
 		k2max = 15; % maximum number of inner (Newton) iterations
-		k1max = 13; % maximum number of outer iterations
+		
 		theta0 = 0.2; % decay ratio for the perturbation parameter mu
 		theta_min = 0.2;
 		theta_max = 0.2;
@@ -16,8 +28,10 @@ classdef IP_controls <handle
 		% kel = 0 fixed tolerance
 		% kel = 1 Kelly on
 		kel  = 0; 
-		
 		min_outer_tol= 1e-5; %lower bound for solving linear system
+		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 		
 		% verbosity
 		verbose=2;
