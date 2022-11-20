@@ -1,7 +1,9 @@
 function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Ntime,...
 																									 IP_ctrl,linear_solver_ctrl,... 
-																									 rho_initial,rho_final, phi_rho_slack_initial_guess)
+																									 rho_initial,rho_final, phi_rho_slack_initial_guess,...
+																									 varargin)
 
+	
 	% SPATIAL AND TEMPORAL DISCRETIZATION
 	% grid_rho (class in TPFA_grid.m) ::  grid where the problem is discretized
 	% grid_phi (class in TPFA_grid.m) ::  grid where potential phi is defined
@@ -10,7 +12,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	%               :: rec==2 : harmonic recostruction
 	% Ntime(integer):: number of time steps. Deltat=1/Ntime
 
-	% ALGORITHM CONTROLS
+	% ALGORITHM CONTROLS 
 	% IP_ctrl (class in IP_controls.m) :: IP algorithm controls
 	% linear_solver_ctrl (structure defined in set_linear_algebra_controls.m ) :: structire
 	%      containg controls for solving Newton system JF dx = - F 
@@ -19,12 +21,34 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	% rho_initial, rho_final (real arrays of grid_rho.ncell) :: non negative arrays of size grid_rho.ncell
 	%                           described initial and final density distribution
 	% phi_rho_slack_initial_guess (real arrays) :: initial guess of the problem
-
+	
+	% OPTINAL INPUTS (pass using 'keyword', value)
+	
+	% fun_dfun_ddfun [optional]: triples containg the [f,f',f''] i.e.; function, its derivative,
+	%             and second derivative  with f:[0,\infty[ \to [0,\infty[.
+	% phi_rho_slack_initial_reference_solution [optional] (real arrays) :: reference solution
+	
 	% returns:
 	% phi (real array of size grid_phi.ncell*(Ntime+1) ) with the potential 
 	% rho (real array of sixe grid_rho.ncell*(Ntime)) density defined on the mesh grid_rho 
 	% slack (real array of sixe grid_rho.ncell*(Ntime) ) with slackness varaible defined on the mesh grid_rho 
 	% info_solve (structure created at te end) :: info solver (IP iterations, linear algebra iteration, etc)
+
+	% parse optional arguments
+	for i=1:2:length(varargin)-1
+    switch lower(varargin{i})
+      case 'extra_functional'
+				if ~isempty( varargin{i+1} ) 
+					fun_dfun_ddfun = varargin{i+1};
+				end
+			case 'phi_rho_slack_reference_solution'
+				if ~isempty( varargin{i+1} ) 
+					phi_rho_slack_reference_solution = varargin{i+1};
+				end
+		end
+	end
+	
+
 	
 	% open file to store algorithm info
 	if (IP_ctrl.save_csv)
@@ -224,6 +248,17 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				
 				OC = Fkgeod(N,relaxed_rho_final,relaxed_rho_initial,...
 										Dt,divt,M_phi,M_rho,Mst,gradt,It,rhosk,drhosk,uk,mu);
+
+				% add non-linear term from extra funcitonal in rho
+				if ( exist('fun_dfun_ddfun','var') )
+					OC.r = OC.r + ...
+								 assemble_functional_derivative(fun_dfun_ddfun,1,...
+																							uk(Np+1:Np+Nr),...
+																							relaxed_rho_initial,...
+																							relaxed_rho_final,...
+																							grid_rho.area);
+ 				end
+				
 				FOCtime=toc(ctime);
 				delta_mu = norm([OC.p;OC.r;OC.s]);
 
@@ -285,6 +320,18 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				JOC = JFkgeod(N,Dt,divt,M_phi,M_rho,gradt,It,rhosk,drhosk,ddrhosak,...
 											uk,I,Rs,Rst_rho,divt_rho,gradt_rho);
 
+								% add non-linear term from extra funcitonal in rho
+				if ( exist('fun_dfun_ddfun','var') )
+					JOC.rr = JOC.rr + ...
+									 assemble_functional_derivative(fun_dfun_ddfun,2,...
+																							uk(Np+1:Np+Nr),...
+																							relaxed_rho_initial,...
+																							relaxed_rho_final,...
+																							grid_rho.area);
+ 				end
+
+
+				
 				sum_assembly=sum_assembly+toc(assembly);
 				JFOCtime=toc(ctime);
 				if ( IP_ctrl.verbose >=3 )
@@ -401,6 +448,14 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 			if (IP_ctrl.verbose >=1 )
 				fprintf(logID,'%s \n',state_message);
 			end
+
+			if ( exist('phi_rho_slack_reference_solution','var') )
+				err_rhoth = compute_error_rho(uk(Np+1:Np+Nr),...
+																			rho_initial, rho_final, ...
+																			grid_rho,phi_rho_slack_reference_solution(Np+1:Np+Nr));
+				
+				fprintf(logID,'relax,%1.4e,error_rho,%1.4e,cpu,%1.4e\n',mu,	err_rhoth,sum_linsys);
+			end
 			
 			
 			
@@ -424,6 +479,8 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 		h5create(IP_ctrl.file_h5,data_name,[Np+2*Nr+2])
 		h5write(IP_ctrl.file_h5,data_name,[uk;mu;theta]')
 	end
+
+
 
 	% print resume messagge
 	fprintf('%17s %4i %7s %1.4e \n','Total Newton its:',tit,'Error: ',delta_0)
