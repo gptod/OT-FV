@@ -4,13 +4,13 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin","gauss","compression"];
+test_cases = ["compression"];%,"gauss","compression"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
 
 % select the directory where to store the results
-folder_runs='FTNB_runs';
+folder_runs='pisa_runs_sin';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
@@ -26,7 +26,7 @@ folder_restart='initial_solution'; % location of initial solution. See more belo
 %
 % set some globals controls for reproducing experiments
 %
-plot_figures = 0; % print rho evolutions
+plot_figures = 1; % print rho evolutions
 compute_err = 1; % compute errors with respect to exact solutions
 
 
@@ -42,7 +42,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 for mesh_type = 5;
 	
 	% refine level. Available from 1 to 5
-	for h_i = 1:2;
+	for h_i = 1;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -67,7 +67,8 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 2:3
+		%for dt_i = 2
+			dt_i = h_i +1
 			% number of time steps
 			N=4*(2^(dt_i-1));
 
@@ -86,6 +87,18 @@ for mesh_type = 5;
 			[rho_in,rho_f,...
 			 mass,midpoint,exact_phi,exact_rho,exact_W2,bc_sol] = ...
 			bc_density(test_case,grid_rho.cc,grid_rho.area);
+
+			% store exact solution 
+			phi_rho_slack_reference_solution = zeros(Np+2*Nr,1);
+			exact_rho_vec=zeros(Nr,1);
+			for k=1:N
+				t=k/(N+1);
+				rho_real = exact_rho(grid_rho.cc(:,1),grid_rho.cc(:,2),t);
+				rho_real = rho_real*mass/sum(rho_real.*grid_rho.area);
+				phi_rho_slack_reference_solution(Np+1+(k-1)*ncell_rho:Np+k*ncell_rho)=rho_real;
+			end
+			
+		
 
 			% set test case label
 			test_case_label = sprintf('%s_rec%d_mesh%d_h%d_N%0.5d_',test_case,rec,mesh_type,h_i,N);
@@ -129,11 +142,12 @@ for mesh_type = 5;
 			
 
 			% select a list of the approch we can use
-			% primal
-			% simple
-			% hss
-			% bb
-			for solver_approach=["primal", "simple", "hss","bb"];
+			% "primal"
+			% "simple"
+			% "hss"
+			% "bb"
+			% (double quotes are important) 
+			for solver_approach=["bb"];%"primal", "simple", "hss","bb"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
@@ -186,12 +200,31 @@ for mesh_type = 5;
 					IP_ctrl.save_h5=0;
 					IP_ctrl.file_h5=strcat(filename,'.h5');
 
+
+					% Define the functional as matlab symbolic function
+					% for example:
+					% 
+					% then use symbolic2f_df_ddf to define the triples
+					% {function, derivative, second_derivate}
+					% used by the l2_solve
+					% `
+					% syms 
+					% entropy = r*log(r) 
+					% [f_df_ddf] = symbolic2f_df_ddf(entropy)
+					syms entropy(r);
+					entropy = r*log(r);
+					f_df_ddf = symbolic2f_df_ddf(entropy)
 					
 					% solve with interior point
 					[phi,rho,slack,approx_W2,info_solver] = ...                   % solver output and info
 					l2otp_solve(grid_rho, grid_phi,I, rec, N,...        % discretization 
 											IP_ctrl,linear_algebra_ctrl,...         % controls
-											rho_in,rho_f, uk(1:Np+Nr+Nr)); % inputs
+											rho_in,rho_f, uk(1:Np+Nr+Nr),... % inputs
+											... % optional arguments
+											'phi_rho_slack_reference_solution',...%reference solution
+											phi_rho_slack_reference_solution, ... 
+											'extra_functional',	f_df_ddf ... % extra functional 
+										 );
 
 					fprintf('%35s %1.4e \n','Approximated Wasserstein distance: ',approx_W2);
 					
@@ -237,7 +270,7 @@ for mesh_type = 5;
 
 		end  % end mesh type
 	end % mesh size
-end % time size
+%end % time size
 end  % test case
 
 
