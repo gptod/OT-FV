@@ -40,10 +40,14 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
       case 'extra_functional'
 				if ~isempty( varargin{i+1} ) 
 					fun_dfun_ddfun = varargin{i+1};
+				else
+					disp('No rho-functional added')
 				end
 			case 'phi_rho_slack_reference_solution'
 				if ~isempty( varargin{i+1} ) 
 					phi_rho_slack_reference_solution = varargin{i+1};
+				else
+					disp('No reference solution')
 				end
 		end
 	end
@@ -240,11 +244,18 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 																	N,rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
 
 				ctime=tic;
+				if (~IP_ctrl.relax_bc)
+					mu_saved = mu;
+					mu = 0;
+				end
 				% note the we relax the rho_in and rho_f.
 				relaxed_rho_final = (rho_final+mu)/(1+mu);
 				relaxed_rho_final = relaxed_rho_final/(grid_rho.area'*relaxed_rho_final);
 				relaxed_rho_initial = (rho_initial+mu)/(1+mu);
-				relaxed_rho_initial = relaxed_rho_initial/(grid_rho.area'*relaxed_rho_initial);			
+				relaxed_rho_initial = relaxed_rho_initial/(grid_rho.area'*relaxed_rho_initial);
+				if (~IP_ctrl.relax_bc)
+					mu = mu_saved;
+				end
 				
 				OC = Fkgeod(N,relaxed_rho_final,relaxed_rho_initial,...
 										Dt,divt,M_phi,M_rho,Mst,gradt,It,rhosk,drhosk,uk,mu);

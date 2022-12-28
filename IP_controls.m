@@ -15,7 +15,7 @@ classdef IP_controls <handle
 		% newton controls
 		% tolerance Newton
 		eps_mu = 1e-6; 
-		k2max = 15; % maximum number of inner (Newton) iterations
+		k2max = 20; % maximum number of inner (Newton) iterations
 		
 		theta0 = 0.2; % decay ratio for the perturbation parameter mu
 		theta_min = 0.2;
@@ -31,6 +31,10 @@ classdef IP_controls <handle
 		min_outer_tol= 1e-5; %lower bound for solving linear system
 		%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+		% relaxation of the initial and final density
+		% rho = rho + relax / ( 1 + relax)
+		relax_bc = 0; 
+		
 
 		
 		% verbosity
