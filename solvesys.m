@@ -634,14 +634,53 @@ case 'simple'
   % define (~A)^{-1}  as diag(A)^{-1}
 	inv_diag_A = 1.0./(spdiags(A,0)+controls.relax_inv11);
   inv_Diag_A = sparse(1:Np,1:Np,(inv_diag_A)',Np,Np);
-	inv_A=@(x) inv_Diag_A*x;
 
+
+
+	if ( strcmp(controls.ctrl_inner11.approach,'diag'))
+		inv_A=@(x) inv_Diag_A*x;
+		inner_nequ = Np;
+	else
+
+		% partion matrix 
+		nAi=ncellphi;
+		
+		% use block inverse
+		diag_block_invA(Nt,1)=sparse_inverse;
+		ctrl_loc=ctrl_solver;
+		
+		for i=1:Nt
+			index_agmg=index_agmg+1;
+			ctrl_loc=ctrl_solver;
+			ctrl_loc.init(controls.ctrl_inner11.approach,...
+    								controls.ctrl_inner11.tolerance,...
+    								controls.ctrl_inner11.itermax,...
+    								controls.ctrl_inner11.omega,...
+    								controls.ctrl_inner11.verbose,...
+    								sprintf('%sA%d',controls.ctrl_inner11.label,i),...
+										index_agmg);
+			diag_block_invA(i).name=sprintf('inverse A%d',i);
+
+			% create local block and passing to solver
+			% with a potential relaxation
+			matrixAi = A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi) + ...
+							 controls.relax_inv11*speye(nAi,nAi) ;
+			diag_block_invA(i).init(matrixAi,ctrl_loc);
+
+			nsysA=Nt;
+		end
+
+		% define function
+		inv_A  = @(x) apply_block_diag_inverse(diag_block_invA,x);
+
+		inner_nequ2=ncellphi;
+	end
 
 	if (controls.study_eigen)
 
 		for i=1:N
 			nAi=ncellphi;
-			matrixAi=A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
+			matrixAi = A((i-1)*nAi+1 :     i*nAi , (i-1)*nAi+1 : i*nAi);
 			inv_Diag_Ai = sparse(1:nAi,1:nAi,...
 													 (inv_diag_A((i-1)*nAi+1 :     i*nAi))',...
 													 nAi,nAi);
@@ -656,15 +695,50 @@ case 'simple'
   % assembly (~S)^{-1} = ( -(C+B2 * diag(A)^{-1} B1T) )^{-1} 
 	build_S=tic;
 
-  SCA = (C+B2*inv_Diag_A*B1T);
+	if (controls.mode_inner22 == 1)
+		SCA = (C+B2*inv_Diag_A*B1T);
 
-  inv_SCA=sparse_inverse;
-  inv_SCA.init(SCA+controls.relax_inv22*speye(Nr,Nr),controls.ctrl_inner22);
-  inv_SCA.info_inverse.label='inv_tildeS';
-  inv_SCA.cumulative_iter=0;
-  inv_SCA.cumulative_cpu=0;
-  inverse_block22 = @(x) -inv_SCA.apply(x);
-  cpu_assembly_inverseS=toc(build_S);
+		inv_SCA=sparse_inverse;
+		ctrl_SCA = ctrl_solver;
+		index_agmg = index_agmg +1;  
+		ctrl_SCA.init(controls.ctrl_inner22.approach,...
+    							controls.ctrl_inner22.tolerance,...
+    							controls.ctrl_inner22.itermax,...
+    							controls.ctrl_inner22.omega,...
+    							controls.ctrl_inner22.verbose,...
+    							'SIMPLE',...
+									index_agmg...% this force init-apply-kill
+								 );
+		inv_SCA.init(SCA+controls.relax_inv22*speye(Nr,Nr),ctrl_SCA);
+		inv_SCA.info_inverse.label='inv_tildeS';
+		inv_SCA.cumulative_iter=0;
+		inv_SCA.cumulative_cpu=0;
+		inverse_block22 = @(x) -inv_SCA.apply(x);
+	elseif (controls.mode_inner22 == 2)
+		SCA = -Dr * JF.rr + Ds * Mrho + Dr * B2 * inv_Diag_A * B1T;
+
+		inv_SCA = sparse_inverse;
+		ctrl_SCA = ctrl_solver;
+		index_agmg = index_agmg +1;  
+		ctrl_SCA.init(controls.ctrl_inner22.approach,...
+    							controls.ctrl_inner22.tolerance,...
+    							controls.ctrl_inner22.itermax,...
+    							controls.ctrl_inner22.omega,...
+    							controls.ctrl_inner22.verbose,...
+    							'SIMPLE',...
+									index_agmg...% this force init-apply-kill
+								 );
+		inv_SCA.init(SCA+controls.relax_inv22*speye(Nr,Nr),ctrl_SCA);
+		inv_SCA.info_inverse.label = 'inv_tildeS';
+		inv_SCA.cumulative_iter = 0;
+		inv_SCA.cumulative_cpu = 0;
+		inverse_block22 = @(x) -inv_SCA.apply(Dr*x);
+
+	else
+		disp('In simple mode inverse S not supported')
+	end
+
+	cpu_assembly_inverseS=toc(build_S);
 	  
 	
   % store time required to build prec
@@ -2285,18 +2359,29 @@ case 'bb'
 		Rst = blkdiag(Rst{:});
 		I_cellphi_cellrho = assembleIt(N-1,ncellphi,ncellrho,JF.I);
 
-		% spatial component of B tilde matrix
-		new_B_space = Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
-		
+	
+		if ( strcmp(controls.mode_assemble_inverse22,'bbt'))
+			% we use that Bx^T = -Bx - (Laplacian phi)\cdot
+			laplacian_phi = A*JF.phi;
+			diag_laplacian_phi = sparse(1:Np,1:Np,(laplacian_phi)',Np,Np);
 
-		%S22=B1T_time'*inv_Mphi*B1T_time;
-		S22=B2*inv_Mphi*(-JF.B1T_time+new_B_space);
-
+			% not sure about the sign of the laplacian
+			sign_laplacian = -1;
+			S22 = B2 * inv_Mphi * ( B1T + sign_laplacian * diag_laplacian_phi * I_cellphi_cellrho * rec_time');
+		elseif (strcmp(controls.mode_assemble_inverse22,'bb') )
+			% spatial component of B tilde matrix
+			new_B_space = Rst' * spdiags(JF.gradphi,0,te,te) * gradt * I_cellphi_cellrho * rec_time';
+			
+			% we form the BB operator
+			S22=B2*inv_Mphi*(-JF.B1T_time+new_B_space);
+		end
+			
 		% sue different factorization to invert S=(CA-BB)A^{-1}
-		if (controls.mode_inverse22==1)
+		if (controls.mode_apply_inverse22==1)
 			approx_S =  C*inv_Mrho*A_rho + S22;
-		elseif (controls.mode_inverse22==2)
-			approx_S =  Ds*inv_Mrho*A_rho + Dr*inv_Mrho* S22;
+		elseif (controls.mode_apply_inverse22==2)
+			% C = -JF.rr + M Ds/Dr
+			approx_S =  -Dr * JF.rr + Ds*A_rho + Dr * S22;
 		end
 
 		% set inverse 
@@ -2318,10 +2403,10 @@ case 'bb'
 		
 
 		%inverseS	= @(y) Dr*inv_Mrho*A_rho*(inv_SCA.apply(y));
-		if (controls.mode_inverse22==1)
+		if (controls.mode_apply_inverse22==1)
 			inverseS	= @(y) inv_Mrho*A_rho*(inv_SCA.apply(y));
-		elseif (controls.mode_inverse22==2)
-			inverseS	= @(y) inv_Mrho*A_rho*(inv_SCA.apply(Dr*inv_Mrho*y));
+		elseif (controls.mode_apply_inverse22==2)
+			inverseS	= @(y) inv_Mrho*A_rho*(inv_SCA.apply(Dr*y));
 		end
 		
 	elseif (strcmp(controls.inverse22,'full'))
@@ -2504,8 +2589,8 @@ case 'bb'
 	% check res
   [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
 	relres=resnorm; 
-	resume_msg=sprintf('outer: %d res=%1.1e [%1.1e,%1.1e,%1.1e] iter=%d cpu=%1.1e| A %s : in/out=%0.1f bt=%1.1e  | S : in/out=%d bt=%1.1e',...
-   									 info_J.flag,resnorm,resp,resr,ress,outer_iter,outer_cpu,...
+	resume_msg=sprintf('outer: %d res=%1.1e [%1.1e,%1.1e,%1.1e] iter=%03d cpu=%1.1e| A %s : in/out=%0.1f bt=%1.1e  | S : in/out=%d bt=%1.1e',...
+   									 info_J.flag,resnorm,resp,resr,ress,uint64(outer_iter),outer_cpu,...
 										 controls.inverse11,(inner_iter/outer_iter)/nsysA,cpu_assembly_inverseA,...
    									 inner_iter2/outer_iter,cpu_assembly_inverseS);
 
