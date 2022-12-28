@@ -80,4 +80,5 @@ JOC.divt_rho=divt_rho;
 JOC.gradt_rho=gradt_rho;
 
 JOC.gradphi=gradphi;
+JOC.phi = phi;
 end
