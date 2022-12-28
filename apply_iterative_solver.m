@@ -32,7 +32,6 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, so
 	
   if (strcmp(ctrl.approach,'bicgstab'))
 		if (exist('prec_right','var') )
-			'left_and_right'
 			[sol,infos,j,info.iter] = bicgstab(@(y) matrix_operator(y),rhs,...
 																				 ctrl.tolerance,...
 																				 ctrl.itermax,...
@@ -87,32 +86,35 @@ function [sol,info]= apply_iterative_solver(matrix_operator, rhs, ctrl, prec, so
     info.approach_used='FGMRES';
     
   elseif (strcmp(ctrl.approach,'gmres'))
-    nrestart=20;
-		if (exist('prec_right','var') )
+		nrestart=20;
+		disp(scaling)
+		correction = 1;%1./scaling;
+		if (exist('prec_right','var') && (~isempty( prec_right ))  )
 			 [sol,infos,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
 			      nrestart, ... % to fix the total number of iterattion
-			      ctrl.tolerance,...
+			      ctrl.tolerance*correction,...
 			      int64(ctrl.itermax/nrestart),...
  			      @(x) prec(x),prec_right,... %left ,right
 			      x0);
+		else			
+			if (strcmp(left_right,'left'))
+				%disp('GMRES LEFT')
+				[sol,infos,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
+																		nrestart, ... % to fix the total number of iterattion
+																		ctrl.tolerance*correction,...
+																		int64(ctrl.itermax/nrestart),...
+ 																		@(x) prec(x),[],... %left ,right
+																		x0);      
+			else
+				%disp('GMRES RIGHT')
+				[sol,infos,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
+																		nrestart, ... % to fix the total number of iterattion
+																		ctrl.tolerance*correction,...
+																		int64(ctrl.itermax/nrestart),...
+ 																		[],@(x) prec(x),... %left,right
+																		x0);
+			end
 		end
-			
-    if (strcmp(left_right,'left'))
-      [sol,infos,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
-			      nrestart, ... % to fix the total number of iterattion
-			      ctrl.tolerance,...
-			      int64(ctrl.itermax/nrestart),...
- 			      @(x) prec(x),[],... %left ,right
-			      x0);      
-    else
-      [sol,infos,j,iters] = gmres(@(y) matrix_operator(y),rhs,...
-			      nrestart, ... % to fix the total number of iterattion
-			      ctrl.tolerance,...
-			      int64(ctrl.itermax/nrestart),...
- 			      [],@(x) prec(x),... %left,right
-			      x0);
-    end
-
 
     info.approach_used='GMRES';
     %fprintf('%d %d\n', iters(1),iters(2))
