@@ -51,7 +51,6 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				end
 		end
 	end
-	
 
 	
 	% open file to store algorithm info
@@ -60,7 +59,18 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 		fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ, minrho,    mu, theta,cpulinsys,cpuassemb,cpuprec, inner2,innernequ2,inner3,innernequ3\n');
 	end
 
+	%grid_rho.edges
+	%grid_phi.edges
+	%grid_rho.cells
+	%grid_rho.edges
+	%grid_rho.nei
 
+	%disp('phi')
+	%size(grid_phi.cells)
+	%grid_phi.edges
+	%grid_phi.nei
+	%return
+	
 	% open log file in append mode
 	if (IP_ctrl.save_log)
 		logID = fopen(IP_ctrl.file_log,'a+');
@@ -100,7 +110,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	Nt = N + 1;
 	ncell_phi = grid_phi.ncell;
 	ncell_rho = grid_rho.ncell;
-	nei = size(grid_phi.ind.internal,1);
+	nei = grid_phi.nei;
 	Np = (N+1)*ncell_phi; % total number of dofs for the potential
 	Nr = N*ncell_rho; % total number of dofs for the density
 	tne = (N+1)*nei; % total number of internal edges
@@ -359,15 +369,21 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				% print linear solver info
 				if (strcmp(resume_msg,''))
 					print_info_solver(linear_solver_info)
-					print_info_solver(linear_solver_info,logID)
+					if (IP_ctrl.save_log)
+						print_info_solver(linear_solver_info,logID)
+					end
 				else
 					fprintf('%s\n',resume_msg);
-					fprintf(logID,'%s\n',resume_msg);
+					if (IP_ctrl.save_log)
+						fprintf(logID,'%s\n',resume_msg);
+					end
 				end
 				
 				if (linear_solver_info.relres > 5*resvar.etamax)
 					disp('ERROR')
-					fprintf(logID,'%s\n','ERROR');
+					if (IP_ctrl.save_log)
+						fprintf(logID,'%s\n','ERROR');
+					end
 					ierr=3;
 					uk=uk_before;
 					break
@@ -457,7 +473,9 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 			end
 
 			if (IP_ctrl.verbose >=1 )
-				fprintf(logID,'%s \n',state_message);
+				if (IP_ctrl.save_log)
+					fprintf(logID,'%s \n',state_message);
+				end
 			end
 
 			if ( exist('phi_rho_slack_reference_solution','var') )
@@ -495,13 +513,18 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 
 	% print resume messagge
 	fprintf('%17s %4i %7s %1.4e \n','Total Newton its:',tit,'Error: ',delta_0)
-	fprintf(logID,'%17s %4i %7s %1.4e \n','Total Newton its:',tit,'Error: ',delta_0);
-	fprintf(logID,'%19s %1.4e %21s %1.4e \n','Total linsys time: ',cpu_linsys,'Total assembly time: ',cpu_assembly);
-
+	if (IP_ctrl.save_log)
+		fprintf(logID,'%17s %4i %7s %1.4e \n','Total Newton its:',tit,'Error: ',delta_0);
+		fprintf(logID,'%19s %1.4e %21s %1.4e \n','Total linsys time: ',cpu_linsys,'Total assembly time: ',cpu_assembly);
+	end
 	
 	% close files
-	fclose(logID);
-	fclose(csvID);
+	if (IP_ctrl.save_log)
+		fclose(logID);
+	end
+	if (IP_ctrl.save_csv)
+		fclose(csvID);
+	end
 
 
 	% get the solution 
@@ -509,10 +532,10 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	rho   = uk(Np+1:Np+Nr);
 	slack = uk(Np+Nr+1:Np+2*Nr);
 
-    % Compute Wasserstein distance
-    rhos=compute_rhosigma(grid_phi.ind,grid_phi.edges,grid_phi.cc,grid_phi.mid,N,...
-                          rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
-    W2th = compute_cost(gradt,Mst,N,rhos,phi);
+  % Compute Wasserstein distance
+  rhos=compute_rhosigma(grid_phi.ind,grid_phi.edges,grid_phi.cc,grid_phi.mid,N,...
+                        rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
+  W2th = compute_cost(gradt,Mst,N,rhos,phi);
 
 	% set info_solver
 	info_solver=struct('ierr',ierr,...

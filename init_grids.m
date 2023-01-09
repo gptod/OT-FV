@@ -35,6 +35,7 @@ function [grid_rho,grid_phi,I]=init_grids(mesh_type,h_i)
 	grid_phi.area  = mesh.area;
 	grid_phi.cc    = mesh.cc;
 	grid_phi.mid   = mesh.mid;
+	grid_phi.nei = size(mesh.ind.internal,1);
 
 	ncell=grid_phi.ncell;
 
@@ -55,6 +56,8 @@ function [grid_rho,grid_phi,I]=init_grids(mesh_type,h_i)
 		grid_rho.cc    = mesh.cc2h;
 		grid_rho.mid   = mesh.mid2h;
 
+		grid_rho.nei = size(mesh.ind2h.internal,1);
+		
 		I=mesh.I;
 	else
 		I = speye(ncell,ncell);
