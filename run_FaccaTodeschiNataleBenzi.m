@@ -4,7 +4,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin"];%,"compression"];
+test_cases = ["sin";"compression"; "gauss"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
@@ -148,7 +148,7 @@ for mesh_type = 5;
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["bb"];%, "primal", "hss","bb"];
+			for solver_approach=["bb", "simple","primal"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
