@@ -173,7 +173,7 @@ function [ctrls, approach_descriptions] = ...
 				ctrl_inner11.init('diag',1e-1,20,1.0,1);
 				
 				% set grounded_node>0 to gorund the potential in grounded node
-				ground=0;
+				ground = 0;
 				diagonal_scaling=0;
 				scaling_rhs=1;
 
@@ -189,7 +189,7 @@ function [ctrls, approach_descriptions] = ...
 				for mode_inner22 = [1];
 
 				study_eigen=0;
-				for isol=[1,4];%1:length(solvers)
+				for isol=[1];%1:length(solvers)
 					
 					ctrl_inner22=ctrl_solver;
 					ctrl_inner22.init(solvers{isol},1e-1,iters{isol},1.0,0,...
