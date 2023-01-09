@@ -33,7 +33,7 @@ classdef IP_controls <handle
 
 		% relaxation of the initial and final density
 		% rho = rho + relax / ( 1 + relax)
-		relax_bc = 0; 
+		relax_bc = 1; 
 		
 
 		

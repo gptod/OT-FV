@@ -1,11 +1,16 @@
 % class spatial information of grid
 classdef TPFA_grid <handle
   properties
+		% cells, cells number
 		ncell;
 		cells;
+		% nodes coordinate, nodes number
 		nodes;
     nnodes;
+		% edges, edge, edge number, internal edge number
     edges;
+		nedges;
+		nei; 
     ind;
     area;
     cc;
@@ -20,23 +25,25 @@ classdef TPFA_grid <handle
 		% coord : real(2,nnode) array with nodes coordinates
 		% OUTPUTS
 		% obj: mesh initialized
-    function obj = init(topol,coord)
+    function obj = init(obj, topol,nodes)
 			% add the number of node in cells
 			% TODO: use csr matrix
 		  obj.cells = [sum(topol~=0,2) topol];
-			obj.ncell = size(obj.cells,2);
-			obj.node = nodes;
-			obj.nnodes = size(nodes,2);
+			obj.ncell = size(obj.cells,1);
+			obj.nodes = nodes;
+			obj.nnodes = size(nodes,1);
+
 
 			% compute cells related properties
-			[obj.cc,obj.area,h] = mesh_properties(obj.nodes,obj.cells);
+			[obj.cc,obj.area,h] = obj.mesh_properties(obj.nodes,obj.cells);
 
 			% compute edges structure
-			[obj.edges,obj.mid] = str_edge(obj.nodes, obj.cells, obj.cc);
-			nedge = size(edges,1);
+			[obj.edges,obj.mid] = obj.str_edge(obj.nodes, obj.cells, obj.cc);
+			obj.nedges = size(obj.edges,1);
 
 			% compute indices 
-			obj.ind = indices(obj.ncell,obj.edges);
+			obj.ind = obj.indices(obj.ncell,obj.edges);
+			obj.nei = obj.ind.nei;
     end
 
 		% Generate a finer mesh subdividiving each cell
@@ -49,17 +56,17 @@ classdef TPFA_grid <handle
 		% coarse2fine : sparse matrix mapping functions/vectors on the coarse
 		%               mesh into functions/vectors in the fine one.
 		%               It also describes the relation between cooarse and fine cells
-		function refined, coarse2fine = sub_mesh(obj)
+		function [refined, coarse2fine] = refine(obj)
 			% shorthands
 			ncell = obj.ncell;
-			nedge = obj.nedge;
-			nnode = obj.nnode;
+			nedge = obj.nedges;
+			nnode = obj.nnodes;
 			
 
 			
 			% compute cells-edges structure
 			maxn= max(obj.cells(:,1));
-			[cell_e,~,~] = str_cell(maxn,obj.ind,obj.edges,obj.mid,obj.cc);
+			[cell_e,~,~] = obj.str_cell(maxn,obj.ind,obj.edges,obj.mid,obj.cc);
 		
 			cells_f = zeros(3*ncell,5);
 			nodes_f = zeros(nnode+nedge+ncell,2);
@@ -80,13 +87,13 @@ classdef TPFA_grid <handle
 					
 					ej = E(obj.edges(E',1)==K(j) | obj.edges(E',2)==K(j));
 					
-					if obj.nodes(K(j),3)==0
+					if nodes(K(j),3)==0
             int = int+1;
             A = int;
             obj.nodes(K(j),3) = int;
             nodes_f(int,:) = obj.nodes(K(j),1:2);
 					else
-            A = obj.nodes(K(j),3);
+            A = nodes(K(j),3);
 					end
 					
 					if mid(ej(1),3)==0
@@ -125,14 +132,15 @@ classdef TPFA_grid <handle
 			end
 
 			refined = TPFA_grid;
-			refined.init(cells_f,coord_f);
+			refined.init(cells_f(:,2:end),nodes_f);
+			
 		end
 			
    	% destructor
 		function obj = kill(obj)
 			if (obj.initalized == 1)
 				clear obj.cells;
-				clear obj.edges
+				clear obj.edges;
 				clear obj.ind;
 				clear obj.area;
 				clear obj.cc;
@@ -152,7 +160,7 @@ classdef TPFA_grid <handle
 		%        (grad = - edge_mass^{-1} div )
 		function [mass,edge_mass,div,grad] = build_matrices(obj);
 			mass = spdiags(obj.area,0,obj.ncell,obj.ncell);
-			nei=size(obj.ind.internal,1);
+			nei = obj.nei;
 			ds = obj.edges(obj.ind.internal,5).*obj.edges(obj.ind.internal,6);
 			edge_mass = spdiags(ds,0,nei,nei);
 			div = Div2D(obj.ncell,nei,obj.ind,obj.edges); % divergence matrix
@@ -166,7 +174,7 @@ classdef TPFA_grid <handle
 			end
 		end
 
-		function [cc,area,h] = mesh_properties(nodes,cells)
+		function [cc,area,h] = mesh_properties(obj,nodes,cells)
 
 			% INPUT:
 			% node: nodes' coordinate
@@ -290,7 +298,7 @@ classdef TPFA_grid <handle
 
 		end
 
-		function [edges,mid] = str_edge(nodes,cells,cc)
+		function [edges,mid] = str_edge(obj,nodes,cells,cc)
 
 			% rough computation of the edges structure
 			% INPUT:
@@ -388,7 +396,7 @@ classdef TPFA_grid <handle
 
 		end
 
-		function ind = indices(ncell,edges)
+		function [ind] = indices(obj,ncell,edges)
 
 			% INPUT:
 			% ncell: number of cells
@@ -416,10 +424,12 @@ classdef TPFA_grid <handle
 			% [ind.u_KL,~,ind.o_KL] = unique(ind.i_KL);
 			% [ind.u_LK,~,ind.o_LK] = unique(ind.i_LK);
 
+			ind ={};
 			ind.internal = internal;
 			ind.bound = find(edges(:,4)==0);
 
-			ind.nei = length(internal);
+			ind.nei = length(internal)
+			disp(ind.nei)
 			% ind.et_K = sub2ind([ind.nei ncell],[1:ind.nei]',edges(internal,3));
 			% ind.et_L = sub2ind([ind.nei ncell],[1:ind.nei]',edges(internal,4));
 
@@ -449,7 +459,7 @@ classdef TPFA_grid <handle
 
 		end
 
-		function [cell_e,cell_eint,cell_dist] = str_cell(maxn,ind,edges,mid,cc)
+		function [cell_e,cell_eint,cell_dist] = str_cell(obj,maxn,ind,edges,mid,cc)
 
 			% INPUT:
 			% maxn: maximum number of vertices/edges per polygonal cell
@@ -507,4 +517,18 @@ classdef TPFA_grid <handle
 		end
 		
 	end
+end
+
+function [area] = area_pol(Np,coord)
+
+%compute the area of the polygon
+vertices = [coord; coord(1,:)];
+sum1=0; sum2=0;
+for i=1:Np
+    sum1 = sum1 + vertices(i,1)*vertices(i+1,2);
+    sum2 = sum2 + vertices(i,2)*vertices(i+1,1);
+end
+area = (sum1-sum2)/2;
+area = abs(area);
+
 end
