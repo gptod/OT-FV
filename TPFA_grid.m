@@ -65,7 +65,7 @@ classdef TPFA_grid <handle
 
 			
 			% compute cells-edges structure
-			maxn= max(obj.cells(:,1));
+			maxn= max(obj.cells(:,1))
 			[cell_e,~,~] = obj.str_cell(maxn,obj.ind,obj.edges,obj.mid,obj.cc);
 		
 			cells_f = zeros(3*ncell,5);
@@ -90,8 +90,8 @@ classdef TPFA_grid <handle
 					if nodes(K(j),3)==0
             int = int+1;
             A = int;
-            obj.nodes(K(j),3) = int;
-            nodes_f(int,:) = obj.nodes(K(j),1:2);
+            nodes(K(j),3) = int;
+            nodes_f(int,:) = nodes(K(j),1:2);
 					else
             A = nodes(K(j),3);
 					end

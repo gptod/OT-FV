@@ -22,7 +22,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	%                           described initial and final density distribution
 	% phi_rho_slack_initial_guess (real arrays) :: initial guess of the problem
 	
-	% OPTINAL INPUTS (pass using 'keyword', value)
+	% OPTIONAL INPUTS (passed using the combination : 'keyword', value
 	
 	% fun_dfun_ddfun [optional]: triples containg the [f,f',f''] i.e.; function, its derivative,
 	%             and second derivative  with f:[0,\infty[ \to [0,\infty[.
@@ -59,17 +59,6 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 		fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ, minrho,    mu, theta,cpulinsys,cpuassemb,cpuprec, inner2,innernequ2,inner3,innernequ3\n');
 	end
 
-	%grid_rho.edges
-	%grid_phi.edges
-	%grid_rho.cells
-	%grid_rho.edges
-	%grid_rho.nei
-
-	%disp('phi')
-	%size(grid_phi.cells)
-	%grid_phi.edges
-	%grid_phi.nei
-	%return
 	
 	% open log file in append mode
 	if (IP_ctrl.save_log)
