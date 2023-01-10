@@ -29,6 +29,7 @@ function [grid_rho,grid_phi,I]=init_grids(mesh_type,h_i)
 	grid_phi = TPFA_grid;
 	grid_phi.ncell = mesh.ncell;
 	grid_phi.nodes = mesh.nodes;
+	grid_phi.nnodes = size(mesh.nodes,1);
 	grid_phi.cells = mesh.cells;
 	grid_phi.edges = mesh.edges;
 	grid_phi.ind   = mesh.ind;
