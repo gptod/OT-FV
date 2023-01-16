@@ -151,7 +151,7 @@ function [ctrls, approach_descriptions] = ...
 		outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
 		for isolver=[3]
 			ctrl_outer=ctrl_solver;
-			ctrl_outer.init(outer_solvers{isolver},1e-05,400,0.0,0);
+			ctrl_outer.init(outer_solvers{isolver},1e-05,800,0.0,0);
 
 			% left or right preconditioner
 			left_right='right';
@@ -186,7 +186,7 @@ function [ctrls, approach_descriptions] = ...
 				% mode to form and invert S_tilde
 				% mode 1 = ~S = C + B2 diag(A)^{-1} B1T
 				% mode 2 = ~S = Ds M + Dr B2 diag(A)^{-1} B1T
-				for mode_inner22 = [1];
+				for mode_inner22 = [2];
 
 				study_eigen=0;
 				for isol=[1];%1:length(solvers)
