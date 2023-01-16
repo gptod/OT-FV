@@ -25,7 +25,7 @@ nodes = nodes(:,j1l+1:end-j1r);
 
 cells = read(filename2,j2l,j2r);
 % add the number of vertices for each polygon
-cells = [sum(cells~=0,2) cells];
+%cells = [sum(cells~=0,2) cells];
 % sort the vertices per each polygon
 %for i=1:size(cells,1)
 %    cells(i,2:1+cells(i,1)) = sort(cells(i,2:1+cells(i,1)));
