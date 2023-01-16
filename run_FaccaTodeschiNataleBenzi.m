@@ -4,13 +4,13 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin";"compression"; "gauss"];
+test_cases = ["sin","gauss_plus","compression", "gauss"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
 
 % select the directory where to store the results
-folder_runs='runs_after_review';
+folder_runs='runs_20230112';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
@@ -42,7 +42,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 for mesh_type = 5;
 	
 	% refine level. Available from 1 to 5
-	for h_i = 3;
+	for h_i = 4:-1:1;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -63,20 +63,23 @@ for mesh_type = 5;
 		% grids for rho and phi (see TPFA_grid class)
 		% are read from file
 		[grid_rho, grid_phi, I] = init_grids(mesh_type, h_i);
-
+		
+		
+		
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 3
+		for dt_i = 4:-1:1
 		%for dt_i = h_i +1
 			% number of time steps
 			N=4*(2^(dt_i));
 
 			% set problem dimension
-			ncell_phi=grid_phi.ncell;
-			ncell_rho=grid_rho.ncell;
-			Np=(N+1)*ncell_phi;
-			Nr=(N)*ncell_rho;
+			ncell_phi=grid_phi.ncell
+			ncell_rho=grid_rho.ncell
+			Np=(N+1)*ncell_phi
+			Nr=(N)*ncell_rho
+			
 
 
 			%
@@ -148,7 +151,7 @@ for mesh_type = 5;
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["bb", "simple","primal"];
+			for solver_approach=["simple"];%, "simple","primal"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
