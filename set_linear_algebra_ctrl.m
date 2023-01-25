@@ -371,7 +371,7 @@ function [ctrls, approach_descriptions] = ...
 				% A = A + relax * Id
 				relax4inv11=1e-10;
 
-				for precision_primal=5e-1
+				for precision_primal=5e-2
 					% set here other approximate inverse of block11
 					ctrl_inner11=ctrl_solver;
 					ctrl_inner11.init('agmg',... %approach
