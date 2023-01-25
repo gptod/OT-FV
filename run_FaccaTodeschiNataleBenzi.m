@@ -4,13 +4,13 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin","gauss_plus","compression", "gauss"];
+test_cases = ["gauss_plus_h"];%"sin","gauss_plus","compression", "gauss"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
 
 % select the directory where to store the results
-folder_runs='runs_20230112';
+folder_runs='runs_20230119';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
@@ -26,7 +26,7 @@ folder_restart='initial_solution'; % location of initial solution. See more belo
 %
 % set some globals controls for reproducing experiments
 %
-plot_figures = 1; % print rho evolutions
+plot_figures = 0; % print rho evolutions
 compute_err = 1; % compute errors with respect to exact solutions
 
 
@@ -42,7 +42,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 for mesh_type = 5;
 	
 	% refine level. Available from 1 to 5
-	for h_i = 4:-1:1;
+	for h_i = 4;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -69,7 +69,7 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 4:-1:1
+		for dt_i = 4;%4:-1:1
 		%for dt_i = h_i +1
 			% number of time steps
 			N=4*(2^(dt_i));
@@ -151,7 +151,7 @@ for mesh_type = 5;
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["simple"];%, "simple","primal"];
+			for solver_approach=["bb"];%,"simple"];%primal"];%, "simple","primal"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 

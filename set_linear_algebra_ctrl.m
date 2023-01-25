@@ -42,6 +42,8 @@ function [ctrls, approach_descriptions] = ...
 		ctrl_outer = ctrl_solver;
 		ctrl_outer.init('fgmres',1e-5,400,0.0,0);
 
+		left_right = 'right';
+
 		% preconditioner approach
 		% full, upper_triang, lower_triang
 		% see SchurAC_based_preconditioner 
@@ -51,20 +53,24 @@ function [ctrls, approach_descriptions] = ...
 		solve_primal=0;
 
 		% permute entries to minimize bandwidth S.
-		% It will destroy its block structure.
-		permute=0;
+		% 0 = off , 1 = permute to minimize band width
+		permute=1;
+
+		% scale tolerance to avoid oversolving
+		scaling_rhs=1;
 		
 		% select assembly of S=A+Mtt+(Mtx+Mtx')+Mxx
 		assembly_S_options=[...
 												 "full",...
-												 "A_Mtt",...
+												 "tt_xx",...
+												 "tt",...
 												 "harmonic",...
 												 "A_Mtt_Mxx",...
 												 "A_Mtt_Mxx_lamped",...
 												 "A_Mtx_Mxt",...
 												 "A_Mtt_Mtx_Mxt",...
 												 "A_Mtt_Mtx_Mxt_blockdiagMxx"];
-		for assembly_S = assembly_S_options([1])
+		for assembly_S = assembly_S_options([2])
 
 			
 			% cycle approach for S inversion
@@ -117,6 +123,8 @@ function [ctrls, approach_descriptions] = ...
 													'sol',solver_approach,...
 													'outer_prec',outer_prec,...
 													'solve_primal',solve_primal,...
+													'left_right', left_right,...
+													'scaling_rhs',scaling_rhs,...
 													'diagonal_scaling',diagonal_scaling,...
 													'assembly_S',assembly_S,...
 													'permute',permute,...
@@ -137,6 +145,8 @@ function [ctrls, approach_descriptions] = ...
 															 'outer=',ctrl_outer.approach,'_',...
 															 'prec=',outer_prec,'_',...
 															 'invS=',inverse11,'_',...
+															 'buildS',assembly_S,'_',...
+															 'permute',num2str(permute),'_',...
 															 'solverS=',ctrl_inner11.label);
 
 				% append string
@@ -354,14 +364,14 @@ function [ctrls, approach_descriptions] = ...
 				outer_prec=outer_precs{iprec};
 				
 				% inverse approach
-				%inverse11='full';
-				inverse11='diag';
+				%inverse11='full'; % 
+				inverse11='diag'; % use the block structure
 				
 				% relaxation
 				% A = A + relax * Id
 				relax4inv11=1e-10;
 
-				for precision_primal=5e-2
+				for precision_primal=5e-1
 					% set here other approximate inverse of block11
 					ctrl_inner11=ctrl_solver;
 					ctrl_inner11.init('agmg',... %approach
@@ -441,6 +451,145 @@ function [ctrls, approach_descriptions] = ...
 							
 							approach_string=strcat('bb_',...
 																		 'ground',num2str(ground),'_',...
+																		 'outer_prec',outer_prec,'_',...
+																		 'invA',ctrl_inner11.label,'_',...
+																		 'inverse22',label_inverse22,'_',...
+																		 'built',mode_assemble_inverse22,'_',...
+																		 'mode',num2str(mode_apply_inverse22),'_',...
+																		 "invSCA",ctrl_inner22.label);
+
+							
+							ctrls=[ctrls,controls];
+							approach_descriptions=[approach_descriptions,approach_string];
+							
+						end
+					end
+						end
+						end  % mode assemmble
+						end  % mode apply
+				end
+			end
+		end
+	case 'bb_noproj'
+		% globals controls
+		verbose=0;
+		
+		% list of outer solvers
+		outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
+		
+		% set here fgmres (for non stationary prec), bicgstab,gmres, pcg
+		for isolver=[3]%1:length(outer_solvers)
+			ctrl_outer=ctrl_solver;
+			ctrl_outer.init(outer_solvers{isolver},1e-5,400,0.0,0);
+			
+			
+			% external prec appraoch
+			outer_precs={'full' ,'lower_triang'  ,'upper_triang','identity'};
+			nouter_precs=length(outer_precs);
+
+			% left or right preconditioner
+			left_right='left';
+			% fgmres works only with right prec
+			if (strcmp(outer_solvers,'fgmres'))
+				left_right='right';
+			end
+
+			% scale the norm of residuo so that
+			% the residuum is computed for the full sytem 
+			scaling_rhs=1;
+			
+			% node for grounding
+			diagonal_scaling=0;
+			
+			
+			for iprec=[3]%1:nouter_precs
+				outer_prec=outer_precs{iprec};
+				
+				% inverse approach
+				%inverse11='full'; % 
+				inverse11='diag'; % use the block structure of A
+				
+				% relaxation
+				% A = A + relax * Id
+				relax4inv11=1e-10;
+
+				for precision_primal=1e-1
+					% set here other approximate inverse of block11
+					ctrl_inner11=ctrl_solver;
+					ctrl_inner11.init('agmg',... %approach
+														precision_primal,... %tolerance
+														20,...% itermax
+														0.0,... %omega
+														1);%,... verbose
+														%strcat('agmg',num2str(precision_primal))); %verbose
+					
+					% possible choices for dual schur complement
+					inverses22={'diagA','perm','lsc','full',...
+											'commute','commute_bis','commute_ter','commute_quater',...
+											'stationary'};
+					null_space=0;
+					lrb='r';
+					for ground=[0]
+
+						for mode_assemble=["bb"]
+						% how BB is assembled
+						% 'bb' = we form a Btilde to match dimension and form BB
+						% 'bbt' = we use the identity Bx^t = -B - Laplacian
+						mode_assemble_inverse22 = mode_assemble;
+						
+					% for commute approach
+						% 1 = CA-BB y = g
+						% 2 = Ds A - Dr BB = Dr g
+						for mode_apply = [2]
+							mode_apply_inverse22=mode_apply;
+
+							
+					
+					
+					for ia = [8];
+						inverse22=inverses22{ia};
+						if ( contains(inverse22,'commute') )
+							label_inverse22=strcat(inverse22,'null_space',num2str(null_space),'lrb', lrb);
+						else
+							label_inverse22=strcat(inverse22);
+						end
+						
+						% set here list of solvers for block 22 
+						solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete','diag','krylov_no_prec'};
+						iters  ={1      ,10      ,400,1       ,1        ,10        ,  1          ,0,10};
+						label  ={'agmg1','agmg10','agmg1e-1','direct','krylov1','krylov10','incomplete','diag','purekrylov'};
+						relax4inv22=1e-12;
+
+
+						for precision_dual=1
+							ctrl_inner22=ctrl_solver;
+							ctrl_inner22.init('agmg',...% when inverse22=stationary is ignored
+																10^(-precision_dual),... % tolerance
+																30,... % max iterations
+																1e-2,... % relaxation used only for inverse22=stationary 
+																0,strcat('agmg',num2str(precision_dual)));%,...
+							%sprintf('%s%1.1e',solvers{i},dual_schur_tol));
+							controls = struct('ground',ground,...
+																'sol',solver_approach,...
+																'null_space',null_space,...
+																'lrb',lrb,...
+																'scaling_rhs',scaling_rhs,...
+																'diagonal_scaling',diagonal_scaling,...
+																'outer_prec',outer_prec,...
+																'left_right',left_right,...
+																'ctrl_inner11',ctrl_inner11,...
+																'ctrl_inner22',ctrl_inner22,...
+																'ctrl_outer',ctrl_outer,...
+																'verbose',verbose,...
+																'inverse11',inverse11,...
+																'relax4inv11',relax4inv11,...
+																'inverse22',inverse22,...
+																'relax4inv22',relax4inv22,...
+																'mode_apply_inverse22',mode_apply_inverse22,...
+																'mode_assemble_inverse22',mode_assemble_inverse22);
+							
+							
+							approach_string=strcat('bb_noproj',...
 																		 'outer_prec',outer_prec,'_',...
 																		 'invA',ctrl_inner11.label,'_',...
 																		 'inverse22',label_inverse22,'_',...

@@ -351,7 +351,11 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				resvar.set(IP_ctrl.kel,IP_ctrl.min_outer_tol,delta_mu,Np+2*Nr);
 				ctrl_outer.tolerance=resvar.etak;
 
+				
+
+				%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 				% solve linear system J d = -F 
+				%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 				timelinsys=tic;
 				[omegak, linear_solver_info,norm_ddd,resume_msg] = solvesys(JOC,OC, linear_solver_ctrl);
 				
