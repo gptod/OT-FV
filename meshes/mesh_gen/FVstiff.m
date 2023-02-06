@@ -1,12 +1,12 @@
-function A = FVstiff(ind,edges,ncell)
+function A = FVstiff(ind,sigma,ncell)
 
-KK=edges(ind.internal,3);
-LL=edges(ind.internal,4);
+KK=sigma(ind.internal,1);
+LL=sigma(ind.internal,2);
 
-HKK = edges(ind.internal,7);
-HLL = edges(ind.internal,7);
-HKL = -edges(ind.internal,7);
-HLK = -edges(ind.internal,7);
+HKK = sigma(ind.internal,7);
+HLL = sigma(ind.internal,7);
+HKL = -sigma(ind.internal,7);
+HLK = -sigma(ind.internal,7);
 
 
 A = sparse(KK,KK,HKK,ncell,ncell);

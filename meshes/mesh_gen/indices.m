@@ -1,4 +1,4 @@
-function ind = indices(ncell,edges)
+function ind = indices(ncell,sigma)
 
 % INPUT:
 % ncell: number of cells
@@ -12,7 +12,17 @@ function ind = indices(ncell,edges)
 
 % indices for internal edges:
 
-internal = find(edges(:,4)~=0);
+internal = find(sigma(:,2)~=0);
+
+
+ind.internal = internal;
+ind.bound = find(sigma(:,2)==0);
+
+ind.nsig_in = length(internal);
+ind.nsig_b = length(ind.bound);
+
+% OLD
+
 % ind.i_KK = sub2ind([ncell ncell],edges(internal,3),edges(internal,3));
 % ind.i_LL = sub2ind([ncell ncell],edges(internal,4),edges(internal,4));
 % ind.i_KL = sub2ind([ncell ncell],edges(internal,3),edges(internal,4));
@@ -26,10 +36,6 @@ internal = find(edges(:,4)~=0);
 % [ind.u_KL,~,ind.o_KL] = unique(ind.i_KL);
 % [ind.u_LK,~,ind.o_LK] = unique(ind.i_LK);
 
-ind.internal = internal;
-ind.bound = find(edges(:,4)==0);
-
-ind.nei = length(internal);
 % ind.et_K = sub2ind([ind.nei ncell],[1:ind.nei]',edges(internal,3));
 % ind.et_L = sub2ind([ind.nei ncell],[1:ind.nei]',edges(internal,4));
 
