@@ -32,11 +32,12 @@ function [grid_rho,grid_phi,I]=init_grids(mesh_type,h_i)
 	grid_phi.nnodes = size(mesh.nodes,1);
 	grid_phi.cells = mesh.cells;
 	grid_phi.edges = mesh.edges;
+    grid_phi.sigma = mesh.sigma;
 	grid_phi.ind   = mesh.ind;
 	grid_phi.area  = mesh.area;
 	grid_phi.cc    = mesh.cc;
-	grid_phi.mid   = mesh.mid;
-	grid_phi.nei = size(mesh.ind.internal,1);
+	grid_phi.mid_edges   = mesh.mid_edges;
+	grid_phi.nsig_in = size(mesh.ind.internal,1);
 
 	ncell=grid_phi.ncell;
 
@@ -52,12 +53,13 @@ function [grid_rho,grid_phi,I]=init_grids(mesh_type,h_i)
 		grid_rho.nodes = mesh.nodes2h;
 		grid_rho.cells = mesh.cells2h;
 		grid_rho.edges = mesh.edges2h;
+        grid_rho.sigma = mesh.sigma2h;
 		grid_rho.ind   = mesh.ind2h;
 		grid_rho.area  = mesh.area2h;
 		grid_rho.cc    = mesh.cc2h;
 		grid_rho.mid   = mesh.mid2h;
 
-		grid_rho.nei = size(mesh.ind2h.internal,1);
+		grid_rho.nsig_in = size(mesh.ind2h.internal,1);
 		
 		I=mesh.I;
 	else

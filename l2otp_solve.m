@@ -1,7 +1,7 @@
 function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Ntime,...
-																									 IP_ctrl,linear_solver_ctrl,... 
-																									 rho_initial,rho_final, phi_rho_slack_initial_guess,...
-																									 varargin)
+														IP_ctrl,linear_solver_ctrl,... 
+														rho_initial,rho_final, phi_rho_slack_initial_guess,...
+														varargin)
 
 	
 	% SPATIAL AND TEMPORAL DISCRETIZATION
@@ -99,10 +99,10 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	Nt = N + 1;
 	ncell_phi = grid_phi.ncell;
 	ncell_rho = grid_rho.ncell;
-	nei = grid_phi.nei;
+	nsig_in = grid_phi.nsig_in;
 	Np = (N+1)*ncell_phi; % total number of dofs for the potential
 	Nr = N*ncell_rho; % total number of dofs for the density
-	tne = (N+1)*nei; % total number of internal edges
+	tne = (N+1)*nsig_in; % total number of internal edges
 	
 
 	% set initial solution
@@ -127,31 +127,31 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	% global matrices
 	global_ass = tic;
 	Dt = assembleDt(N,ncell_phi);
-	divt = assembleDivt(N,ncell_phi,nei,div_phi);
-	gradt = assembleGradt(N,ncell_phi,nei,grad_phi);
+	divt = assembleDivt(N,ncell_phi,nsig_in,div_phi);
+	gradt = assembleGradt(N,ncell_phi,nsig_in,grad_phi);
 	M_phi = assembleMxt(N,ncell_phi,mass_phi);
 	M_rho = assembleMxt(N,ncell_rho,mass_rho);
-	Mst = assembleMst(N,nei,mass_edge_phi);
+	Mst = assembleMst(N,nsig_in,mass_edge_phi);
 	RHt = assembleRHt(N,ncell_phi);
 	It = assembleIt(N,ncell_phi,ncell_rho,I);
 	I_all = [sparse(ncell_rho,Nr);speye(Nr,Nr);sparse(ncell_rho,Nr)];
 
 	if rec==1
-    Rs=Ktos2D(grid_phi.ind,grid_phi.edges,...
-							grid_phi.cc,grid_phi.mid);
+    Rs=Ktos2D(grid_phi.ind,grid_phi.sigma,...
+							grid_phi.cc,grid_phi.mid_edges);
     Rst = repmat({Rs},1,N+1);
     Rst = blkdiag(Rst{:});
     %clear Rs
-		Rs_rho  = Ktos2D(grid_rho.ind,grid_rho.edges,grid_rho.cc,grid_rho.mid);
+	Rs_rho  = Ktos2D(grid_rho.ind,grid_rho.sigma,grid_rho.cc,grid_rho.mid_edges);
     Rst_rho = repmat({Rs_rho},1,N);
     Rst_rho = blkdiag(Rst_rho{:});
 	else
     Rst = [];
 	end
 
-	nei_rho = size(div_rho,2);
-	divt_rho  = assembleDivt(N-1,grid_rho.ncell,nei_rho,div_rho); 
-	gradt_rho = assembleGradt(N-1,grid_rho.ncell,nei_rho,grad_rho);
+	nsig_in_rho = size(div_rho,2);
+	divt_rho  = assembleDivt(N-1,grid_rho.ncell,nsig_in_rho,div_rho); 
+	gradt_rho = assembleGradt(N-1,grid_rho.ncell,nsig_in_rho,grad_rho);
 
 	
 	
@@ -237,9 +237,9 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 
 				% assembly non-linear equations
 				assembly=tic;
-				[rhosk]=compute_rhosigma(grid_phi.ind,grid_phi.edges,grid_phi.cc,grid_phi.mid,...
+				[rhosk]=compute_rhosigma(grid_phi.ind,grid_phi.sigma,grid_phi.cc,...
 																 N,rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
-				[drhosk]=compute_rhosigma(grid_phi.ind,grid_phi.edges,grid_phi.cc,grid_phi.mid,...
+				[drhosk]=compute_rhosigma(grid_phi.ind,grid_phi.sigma,grid_phi.cc,...
 																	N,rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'drhos');
 
 				ctime=tic;
@@ -259,7 +259,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				OC = Fkgeod(N,relaxed_rho_final,relaxed_rho_initial,...
 										Dt,divt,M_phi,M_rho,Mst,gradt,It,rhosk,drhosk,uk,mu);
 
-				% add non-linear term from extra funcitonal in rho
+				% add non-linear term from extra functional in rho
 				if ( exist('fun_dfun_ddfun','var') )
 					OC.r = OC.r + ...
 								 assemble_functional_derivative(fun_dfun_ddfun,1,...
@@ -325,7 +325,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				
 				% Compute the jacobian of the system of equations
 				ctime=tic;
-				[ddrhosak]=compute_rhosigma(grid_phi.ind,grid_phi.edges,grid_phi.cc,grid_phi.mid,...
+				[ddrhosak]=compute_rhosigma(grid_phi.ind,grid_phi.sigma,grid_phi.cc,...
 																		N,rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'ddrhosa');
 				JOC = JFkgeod(N,Dt,divt,M_phi,M_rho,gradt,It,rhosk,drhosk,ddrhosak,...
 											uk,I,Rs,Rst_rho,divt_rho,gradt_rho);
@@ -441,7 +441,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 			end
 
 			% exit from IP cy
-			if ierr ~= 0;
+			if ierr ~= 0
 				uk=uk_before;
 				break
 			end
@@ -526,7 +526,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	slack = uk(Np+Nr+1:Np+2*Nr);
 
   % Compute Wasserstein distance
-  rhos=compute_rhosigma(grid_phi.ind,grid_phi.edges,grid_phi.cc,grid_phi.mid,N,...
+  rhos=compute_rhosigma(grid_phi.ind,grid_phi.sigma,grid_phi.cc,N,...
                         rho_final,rho_initial,gradt,Mst,RHt,It,Rst,rec,uk,'rhos');
   W2th = compute_cost(gradt,Mst,N,rhos,phi);
 

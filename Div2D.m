@@ -1,12 +1,12 @@
-function [div] = Div2D(ntri,nei,ind,edges)
+function [div] = Div2D(ncell,nsig_in,ind,sigma)
 
 % divergence matrix
 
-div = sparse(ntri,nei);
+div = sparse(ncell,nsig_in);
 
-for e=1:nei
-    K = edges(ind.internal(e),3);
-    L = edges(ind.internal(e),4);
-    div(K,e) = edges(ind.internal(e),6);
-    div(L,e) = -edges(ind.internal(e),6);
+for sig=1:nsig_in
+    K = sigma(ind.internal(sig),1);
+    L = sigma(ind.internal(sig),2);
+    div(K,sig) = sigma(ind.internal(sig),4);
+    div(L,sig) = -sigma(ind.internal(sig),4);
 end

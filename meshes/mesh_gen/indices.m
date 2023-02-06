@@ -14,7 +14,6 @@ function ind = indices(ncell,sigma)
 
 internal = find(sigma(:,2)~=0);
 
-
 ind.internal = internal;
 ind.bound = find(sigma(:,2)==0);
 

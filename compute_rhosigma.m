@@ -1,4 +1,4 @@
-function [out]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,str)
+function [out]=compute_rhosigma(ind,sigma,cc,N,rho_f,rho_in,gradt,Mst,RHt,It,Rst,rec,uk,str)
 
 % str='rhos'    -> compute reconstructed density
 % str='drhos'   -> compute derivative of the reconstructed density
@@ -7,11 +7,11 @@ function [out]=compute_rhosigma(ind,edges,cc,mid,N,rho_f,rho_in,gradt,Mst,RHt,It
 
 ncell2h = size(rho_in,1);
 ncell = size(cc,1);
-nei = length(ind.internal);
+nsig_in = length(ind.internal);
 tnr = N*ncell;
 tnr2h = N*ncell2h;
 tnp = (N+1)*ncell;
-te = (N+1)*nei;
+te = (N+1)*nsig_in;
 phi = uk(1:tnp);
 rho = uk(tnp+1:tnp+tnr2h);
 
@@ -33,12 +33,12 @@ else
     if strcmp(str,'rhos')
         out = zeros(te,1);
         for k=1:N+1
-            out((k-1)*nei+1:k*nei) = rho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));            
+            out((k-1)*nsig_in+1:k*nsig_in) = rho_sig(ind,sigma,rhoa((k-1)*ncell+1:k*ncell));            
         end
     elseif strcmp(str,'drhos')
         out = cell(N+1,1);
         for k=1:N+1
-            out{k} = drho_sig(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell));
+            out{k} = drho_sig(ind,sigma,rhoa((k-1)*ncell+1:k*ncell));
         end
         out = blkdiag(out{:});
         out = out*RHt*It*I_all;
@@ -46,7 +46,7 @@ else
         out = cell(N+1,1);
         a = Mst*gradphi.^2;
         for k=1:N+1
-            out{k} = ddrho_siga(ind,edges,mid,cc,rhoa((k-1)*ncell+1:k*ncell),a((k-1)*nei+1:k*nei));
+            out{k} = ddrho_siga(ind,sigma,rhoa((k-1)*ncell+1:k*ncell),a((k-1)*nsig_in+1:k*nsig_in));
         end
         out = blkdiag(out{:});
         out = I_all'*It'*RHt'*out*RHt*It*I_all;

@@ -1,4 +1,4 @@
-function [] = plot_rhos(grid_rho,rho_in,rho,rho_f)
+function [] = plot_rhos_2d(grid_rho,rho_in,rho,rho_f,dsp)
 	ncell_rho = grid_rho.ncell;
 	N = size(rho,1) / ncell_rho;
 	figure
@@ -24,9 +24,8 @@ function [] = plot_rhos(grid_rho,rho_in,rho,rho_f)
 	%outname=strcat('cross_harm_rhok',str,'.jpg');
 	%saveas(fig,outname)
 	%dsp = 2;
-	dsp = ceil(N/2);
-	for k=1:N
-		%k=4;
+	%dsp = ceil(N/2);
+	for k=dsp
 		rhok = rho((k-1)*ncell_rho+1:k*ncell_rho);
 		figure
 		fig=patch('Faces',grid_rho.cells(:,2:end),...
