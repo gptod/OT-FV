@@ -9,14 +9,14 @@ close all
 
 fn1 = 'sq/mesh1/coord.txt'; %coordinates
 fn2 = 'sq/mesh1/topol.txt'; %topology
-name = 'mat_files/fwi_test_n41'; %name of the final structure
+name = '../mat_files_2d/sq_mesh1'; %name of the final structure
 
 %% load coordinates and topology
 % use the last four input variables to erase useless columns from the two
 % files...
-%[nodes,cells] = get_mesh(fn1,fn2,1,0,1,1);
-[nodes,cells] = get_mesh(fn1,fn2,0,0,1,0);
-%[nodes,cells] = get_mesh(fn1,fn2,0,0,0,0);
+%[nodes,cells] = get_mesh_2d(fn1,fn2,1,0,1,1);
+[nodes,cells] = get_mesh_2d(fn1,fn2,0,0,1,0);
+%[nodes,cells] = get_mesh_2d(fn1,fn2,0,0,0,0);
 nnode = size(nodes,1);
 ncell = size(cells,1);
 maxn = max(cells(:,1));
