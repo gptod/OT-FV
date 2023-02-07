@@ -10,7 +10,7 @@ function [phi,rho,ierr,info_solver] = solve_benamoubrenier(topol,coord,Ntime,...
 		[grid_phi, I] = grid_rho.refine();
 	else
 		grid_phi = grid_rho;
-		I = speye(grid_rho.ncell);
+		I = speye(grid_rho.ncells);
 	end
 
 	% set controls for Interior Point solver and linear solver
@@ -28,8 +28,8 @@ function [phi,rho,ierr,info_solver] = solve_benamoubrenier(topol,coord,Ntime,...
 		error('Initial and final denisity have different mass')
 	end
 	
-	Nr = grid_rho.ncell * Ntime;
-	Np = grid_phi.ncell * (Ntime + 1);
+	Nr = grid_rho.ncells * Ntime;
+	Np = grid_phi.ncells * (Ntime + 1);
 	
 	if exist('phi_initial_guess ','var') 
 		phi0 = phi_initial_guess;

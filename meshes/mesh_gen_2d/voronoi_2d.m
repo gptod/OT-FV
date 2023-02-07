@@ -1,4 +1,4 @@
-function  [nodes_v,cells_v] = voronoi(nodes_t,edges_t,sigma_t,cc_t,mid,corners)
+function  [nodes_v,cells_v] = voronoi_2d(nodes_t,edges_t,sigma_t,cc_t,mid,corners)
 
 % Transform the Delaunay partitioning of a polygonal domain into a Voronoi tessellation
 % The corners needs to be specified in order to be properly added

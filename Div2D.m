@@ -1,8 +1,8 @@
-function [div] = Div2D(ncell,nsig_in,ind,sigma)
+function [div] = Div2D(ncells,nsig_in,ind,sigma)
 
 % divergence matrix
 
-div = sparse(ncell,nsig_in);
+div = sparse(ncells,nsig_in);
 
 for sig=1:nsig_in
     K = sigma(ind.internal(sig),1);

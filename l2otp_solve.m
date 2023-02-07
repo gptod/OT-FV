@@ -97,21 +97,21 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	% dimensions
 	N = Ntime;
 	Nt = N + 1;
-	ncell_phi = grid_phi.ncell;
-	ncell_rho = grid_rho.ncell;
+	ncells_phi = grid_phi.ncells;
+	ncells_rho = grid_rho.ncells;
 	nsig_in = grid_phi.nsig_in;
-	Np = (N+1)*ncell_phi; % total number of dofs for the potential
-	Nr = N*ncell_rho; % total number of dofs for the density
+	Np = (N+1)*ncells_phi; % total number of dofs for the potential
+	Nr = N*ncells_rho; % total number of dofs for the density
 	tne = (N+1)*nsig_in; % total number of internal edges
 	
 
 	% set initial solution
-  uk = phi_rho_slack_initial_guess; % initial condition of the barrier method
+    uk = phi_rho_slack_initial_guess; % initial condition of the barrier method
 	
 	% normalize rho
 	for k = 1:N
-		rhomass=grid_rho.area'*uk(Np+1+(k-1)*ncell_rho:Np+k*ncell_rho);
-		uk(Np+1+(k-1)*ncell_rho:Np+k*ncell_rho) = uk(Np+1+(k-1)*ncell_rho:Np+k*ncell_rho)/rhomass;
+		rhomass=grid_rho.area'*uk(Np+1+(k-1)*ncells_rho:Np+k*ncells_rho);
+		uk(Np+1+(k-1)*ncells_rho:Np+k*ncells_rho) = uk(Np+1+(k-1)*ncells_rho:Np+k*ncells_rho)/rhomass;
 	end
 
 
@@ -126,15 +126,15 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 
 	% global matrices
 	global_ass = tic;
-	Dt = assembleDt(N,ncell_phi);
-	divt = assembleDivt(N,ncell_phi,nsig_in,div_phi);
-	gradt = assembleGradt(N,ncell_phi,nsig_in,grad_phi);
-	M_phi = assembleMxt(N,ncell_phi,mass_phi);
-	M_rho = assembleMxt(N,ncell_rho,mass_rho);
+	Dt = assembleDt(N,ncells_phi);
+	divt = assembleDivt(N,ncells_phi,nsig_in,div_phi);
+	gradt = assembleGradt(N,ncells_phi,nsig_in,grad_phi);
+	M_phi = assembleMxt(N,ncells_phi,mass_phi);
+	M_rho = assembleMxt(N,ncells_rho,mass_rho);
 	Mst = assembleMst(N,nsig_in,mass_edge_phi);
-	RHt = assembleRHt(N,ncell_phi);
-	It = assembleIt(N,ncell_phi,ncell_rho,I);
-	I_all = [sparse(ncell_rho,Nr);speye(Nr,Nr);sparse(ncell_rho,Nr)];
+	RHt = assembleRHt(N,ncells_phi);
+	It = assembleIt(N,ncells_phi,ncells_rho,I);
+	I_all = [sparse(ncells_rho,Nr);speye(Nr,Nr);sparse(ncells_rho,Nr)];
 
 	if rec==1
     Rs=Ktos2D(grid_phi.ind,grid_phi.sigma,...
@@ -150,8 +150,8 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	end
 
 	nsig_in_rho = size(div_rho,2);
-	divt_rho  = assembleDivt(N-1,grid_rho.ncell,nsig_in_rho,div_rho); 
-	gradt_rho = assembleGradt(N-1,grid_rho.ncell,nsig_in_rho,grad_rho);
+	divt_rho  = assembleDivt(N-1,grid_rho.ncells,nsig_in_rho,div_rho); 
+	gradt_rho = assembleGradt(N-1,grid_rho.ncells,nsig_in_rho,grad_rho);
 
 	
 	
@@ -426,9 +426,9 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				
 				% normalize rho
 				for k = 1:N
-					rhomass=grid_rho.area'*uk(Np+1+(k-1)*ncell_rho:Np+k*ncell_rho);
+					rhomass=grid_rho.area'*uk(Np+1+(k-1)*ncells_rho:Np+k*ncells_rho);
 					%fprintf('mass rho(%d)-1.0=%1.1e\n',k,rhomass-1.0)
-					uk(Np+1+(k-1)*ncell_rho:Np+k*ncell_rho) = uk(Np+1+(k-1)*ncell_rho:Np+k*ncell_rho)/rhomass;
+					uk(Np+1+(k-1)*ncells_rho:Np+k*ncells_rho) = uk(Np+1+(k-1)*ncells_rho:Np+k*ncells_rho)/rhomass;
 				end
 
 				if (IP_ctrl.save_h5 > 1 )
@@ -484,7 +484,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 			
 			if (IP_ctrl.save_csv)
 				fprintf(csvID,'%6d,%6d,%6d,%5d,%8.3e,%6d,%7d,%8d,%11d,%1.1e,%1.1e,%1.1e,%1.1e,%1.1e,%1.1e,%8d,%11d,%8d,%11d\n',...
-								ncell_rho,ncell_phi,N,...
+								ncells_rho,ncells_phi,N,...
 								itk1,delta_0,itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
 								linear_solver_info.inner_nequ,min(uk(Np+1:Np+Nr)),mu,theta,...
 								sum_linsys,sum_assembly,sum_prec,...

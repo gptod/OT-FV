@@ -39,12 +39,12 @@ nodes_v(:,2) = (nodes_v(:,2)+sh)/(1+2*sh);
 % clear all the old variables
 clear e ee v sh corners bl br tr tl
 clear cell_dist cell_e cell_sig_int cells mid cc dcells dnodes edges
-clear h ind maxn ncell nedge nsig_in nnode nodes area fn1
+clear h ind maxn ncells nedges nsig_in nnode nodes area fn1
 
 nodes = nodes_v; cells = cells_v;
 clear nodes_v cells_v
 nnode = size(nodes,1);
-ncell = size(cells,1);
+ncells = size(cells,1);
 maxn= max(cells(:,1));
 
 % compute cells related properties
@@ -52,10 +52,10 @@ maxn= max(cells(:,1));
 
 % compute edges structure
 [sigma,edges,mid_edges] = str_sigma_2d(nodes,cells,cc);
-nedge = size(edges,1);
+nedges = size(edges,1);
 
 % compute indices
-ind = indices(ncell,sigma);
+ind = indices(ncells,sigma);
 
 % compute cells-edges structure
 nsig_in = length(ind.internal);

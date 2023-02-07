@@ -1,6 +1,6 @@
 function [] = plot_rhos_2d(grid_rho,rho_in,rho,rho_f,dsp)
-	ncell_rho = grid_rho.ncell;
-	N = size(rho,1) / ncell_rho;
+	ncells_rho = grid_rho.ncells;
+	N = size(rho,1) / ncells_rho;
 	figure
 	fig=patch('Faces',grid_rho.cells(:,2:end),...
 						'Vertices',grid_rho.nodes,...
@@ -26,7 +26,7 @@ function [] = plot_rhos_2d(grid_rho,rho_in,rho,rho_f,dsp)
 	%dsp = 2;
 	%dsp = ceil(N/2);
 	for k=dsp
-		rhok = rho((k-1)*ncell_rho+1:k*ncell_rho);
+		rhok = rho((k-1)*ncells_rho+1:k*ncells_rho);
 		figure
 		fig=patch('Faces',grid_rho.cells(:,2:end),...
 							'Vertices',grid_rho.nodes,...

@@ -7,9 +7,9 @@ close all
 %        topology structure: [vertex 1, vertex 2, ...]
 % OUTPU: mesh structure
 
-fn1 = 'sq/mesh1/coord.txt'; %coordinates
-fn2 = 'sq/mesh1/topol.txt'; %topology
-name = '../mat_files_2d/sq_mesh1'; %name of the final structure
+fn1 = 'sq/mesh5/coord.txt'; %coordinates
+fn2 = 'sq/mesh5/topol.txt'; %topology
+name = '../mat_files_2d/sq_mesh5'; %name of the final structure
 
 %% load coordinates and topology
 % use the last four input variables to erase useless columns from the two
@@ -17,8 +17,8 @@ name = '../mat_files_2d/sq_mesh1'; %name of the final structure
 %[nodes,cells] = get_mesh_2d(fn1,fn2,1,0,1,1);
 [nodes,cells] = get_mesh_2d(fn1,fn2,0,0,1,0);
 %[nodes,cells] = get_mesh_2d(fn1,fn2,0,0,0,0);
-nnode = size(nodes,1);
-ncell = size(cells,1);
+nnodes = size(nodes,1);
+ncells = size(cells,1);
 maxn = max(cells(:,1));
 
 % shift coordinates (if needed)
@@ -38,9 +38,10 @@ maxn = max(cells(:,1));
 % compute edges structure
 [sigma,edges,mid_edges] = str_sigma_2d(nodes,cells,cc);
 nsig = size(sigma,1);
+nedges = size(edges,1);
 
 % compute indices
-ind = indices(ncell,sigma);
+ind = indices(ncells,sigma);
 nsig_in = length(ind.internal);
 
 
@@ -71,8 +72,8 @@ nsig_in = length(ind.internal);
 %% saving
 
 % save the mesh structure
-%save(name,'area','cc','cells','edges','sigma','h','ind','mid_edges','ncell','nsig','nsig_in','nnode','nodes')
-save(name,'area','cc','cells','edges','sigma','cell_sig','h','ind','mid_edges','ncell','nsig','nsig_in','nnode','nodes')
+%save(name,'area','cc','cells','edges','sigma','h','ind','mid_edges','ncells','nedges','nsig','nsig_in','nnode','nodes')
+save(name,'area','cc','cells','edges','sigma','cell_sig','h','ind','mid_edges','ncells','nedges','nsig','nsig_in','nnodes','nodes')
 
 % %% check validity of the discretization for triangulations
 % 

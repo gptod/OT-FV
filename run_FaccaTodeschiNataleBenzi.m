@@ -39,10 +39,10 @@ compute_err = 1; % compute errors with respect to exact solutions
 % 2:
 % 3:
 % 4,5,6: like 1,2,3 but with two grid level
-for mesh_type = 5;
+for mesh_type = 1;
 	
 	% refine level. Available from 1 to 5
-	for h_i = 4;
+	for h_i = 1;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -62,23 +62,23 @@ for mesh_type = 5;
 		
 		% grids for rho and phi (see TPFA_grid class)
 		% are read from file
-		[grid_rho, grid_phi, I] = init_grids(mesh_type, h_i);
+		[grid_rho, grid_phi, I] = init_grids_2d(mesh_type, h_i);
 		
 		
 		
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 4;%4:-1:1
+		for dt_i = 1;%4:-1:1
 		%for dt_i = h_i +1
 			% number of time steps
 			N=4*(2^(dt_i));
 
 			% set problem dimension
-			ncell_phi=grid_phi.ncell
-			ncell_rho=grid_rho.ncell
-			Np=(N+1)*ncell_phi
-			Nr=(N)*ncell_rho
+			ncells_phi=grid_phi.ncells
+			ncells_rho=grid_rho.ncells
+			Np=(N+1)*ncells_phi
+			Nr=(N)*ncells_rho
 			
 
 
@@ -99,7 +99,7 @@ for mesh_type = 5;
 					t=k/(N+1);
 					rho_real = exact_rho_function(grid_rho.cc(:,1),grid_rho.cc(:,2),t);
 					rho_real = rho_real*mass/sum(rho_real.*grid_rho.area);
-					phi_rho_slack_reference_solution(Np+1+(k-1)*ncell_rho:Np+k*ncell_rho)=rho_real;
+					phi_rho_slack_reference_solution(Np+1+(k-1)*ncells_rho:Np+k*ncells_rho)=rho_real;
 				end
 			end			
 		
@@ -192,7 +192,7 @@ for mesh_type = 5;
 					logID = fopen(IP_ctrl.file_log,'w');
 					fprintf(logID,'mesh type      = %d\n',mesh_type);
 					fprintf(logID,'rec type       = %d\n',rec);
-					fprintf(logID,'ncellphi= %d ncellrho=%d n time step=%d \n',ncell_phi,ncell_rho,N);
+					fprintf(logID,'ncellphi= %d ncellrho=%d n time step=%d \n',ncells_phi,ncells_rho,N);
 					fclose(logID);	
 
 					% csv file with performance resume
@@ -235,10 +235,10 @@ for mesh_type = 5;
 
 						% rebuild some matrices
 						[mass_phi,mass_edge_phi,div_phi,grad_phi] = build_matrices(grid_phi);
-						gradt = assembleGradt(N,ncell_phi,size(grad_phi,1),grad_phi);
+						gradt = assembleGradt(N,ncells_phi,size(grad_phi,1),grad_phi);
 						Mst = assembleMst(N,size(grad_phi,1),mass_edge_phi);
-						RHt = assembleRHt(N,ncell_phi);
-						It = assembleIt(N,ncell_phi,ncell_rho,I);
+						RHt = assembleRHt(N,ncells_phi);
+						It = assembleIt(N,ncells_phi,ncells_rho,I);
 
 						% compute W2
 						%approx_W2 = compute_cost(grid_phi.ind,grid_phi.edges,grid_phi.mid,grid_phi.cc,...
@@ -263,7 +263,9 @@ for mesh_type = 5;
 					
 					% plot
 					if (plot_figures)
-						plot_rhos(grid_rho,rho_in,rho,rho_f)
+                        Ndsp=3;
+                        dsp=ceil(Ntime/(Ndsp+1)):ceil(Ntime/(Ndsp+1)):ceil(Ntime-Ntime/(Ndsp+1));
+						plot_rhos(grid_rho,rho_in,rho,rho_f,dsp)
 					end
 				end	
 			end

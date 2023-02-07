@@ -2,7 +2,7 @@
 classdef TPFA_grid <handle
   properties
 	% cells, cells number
-	ncell;
+	ncells;
 	cells;
 	% nodes coordinate, nodes number
 	nodes;
@@ -21,6 +21,7 @@ classdef TPFA_grid <handle
     area;
     cc;
     mid_edges;
+    mid_faces;
     h;
   end
   methods
@@ -36,7 +37,7 @@ classdef TPFA_grid <handle
 		% TODO: use csr matrix
 
 	    obj.cells = [sum(topol~=0,2) topol];
-		obj.ncell = size(obj.cells,1);
+		obj.ncells = size(obj.cells,1);
 		obj.nodes = nodes;
 		obj.nnodes = size(nodes,1);
 
@@ -49,7 +50,7 @@ classdef TPFA_grid <handle
         obj.nedges = size(obj.edges,1);
 
 		% compute indices 
-		obj.ind = obj.indices(obj.ncell,obj.sigma);
+		obj.ind = obj.indices(obj.ncells,obj.sigma);
 		obj.nsig_in = obj.ind.nsig_in;
 
     end
@@ -69,7 +70,7 @@ classdef TPFA_grid <handle
 		    %               It also describes the relation between cooarse and fine cells
 
 			% shorthands
-			ncell = obj.ncell;
+			ncells = obj.ncells;
 			nsig = obj.nsig;
 			nnode = obj.nnodes;
 			
@@ -79,16 +80,16 @@ classdef TPFA_grid <handle
 			maxn= max(obj.cells(:,1));
 			[cell_sig,~,~] = obj.str_cell_2d(maxn,obj.ind,obj.sigma,obj.mid_edges,obj.cc);
 		
-			cells_f = zeros(3*ncell,5);
-			nodes_f = zeros(nnode+nsig+ncell,2);
+			cells_f = zeros(3*ncells,5);
+			nodes_f = zeros(nnode+nsig+ncells,2);
 			% TODO: remove this, derived variables are computed in the constructor
 			nodes = [obj.nodes zeros(nnode,1)];
 			mid = [obj.mid_edges zeros(nsig,1)];
-			cc = [obj.cc zeros(ncell,1)];
+			cc = [obj.cc zeros(ncells,1)];
 			int = 0;
-			coarse2fine = sparse(3*ncell,ncell);
+			coarse2fine = sparse(3*ncells,ncells);
 
-			for k=1:ncell
+			for k=1:ncells
 				
 				K = obj.cells(k,2:4);
 				E = cell_sig(k,2:4);
@@ -171,11 +172,11 @@ classdef TPFA_grid <handle
 		    % div : sparse matrix discretizing the divergence operator
 		    % grad : sparse matrix discretizing the grad operator
 		    %        (grad = - edge_mass^{-1} div )
-			mass = spdiags(obj.area,0,obj.ncell,obj.ncell);
+			mass = spdiags(obj.area,0,obj.ncells,obj.ncells);
 			nsig_in = obj.nsig_in;
 			ds = obj.sigma(obj.ind.internal,3).*obj.sigma(obj.ind.internal,4);
 			edge_mass = spdiags(ds,0,nsig_in,nsig_in);
-			div = Div2D(obj.ncell,nsig_in,obj.ind,obj.sigma); % divergence matrix
+			div = Div2D(obj.ncells,nsig_in,obj.ind,obj.sigma); % divergence matrix
 			grad = -edge_mass\div'; % gradient matrix
 		end
 		
@@ -416,10 +417,10 @@ classdef TPFA_grid <handle
 
 		end
 
-		function [ind] = indices(obj,ncell,sigma)
+		function [ind] = indices(obj,ncells,sigma)
         
             % INPUT:
-            % ncell: number of cells
+            % ncells: number of cells
             % edges: edges structure
             % OUPUT:
             % ind: indices structure
@@ -496,11 +497,11 @@ classdef TPFA_grid <handle
             % cell_eint: internal edges per cell structure
             % cell_dist: distances from cc to the edges per cell structure
             
-            ncell = size(cc,1);
+            ncells = size(cc,1);
             nsigma = size(sigma,1);
             nsig_in = length(ind.internal);
             
-            cell_sig_in = zeros(ncell,maxn+1);
+            cell_sig_in = zeros(ncells,maxn+1);
             % for each internal edge e, take the two cells K and L defining it and assign to both the
             % edge e
             for sig=1:nsig_in
@@ -514,7 +515,7 @@ classdef TPFA_grid <handle
                 end
             end
             
-            cell_sig = zeros(ncell,maxn+1);
+            cell_sig = zeros(ncells,maxn+1);
             % for each edge sig, take the two cells K and L defining it and assign to both the
             % edge sig
             for sig=1:nsigma
@@ -528,10 +529,10 @@ classdef TPFA_grid <handle
                 end
             end
             
-            cell_dist = zeros(ncell,maxn+1);
+            cell_dist = zeros(ncells,maxn+1);
             cell_dist(:,1) = cell_sig(:,1);
             % for each cell i, for each edges j of the cell i, compute the distance |cc(i)-mid(j)|
-            for i=1:ncell
+            for i=1:ncells
                 for j=1:cell_dist(i,1)
                     cell_dist(i,1+j) = sqrt((cc(i,1)-mid(cell_sig(i,1+j),1)).^2+(cc(i,2)-mid(cell_sig(i,1+j),2)).^2);
                 end

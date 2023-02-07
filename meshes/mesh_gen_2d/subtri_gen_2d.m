@@ -3,10 +3,10 @@ close all
 
 % construct the finer mesh from a coarse triangular mesh
 
-name_f = 'subtri2_mesh1'; %name of the final structure
+name_f = '../mat_files_2d/subtri2_mesh5'; %name of the final structure
 
 % load the coarse mesh
-load('tri2_mesh1.mat');
+load('../mat_files_2d/tri2_mesh5.mat');
 
 if exist('cell_sig','var')==0
     % compute cells-edges structure
@@ -14,15 +14,15 @@ if exist('cell_sig','var')==0
     [cell_e,~,~] = str_cell_2d(maxn,ind,sigma,mid_edges,cc);
 end
 
-cells_f = zeros(3*ncell,5);
-nodes_f = zeros(nnode+nsig+ncell,2);
-nodes = [nodes zeros(nnode,1)];
+cells_f = zeros(3*ncells,5);
+nodes_f = zeros(nnodes+nsig+ncells,2);
+nodes = [nodes zeros(nnodes,1)];
 mid_edges = [mid_edges zeros(nsig,1)];
-cc = [cc zeros(ncell,1)];
+cc = [cc zeros(ncells,1)];
 int = 0;
-I = sparse(3*ncell,ncell);
+I = sparse(3*ncells,ncells);
 
-for k=1:ncell
+for k=1:ncells
     
     K = cells(k,2:4);
     E = cell_sig(k,2:4);
@@ -90,13 +90,18 @@ cells = cells_f;
 cc2h = cc;
 mid_edges2h = mid_edges;
 area2h = area;
-ncell2h = ncell;
+nnodes2h = nnodes;
+ncells2h = ncells;
+nedges2h = nedges;
+nsig2h = nsig;
+nsig_in2h = nsig_in;
 h2h = h;
-clearvars -except nodes cells I name_f cc2h mid_edges2h area2h ncell2h nodes2h cells2h edges2h sigma2h ind2h h2h
+clearvars -except nodes cells I name_f cc2h mid_edges2h area2h ncells2h nodes2h ...
+                  cells2h edges2h sigma2h ind2h h2h nedges2h nsig2h nsig_in2h nnodes2h
 
 
-nnode = size(nodes,1);
-ncell = size(cells,1);
+nnodes = size(nodes,1);
+ncells = size(cells,1);
 maxn= max(cells(:,1));
 
 
@@ -108,9 +113,10 @@ maxn= max(cells(:,1));
 % compute edges structure
 [sigma,edges,mid_edges] = str_sigma_2d(nodes,cells,cc);
 nsig = size(sigma,1);
+nedges = size(edges,1);
 
 % compute indices
-ind = indices(ncell,sigma);
+ind = indices(ncells,sigma);
 nsig_in = length(ind.internal);
 
 
@@ -130,6 +136,8 @@ axis off
 %% saving
 
 % save the mesh structure
-save(name_f,'area','cc','cells','edges','sigma','h','ind','mid_edges','ncell','nsig','nsig_in','nnode','nodes','I',...
-            'cc2h','mid_edges2h','area2h','ncell2h','nodes2h','cells2h','edges2h','sigma2h','ind2h','h2h')
+save(name_f,'area','cc','cells','edges','sigma','h','ind','mid_edges','ncells',...
+            'nedges','nsig','nsig_in','nnodes','nodes','I','cc2h','mid_edges2h',...
+            'area2h','ncells2h','nodes2h','cells2h','edges2h','sigma2h','ind2h','h2h',...
+            'nnodes2h','nedges2h','nsig2h','nsig_in2h')
 

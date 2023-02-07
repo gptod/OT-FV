@@ -5,7 +5,7 @@ close all
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
 test_cases = ["sin"];%,"compression"];
-for  test_case = test_cases;
+for  test_case = test_cases
 	test_case = test_case;
 	disp(test_case)
 
@@ -28,7 +28,7 @@ for  test_case = test_cases;
 
 	
 	% refine level. Available from 1 to 5
-	for h_i = 1;
+	for h_i = 1
 
 		% recostruction used
 		% rec == 1 : linear
