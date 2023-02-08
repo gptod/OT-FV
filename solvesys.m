@@ -112,10 +112,15 @@ for k=1:N+1
 end
 % E_phi=A_kernels(1:N,:)';
 % [A,B1T,B2,C,f1,f2,E]=get_saddle_point(JF,F);
-
-% W_rho = zeros(Np+Nr,N);
+E_rho=zeros(N,Nr);
+for k = 1:N
+	E_rho(k,1+(k-1)*ncellrho:k*ncellrho) = ones(1,ncellrho);
+end
+% Mrho = -JF.rs;
+% E=[zeros(Np,N); Mrho*E_rho'];
+% W_rho=zeros(Np+Nr,N);
 % for i=1:N
-% 	rhs = [zeros(Np,1);E(i,:)'];
+% 	rhs = E(:,i);
 % 	W_rho(1:i*ncellphi,i) = -1/(N+1);
 	
 	
@@ -131,6 +136,7 @@ end
 
 
 area2h=JF.area2h;
+area=JF.area;
 domain_size = sum(JF.area2h);
 deltat=1/(N+1);
 
@@ -536,6 +542,15 @@ case 'primal'
 		% solve with fgmres or bicgstab if prec is linear
 		outer_timing=tic;
 		rhs=[f1;f2];
+
+		% scaling rhs to avoid over solving of full IP system
+		if (controls.scaling_rhs)
+			scaling=1.0/(norm(rhs)/norm([f;g;h]));
+		else
+			scaling=1.0;
+		end
+
+		
 		%'applying'
 		[d,info_J]=...
 		apply_iterative_solver( @(x) apply_saddle_point(x,@(y) A*y ,...
@@ -544,7 +559,7 @@ case 'primal'
 																										@(z) C*z,...
 																										Np,Nr),...
 														rhs, controls.ctrl_outer, prec,[],...
-														controls.left_right,controls.scaling_rhs );
+														controls.left_right,scaling );
 		outer_iter=uint64(info_J.iter);
 		outer_cpu=toc(outer_timing);		
 	
@@ -2383,11 +2398,11 @@ case 'bb'
 	
 		if ( strcmp(controls.mode_assemble_inverse22,'bbt'))
 			% we use that Bx^T = -Bx - (Laplacian phi)\cdot
-			laplacian_phi = A*JF.phi;
+			laplacian_phi = JF.divt_phi*JF.gradphi;
 			diag_laplacian_phi = sparse(1:Np,1:Np,(laplacian_phi)',Np,Np);
 
 			% not sure about the sign of the laplacian
-			sign_laplacian = -1;
+			sign_laplacian = 1;
 			S22 = B2 * inv_Mphi * ( B1T + sign_laplacian * diag_laplacian_phi * I_cellphi_cellrho * rec_time');
 		elseif (strcmp(controls.mode_assemble_inverse22,'bb') )
 			% spatial component of B tilde matrix
@@ -2621,15 +2636,39 @@ case 'bb_noproj'
 
 	% create saddle point components
 	[A,B1T,B2,C,f1,f2,E_rho]=get_saddle_point(JF,F);
-	lambda = zeros(N,1);
-	for i=1:N
-		imbalance = sum( f2(1+(i-1)*ncellrho:i*ncellrho));
-		lambda(i) = - imbalance / domain_size;
-	end
-	f2 = f2 + E_rho'*lambda;
+	rhs_i  = zeros(N,1);
 
-	E_phi=A_kernels(1:N,:)';
-	rhs_i = E_phi(1:Np,1:N)'*F.phi;
+	E_phi=zeros(N,Np);
+	for k = 1:N
+	  E_phi(k,1+(k-1)*ncellphi:k*ncellphi) = ones(1,ncellphi);
+  end
+	
+	
+	E_rho=zeros(N,Nr);
+	for k = 1:N
+	  E_rho(k,1+(k-1)*ncellrho:k*ncellrho) = ones(1,ncellrho);
+  end
+	
+
+	Mphi = JF.Mxt;
+	Mrho = -JF.rs;
+
+	% we assume \bar{phi} having zero mean
+	% this does not affect the optimality conditions wiht the real phi
+	% but we new to add M*(E')^T lambda once lambda is fixed
+
+	% lambda is defined according to the formula
+	% phi = \bar{phi} + int_0^t lambda
+	area_domain = sum(JF.area2h);
+	lambda = E_phi*Mphi*F.phi/area_domain;
+	for i=2:N
+	 	% see also dp_correction
+	 	lambda(i)  = lambda(i) - lambda(i-1);
+	end
+	lambda=zeros(N,1);
+
+	f2 = f2 + Mrho * E_rho'*lambda;
+	rhs_i = zeros(N,1);
 	
 	
 	B1T_time=-JF.B1T_time;
@@ -2638,14 +2677,6 @@ case 'bb_noproj'
 	% define projectors actions
 	P = @(y) P_apply(y,area2h);
 	PT = @(y) PT_apply(y,area2h);
-
-	if (controls.ground)
-		% ground system 
-		[A,B1T_time,B1T_space,B2_time,B2_space,f1]=ground_saddle(A,B1T_time,B1T_space,f1,N);
-		B1T= B1T_time+B1T_space;
-		B2 = B2_time+B2_space;
-		rhsR=[f1;P(f2)];
-	end
 
 	% cpu for preprocessing A
 	time_A=tic;
@@ -2756,6 +2787,7 @@ case 'bb_noproj'
 		% from BTA=-AB we can get
 		% BA^{-1}BT=A (-BB)^{-1}=-(B^TB^T)^{-1} A
 		% lrb
+		disp('bb prec')
 		lrb=controls.lrb;
 
 		% inverse of C
@@ -2777,6 +2809,8 @@ case 'bb_noproj'
 		rho=spdiags(-JF.ss,0);
 		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
 		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
+
+		
 		
 		% matrix H
 		RHt = assembleRHt(N,ncellphi);
@@ -2832,7 +2866,7 @@ case 'bb_noproj'
      							ctrl_inner22.verbose,...
      							'SCA',...
 		 							index_agmg);
-		inv_SCA.init(approx_S+1e-10*speye(Nr),ctrl_loc);
+		inv_SCA.init(approx_S,ctrl_loc);
 		inv_SCA.cumulative_iter=0;
 		inv_SCA.cumulative_cpu=0;
 
@@ -2912,58 +2946,118 @@ case 'bb_noproj'
 	inverse_S=@(y) apply_Schur_inverse(y,inverseS,apply_schur);
 	
 
+	 
+	
+
+	% [A            BT 0            ] dx = f1 
+  % [B            -C M_rho E_rho' ] dy = f2 
+	% [E_phi*M_phi  0  0            ] dl = rhs_i
+
+	% J = [ A, BT ]
+	%     [ B  -C ]
+
+	% [A           BT 0            ]   [I                  ] [J ] [I J^{-1} (0; E_rho) ]
+  % [B           -C  M_rho E_rho'] = [(E_phi;0)*J^{-1} I ] [ S] [  I                 ]
+	% [E_phi M_phi 0  0            ] 
+	
+	% W_rho = J^{-1} [0; E_rho] = [-E_phi/deltat; zero] <- exact
+	% W_phi = J^{-1} [E_phi; 0]   <- non trivial
+
+	% [A            BT  0           ]   [I       ] [J ] [I W_rho]
+  % [B            -C  M_rho E_rho'] = [W_phi I ] [ S] [  I    ]
+	% [E_phi M_phi  0   0           ]
+
+	% S = (E_phi;0)*J^{-1} [0; E_rho] = [E_phi,0] W_rho <- exact
+	
+	W_rho = zeros(Np+Nr,N);
+	for i=1:N
+		 W_rho(1:i*ncellphi,i) = -1/(N+1);
+	end  
+		 
+	% S_lambda = [E_phi Mphi; 0] * W_rho is lower triangular
+	S_lambda = E_phi * Mphi * W_rho(1:Np,1:N);
+
+
+	Czero=sparse(N,N);
+		
+	B1T_full = [sparse(Np,N);Mrho*E_rho'];
+	rho = spdiags(Dr);
+	I_cellphi_cellrho = assembleIt(N-2,ncellphi,ncellrho,JF.I);
+	size(I_cellphi_cellrho)
+	rho_phi = I_cellphi_cellrho*rho;
+	
+	Dr_phi = sparse(1:Np,1:Np,rho_phi,Np,Np);
+	B2_full = [E_phi*Dr_phi*Mphi, sparse(N,Nr)];
+
+	
+
+	Jacobian = @(v) apply_saddle_point(v,@(x) A*x ,...
+																		 @(y) B1T*y,...
+																		 @(x) B2*x,...
+																		 @(y) C*y,...
+																		 Np,Nr);
+	Jacobian_full = @(v) apply_saddle_point(v,@(x) Jacobian(x) ,...
+																		 @(y) B1T_full*y,...
+																		 @(x) B2_full*x,...
+																		 @(y) Czero*y,...
+																		 Np+Nr,N);
+
+
+	
+	rhs = [f1;f2;rhs_i];
+
+	% direct = 1
+	
+	Jacobian=[
+						A+1e-12*speye(Np,Np),B1T;...
+						B2,-C;...
+	];	
+	d_exact = Jacobian \ [f1;f2] ;
+
+	W_phi=zeros(Np+Nr,N);
+	
+	%hold on
+	for i=2:4
+		rhs = B2_full(i,:)';
+		vec = Jacobian \ rhs;
+		W_phi(:,i) = vec;
+		figure;
+		plot(W_phi(1:Np,i)-W_phi(1:Np,i-1));
+		norm(Jacobian*vec-rhs)
+		norm(Jacobian*vec-rhs)/norm(rhs)
+	end
+	%hold off
+
+	return
+	
 	%
 	% define preconditioner for
 	% [ A BT ]
 	% [ B -C ]
 	% option descibed in controls.outer_prec
-	prec_J = @(x) SchurCA_based_preconditioner(x, @(y) ort_proj(invA(y),A_kernels),...
+	prec_J = @(v) SchurCA_based_preconditioner(v, @(x) zero_mean(invA(x),area),...
 																						 @(y) inverse_S(y),...
 																						 @(y) B1T*y,...
-																						 @(z) B2*z,...
+																						 @(x) B2*x,...
 																						 Np,Nr,...
-																						 controls.outer_prec);%,@(y) SCA*y);
-
-	prec_J_full = @(x) SchurCA_based_preconditioner(x, prec_J,...
-																						 @(y) S_lambda\y,...
-																						 @(y) E_rho*y(Np+1:Np+Nr),...
-																						 @(x) E_phi*x(1:Np),...
-																						 Np+Nr,N,...
-																						 'upper');
+																						 'upper_triang');
 	
+	prec_J = @(x) invJ(Jacobian,x,area,N+1);
+	factor_one = @(v) SchurCA_based_preconditioner(v, @(x) prec_J(x) ,...
+																									@(y) -S_lambda\y,...
+																									@(y) B1T_full*y,...
+																									@(x) B2_full*x,... % this is wrong but is not used
+																									Np+Nr,N,...
+																									'lower_triang');
 
-	% [A      BT 0    ] dx = f1 
-  % [B     -C  E_rho] dy = f2 
-	% [E_phi  0  0    ] dl = rhs_i
+	factor_two = @(v) SchurCA_based_preconditioner(v, @(x) x ,... % identity 
+																									@(y) y,... % identity 
+																									@(y) W_rho*y,...
+																									@(x) zeros(N,1),... % this  is not used
+																									Np+Nr,N,...
+																									'upper_triang');
 
-	% J = [ A, BT ]
-	%     [ B  -C ]
-
-	% [A      BT 0    ]   [I                  ] [J ] [I J^{-1} (0; E_rho) ]
-  % [B     -C  E_rho] = [(E_phi;0)*J^{-1} I ] [ S] [  I                 ]
-	% [E_phi  0  0    ] 
-	
-	% W_rho = J^{-1} [0; E_rho]
-	% W_phi = J^{-1} [E_phi; 0]
-
-	% [A      BT 0    ]   [I       ] [J ] [I W_rho]
-  % [B     -C  E_rho] = [W_phi I ] [ S] [  I    ]
-	% [E_phi  0  0    ]
-
-	% (E_phi;0)*J^{-1} [0; E_rho] 
-
-	
-
-	% W_rho is trivial
-	W_rho = zeros(Np+Nr,N);
-	for i = 1:N
-		W_rho(1:i*ncellphi,i) = -1/(N+1);
-	end
-	% S_lambda = [E_phi; 0] * W_rho is lower triangular
-	S_lambda = E_phi(1:Np,1:N)'*W_rho(1:Np,1:N);
-
-
-	rhs = [f1;f2;rhs_i];
+	prec_full = @(x) factor_two( factor_one( x ) );
 	
 	
 	%dl = S\(-W_rho*rhs+rhs_i);
@@ -2979,42 +3073,61 @@ case 'bb_noproj'
 	else
 		scaling=1.0;
 	end
-	Czero=sparse(N,N);
-
-	Jacobian = @(v) apply_saddle_point(v,@(x) A*x ,...
-																		 @(y) B1T*y,...
-																		 @(x) B2*x,...
-																		 @(y) C*y,...
-																		 Np,Nr)
-	Jacobian_full = @(v) apply_saddle_point(v,Jacobian(x) ,...
-																		 @(y) E_rho*y(Np+1:Np+Nr),...
-																		 @(x) E_phi*x(1:Np),...
-																		 @(y) Czero*y,...
-																		 Np+Nr,N)
 	
 
-	controls.ctrl_outer.itermax = 4;
 	% run krylov solver with preconditioner prec
 	% controls are given in controls.ctrl_outer
 	[d,info_J]=apply_iterative_solver(@(v) Jacobian_full(v),...
-																		rhs_full, controls.ctrl_outer, ...
-																		@(z) prec(z),[],controls.left_right,scaling);
+																		rhs, controls.ctrl_outer, ...
+																		@(z) 	prec_full(z),[],controls.left_right,scaling);
 
+	norm(Jacobian_full(d)-rhs)/norm(rhs)
+
+	%for i=1:N
+	%	imbalance = d(Np+1+(i-1)*ncellrho:Np+i*ncellrho)'*JF.area2h;
+	%	fprintf('%d imb = %.2e, lambda = %.2e \n',i,imbalance,d(Np+Nr+i))
+	%end
+	%vec = E_phi*Mphi*d(1:Np);
+	%for i=1:N
+%		fprintf('%d m^x_i = %.2e\n',i,vec(i))
+	%end
+	
 	outer_cpu=toc(outer_cpu);
 	% get s increment
-	
+
 	
 	% get ds
 	ds = JF.ss\(-F.s-JF.sr*d(Np+1:Np+Nr));
-	d = [d; ds];
+	dl = d(Np+Nr+1:Np+Nr+N);
+	d = [d(1:Np+Nr); ds];
+	% correction of phi increment 
+	d(1:Np) = dp_correction(d(1:Np),JF,-dl);
 
-	% get lambda increment dl=-(deltat*|m|)^{-2} W_mat*(B*x + R*y + M*z+g)
-  dl=get_dl(JF,F,d);
+	vec = E_phi*Mphi*d(1:Np);
+	%for i=1:N
+%		fprintf('%d m^x_i = %.2e\n',i,vec(i))
+	%end
+
 	
-  
-  % correction of phi increment 
-	d(1:Np) = dp_correction(d(1:Np),JF,dl);
+	ds_exact = JF.ss\(- F.s - JF.sr * d_exact(Np+1:Np+Nr) );
+	d_exact = [d_exact(1:Np); d_exact(Np+1:Np+Nr); ds_exact];
+	
 
+	%vec = E_phi*Mphi*d_exact(1:Np);
+	%for i=1:N
+%		fprintf('%d m^x_i = %.2e\n',i,vec(i))
+	%end
+	
+
+	
+
+	plot(d-d_exact,'b');
+	%plot(d(1:Np+Nr+Nr),'b');
+	%d=d_exact;
+	
+	%hold on
+	%plot(d_exact(1:Np+Nr+Nr)-d(1:Np+Nr+Nr),'r');
+	%hold off
 	%
 	% STORE INFO
 	%
@@ -3023,7 +3136,7 @@ case 'bb_noproj'
   relres=info_J.res;
   iter=info_J.iter;
   normd = norm(d);
-
+	
 	if ( strcmp(inverseA_approach,'full'))
 		inner_iter=inverseA.cumulative_iter;
 		inner_cpu=inverseA.cumulative_cpu;
@@ -3054,13 +3167,18 @@ case 'bb_noproj'
 	prec_cpu=cpu_assembly_inverseA+cpu_assembly_inverseS;
 	% check res
   [resnorm,resp,resr,ress] = compute_linear_system_residuum(JF,F,d);
-	relres=resnorm; 
-	resume_msg=sprintf('outer: %d res=%1.1e [%1.1e,%1.1e,%1.1e] iter=%03d cpu=%1.1e| A %s : in/out=%0.1f bt=%1.1e  | S : in/out=%d bt=%1.1e',...
-   									 info_J.flag,resnorm,resp,resr,ress,uint64(outer_iter),outer_cpu,...
+	relres=resnorm;
+	
+	resume_msg=sprintf('outer: %d res=%1.1e [%1.1e,%1.1e,%1.1e] F=[%1.1e,%1.1e,%1.1e] iter=%03d cpu=%1.1e| A %s : in/out=%0.1f bt=%1.1e  | S : in/out=%d bt=%1.1e',...
+   									 info_J.flag,resnorm,resp,resr,ress,...
+										 norm(F.p),norm(F.r),norm(F.s),...
+										 uint64(outer_iter),outer_cpu,...
 										 controls.inverse11,(inner_iter/outer_iter)/nsysA,cpu_assembly_inverseA,...
    									 inner_iter2/outer_iter,cpu_assembly_inverseS);
-
-
+	disp(resume_msg)
+	%if (relres>1e-3)
+	%	return
+	%end
 	
 case 'bb_full'
 	% preconditioner for the full system 

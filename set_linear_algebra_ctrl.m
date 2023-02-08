@@ -40,7 +40,7 @@ function [ctrls, approach_descriptions] = ...
 		% tolerance
 		% max iterations
 		ctrl_outer = ctrl_solver;
-		ctrl_outer.init('fgmres',1e-5,400,0.0,0);
+		ctrl_outer.init('fgmres',1e-5,500,0.0,0);
 
 		left_right = 'right';
 
@@ -54,7 +54,7 @@ function [ctrls, approach_descriptions] = ...
 
 		% permute entries to minimize bandwidth S.
 		% 0 = off , 1 = permute to minimize band width
-		permute=1;
+		permute=0;
 
 		% scale tolerance to avoid oversolving
 		scaling_rhs=1;
@@ -70,7 +70,7 @@ function [ctrls, approach_descriptions] = ...
 												 "A_Mtx_Mxt",...
 												 "A_Mtt_Mtx_Mxt",...
 												 "A_Mtt_Mtx_Mxt_blockdiagMxx"];
-		for assembly_S = assembly_S_options([2])
+		for assembly_S = assembly_S_options([1])
 
 			
 			% cycle approach for S inversion
@@ -393,8 +393,6 @@ function [ctrls, approach_descriptions] = ...
 						% how BB is assembled
 						% 'bb' = we form a Btilde to match dimension and form BB
 						% 'bbt' = we use the identity Bx^t = -B - Laplacian
-							mode_assemble_inverse22 = 'bb';
-						%mode_assemble_inverse22 = 'bbt'
 						mode_assemble_inverse22 = mode_assemble;
 						
 					% for commute approach
@@ -480,7 +478,7 @@ function [ctrls, approach_descriptions] = ...
 		% set here fgmres (for non stationary prec), bicgstab,gmres, pcg
 		for isolver=[3]%1:length(outer_solvers)
 			ctrl_outer=ctrl_solver;
-			ctrl_outer.init(outer_solvers{isolver},1e-5,400,0.0,0);
+			ctrl_outer.init(outer_solvers{isolver},1e-5,1000,0.0,0);
 			
 			
 			% external prec appraoch
@@ -513,14 +511,14 @@ function [ctrls, approach_descriptions] = ...
 				% A = A + relax * Id
 				relax4inv11=1e-10;
 
-				for precision_primal=1e-1
+				for precision_primal=1e-3
 					% set here other approximate inverse of block11
 					ctrl_inner11=ctrl_solver;
-					ctrl_inner11.init('agmg',... %approach
+					ctrl_inner11.init('diag',... %approach
 														precision_primal,... %tolerance
 														20,...% itermax
 														0.0,... %omega
-														1);%,... verbose
+														0);%,... verbose
 														%strcat('agmg',num2str(precision_primal))); %verbose
 					
 					% possible choices for dual schur complement
@@ -546,7 +544,7 @@ function [ctrls, approach_descriptions] = ...
 							
 					
 					
-					for ia = [8];
+					for ia = [1];
 						inverse22=inverses22{ia};
 						if ( contains(inverse22,'commute') )
 							label_inverse22=strcat(inverse22,'null_space',num2str(null_space),'lrb', lrb);
