@@ -10,7 +10,7 @@ for  test_case = test_cases;
 	disp(test_case)
 
 % select the directory where to store the results
-folder_runs='runs_20230202';
+folder_runs='runs_20230208';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
@@ -72,7 +72,7 @@ for mesh_type = 5;
 		%for dt_i = 4;%4:-1:1
 		for dt_i = h_i
 			% number of time steps
-			N=4*(2^(dt_i));
+			N = 4*(2^(dt_i));
 
 			% set problem dimension
 			ncell_phi=grid_phi.ncell
@@ -151,7 +151,7 @@ for mesh_type = 5;
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["bb"];%simple"];%primal"];%, "simple","primal"];
+			for solver_approach=["bb","simple","primal"];%, "simple","primal"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
