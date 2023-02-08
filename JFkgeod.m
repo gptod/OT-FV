@@ -66,6 +66,7 @@ JOC.Mxt=Mxt;
 				% store this diagonal
 Np=tnp;
 JOC.area2h=-spdiags(JOC.rs(1:ncell2h,1:ncell2h));
+JOC.area=spdiags(Mxt(1:ncell,1:ncell));
 JOC.areadomain=sum(JOC.area2h);
 
 
@@ -78,6 +79,11 @@ JOC.Rst_rho=Rst_rho;
 JOC.Rs=Rs;
 JOC.divt_rho=divt_rho;
 JOC.gradt_rho=gradt_rho;
+
+JOC.divt_phi=divt;
+JOC.gradt_phi=gradt;
+
+
 
 JOC.gradphi=gradphi;
 JOC.phi = phi;

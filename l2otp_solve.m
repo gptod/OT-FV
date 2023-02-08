@@ -56,7 +56,8 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	% open file to store algorithm info
 	if (IP_ctrl.save_csv)
 		csvID = fopen(IP_ctrl.file_csv,'w');
-		fprintf(csvID,'  nrho,    np,    nt, step,    error,newton,  outer,   inner,  innernequ, minrho,    mu, theta,cpulinsys,cpuassemb,cpuprec, inner2,innernequ2,inner3,innernequ3\n');
+		fprintf(csvID,'  nrho,    np,    nt, step,conv,    error,newton,  outer,   inner,  innernequ, minrho,    mu, theta,cpulinsys,cpuassemb,cpuprec, inner2,innernequ2,inner3,innernequ3\n');
+		fclose(csvID);
 	end
 
 	
@@ -199,7 +200,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				break
 			end
 		end
-    
+    mu_before = mu;
     mu = theta*mu;
     itk2 = 0;
     flag2 = 0;
@@ -379,6 +380,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 					end
 					ierr=3;
 					uk=uk_before;
+					mu=mu_before;
 					break
 				end
 
@@ -480,16 +482,22 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 			end
 			
 			
-			
+			if (ierr==0)
+				conv=1;
+			else
+				conv=0;
+			end
 			
 			if (IP_ctrl.save_csv)
-				fprintf(csvID,'%6d,%6d,%6d,%5d,%8.3e,%6d,%7d,%8d,%11d,%1.1e,%1.1e,%1.1e,%1.1e,%1.1e,%1.1e,%8d,%11d,%8d,%11d\n',...
+				csvID = fopen(IP_ctrl.file_csv,'a+');
+				fprintf(csvID,'%6d,%6d,%6d,%5d,%8.3e,%4d,%6d,%7d,%8d,%11d,%1.1e,%1.1e,%1.1e,%1.1e,%1.1e,%1.1e,%8d,%11d,%8d,%11d\n',...
 								ncell_rho,ncell_phi,N,...
-								itk1,delta_0,itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
+								itk1,conv,delta_0,itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
 								linear_solver_info.inner_nequ,min(uk(Np+1:Np+Nr)),mu,theta,...
 								sum_linsys,sum_assembly,sum_prec,...
 								uint64(sum_iter2_inner_linear),linear_solver_info.inner_nequ2,...
 								uint64(sum_iter3_inner_linear),linear_solver_info.inner_nequ3);
+				fclose(csvID);
 			end
 		end
 
@@ -514,9 +522,6 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 	% close files
 	if (IP_ctrl.save_log)
 		fclose(logID);
-	end
-	if (IP_ctrl.save_csv)
-		fclose(csvID);
 	end
 
 
