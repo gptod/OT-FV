@@ -4,7 +4,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ['gauss_plus'];%,'sin'];%'compression', 'gauss'];
+test_cases = ["gauss_plus"];%,"sin"];%"compression", "gauss"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
@@ -20,7 +20,7 @@ end
 %
 % start the solution from prebuilt initial guess
 % 
-read_from_file = 2; % 0 : standard initial guess >0: start from the corresponding IP iterations
+read_from_file = 0; % 0 : standard initial guess >0: start from the corresponding IP iterations
 folder_restart='initial_solution'; % location of initial solution. See more below
 
 %
@@ -151,7 +151,7 @@ for mesh_type = 5;
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["bb_noproj"];%simple"];%primal"];%, "simple","primal"];
+			for solver_approach=["bb"];%simple"];%primal"];%, "simple","primal"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
