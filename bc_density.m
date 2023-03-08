@@ -36,6 +36,22 @@ elseif (strcmp(test_case,'gauss_plus'))
   geodesic = [];
   W2 = [];
   bc_sol = 0;
+elseif (strcmp(test_case,'gauss_wide'))
+    
+	% Gaussian densities
+	std_variation = 0.1;
+  initial =@(x,y) exp((-(x-0.3).^2-(y-0.3).^2)/std_variation);
+  final =@(x,y) exp((-(x-0.7).^2-(y-0.7).^2)/std_variation);
+  rho_in = initial(cc(:,1),cc(:,2));
+  mass = sum(area.*rho_in);
+  rho_in = rho_in/mass; mass = sum(area.*rho_in); %normalization
+  rho_f = final(cc(:,1),cc(:,2));
+  rho_f = rho_f*mass/sum(rho_f.*area);
+  midpoint = [];
+  potential = [];
+  geodesic = [];
+  W2 = [];
+  bc_sol = 0;
 	
 elseif (strcmp(test_case,'sin'))
     
