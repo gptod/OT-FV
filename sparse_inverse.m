@@ -122,7 +122,7 @@ classdef sparse_inverse <handle
 				else
 					icg=obj.ctrl.nrestart;
 				end
-				verbose_agmg=0;
+				verbose_agmg=-1;
 				if (obj.preprocess_agmg>0)
 					if (strcmp(obj.ctrl.approach ,'agmg'))
 						jobagmg=2;
@@ -130,7 +130,7 @@ classdef sparse_inverse <handle
 						agmg_str=sprintf('agmg%d',obj.preprocess_agmg);
 						[sol,obj.info_inverse.flag, obj.info_inverse.res, obj.info_inverse.iter,obj.info_inverse.resvec]=...
 						feval( agmg_str, obj.matrix,rhs,icg,obj.ctrl.tolerance,obj.ctrl.itermax,verbose_agmg,[],jobagmg);
-						% [x,flag,relres,iter,resvec] = agmg(A,b,icg,tol,maxit,verbose,x0,ijob)
+						% [x,flag,relres,iter,resvec] = agmg(A,b,icg,tol,maxit,verbose_agmg,x0,ijob)
 
 						obj.info_inverse.approach_used = 'agmg';
 					elseif(strcmp(obj.ctrl.approach ,'precagmg'))
