@@ -615,7 +615,7 @@ case 'primal'
 
 		%print resume message
 		resume_msg=sprintf('outer: %d ressys=%1.1e [%1.2e,%1.2e,%1.2e] iter=%d cpu=%1.2e | nequ=%d - avg inner=%d cpu build S=%1.2e',...
-											 info_J.flag,relres,resp,resr,ress,outer_iter,outer_cpu,...
+											 info_J.flag,ressys,resp,resr,ress,outer_iter,outer_cpu,...
 											 inner_nequ, inner_iter/(outer_iter*Nsys), ...
 											 preprocess_S);
 
@@ -785,7 +785,7 @@ case 'simple'
 
 	
 	% Define action of block preconditoner 
-	prec = @(x) SchurCA_based_preconditioner(x, inv_A,...
+	prec = @(x) SchurCA_based_preconditioner(x, inv_A,... 
 																					 inverse_block22,...
 																					 @(y) B1T*y,...
 																					 @(z) B2*z,...
@@ -802,14 +802,39 @@ case 'simple'
 	outer_timing=tic;
 	rhs=[f1;f2];
 	check=0;
-	[d,info_J]=apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,...
-																														@(y) B1T*y,...
-																														@(z) B2*z,...
-																														@(z) C*z,...
-																														Np,Nr), ...
-																		rhs, controls.ctrl_outer, @(z) prec(z),...
-																		[],controls.left_right,scaling,[],check);
-	outer_cpu=toc(outer_timing);
+
+itermax= controls.ctrl_outer.itermax;
+portion = controls.ctrl_outer.itermax+1;
+nrestart = fix(controls.ctrl_outer.itermax/portion);
+extra = mod(controls.ctrl_outer.itermax,portion);
+  controls.ctrl_outer.itermax = extra;
+  [d,info_J]=apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,@(y) B1T*y,@(z) B2*z,@(z) C*z,Np,Nr), ...
+					  rhs, controls.ctrl_outer, @(z) prec(z),...
+					  [],controls.left_right,scaling,[],check);
+iter=info_J.iter;
+bal=sum(d(1:Np));
+for i=1:nrestart
+        % get the ds 
+	ds = Dr\(h-Ds*d(Np+1:Np+Nr));
+	dfull=[d;ds];
+	[ressys,resp,resr,ress]=compute_linear_system_residuum(JF,F,dfull);
+	if (ressys <= controls.ctrl_outer.tolerance)
+	  break
+	end
+	
+	    bal=sum(d(1:Np));
+        d(1:Np)=d(1:Np)-bal/Np;
+fprintf('restart %d x^1=%.2e\n',i,bal)
+	controls.ctrl_outer.itermax=portion;
+	[d,info_J]=apply_iterative_solver(@(x) apply_saddle_point(x,@(y) A*y ,@(y) B1T*y,@(z) B2*z,@(z) C*z,Np,Nr), ...
+					  rhs, controls.ctrl_outer, @(z) prec(z),...
+					  d,controls.left_right,scaling,[],check);
+  iter=iter+info_J.iter;
+  end
+  controls.ctrl_outer.itermax=itermax;
+  info_J.iter=iter;
+  
+outer_cpu=toc(outer_timing);
 	
 	if (controls.diagonal_scaling)
 		d(1:Np)      = inv_diag_A*d(1:Np);
