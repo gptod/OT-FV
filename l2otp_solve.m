@@ -373,17 +373,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 					end
 				end
 				
-				if (linear_solver_info.relres > 5*resvar.etamax)
-					disp('ERROR')
-					if (IP_ctrl.save_log)
-						fprintf(logID,'%s\n','ERROR');
-					end
-					ierr=3;
-					uk=uk_before;
-					mu=mu_before;
-					break
-				end
-
+				
 				%
 				% collect data ad save it to csv file
 				%
@@ -402,7 +392,17 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				cpu_assembly=cpu_assembly+sum_assembly;
 				cpu_linsys=cpu_linsys+sum_linsys;
 				
-				
+				if (linear_solver_info.relres > 1e-2)
+					disp('ERROR')
+					if (IP_ctrl.save_log)
+						fprintf(logID,'%s\n','ERROR');
+					end
+					ierr=3;
+					uk=uk_before;
+					mu=mu_before;
+					break
+				end
+
 				
 				% Linesearch just to ensure that rho and s stay positive
 				alpha_k = 1;
@@ -442,11 +442,6 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 				
 			end
 
-			% exit from IP cy
-			if ierr ~= 0;
-				uk=uk_before;
-				break
-			end
 			
 			phimu = uk(1:Np);
 			rhomu = uk(Np+1:Np+Nr);
@@ -490,8 +485,8 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 			
 			if (IP_ctrl.save_csv)
 				csvID = fopen(IP_ctrl.file_csv,'a+');
-				fprintf(csvID,'%6d,%6d,%6d,%5d,%8.3e,%4d,%6d,%7d,%8d,%11d,%1.1e,%1.1e,%1.1e,%1.1e,%1.1e,%1.1e,%8d,%11d,%8d,%11d\n',...
-								ncell_rho,ncell_phi,N,...
+				fprintf(csvID,'%6d,%6d,%6d,%5d,%4d,%8.3e,%6d,%7d,%8d,%11d,%1.1e,%1.1e,%1.1e,%1.2e,%1.2e,%1.2e,%8d,%11d,%8d,%11d\n',...
+								ncell_rho,ncell_phi,N+1,...
 								itk1,conv,delta_0,itk2,sum_iter_outer_linear,uint64(sum_iter_inner_linear),...
 								linear_solver_info.inner_nequ,min(uk(Np+1:Np+Nr)),mu,theta,...
 								sum_linsys,sum_assembly,sum_prec,...
@@ -499,6 +494,13 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 								uint64(sum_iter3_inner_linear),linear_solver_info.inner_nequ3);
 				fclose(csvID);
 			end
+
+			% exit from IP cy
+			if ierr ~= 0;
+				uk=uk_before;
+				break
+			end
+
 		end
 
 	end
