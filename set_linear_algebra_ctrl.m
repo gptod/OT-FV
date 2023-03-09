@@ -40,7 +40,7 @@ function [ctrls, approach_descriptions] = ...
 		% tolerance
 		% max iterations
 		ctrl_outer = ctrl_solver;
-		ctrl_outer.init('fgmres',1e-5,500,0.0,0);
+		ctrl_outer.init('fgmres',1e-5,200,0.0,0);
 
 		left_right = 'right';
 
@@ -57,7 +57,7 @@ function [ctrls, approach_descriptions] = ...
 		permute=0;
 
 		% scale tolerance to avoid oversolving
-		scaling_rhs=1;
+		for scaling_rhs=[1];
 		
 		% select assembly of S=A+Mtt+(Mtx+Mtx')+Mxx
 		assembly_S_options=[...
@@ -91,14 +91,14 @@ function [ctrls, approach_descriptions] = ...
 				ground_node=1;
 
 				% S=S+relax*I	to remove kernel		
-				relax_inv11=1e-10;
+				relax_inv11=1e-8;
 
 				% controls for primal Schur complement
 				%preprocess = 0;
 				preprocess = 1;
 				
 				ctrl_inner11=ctrl_solver;
-				ctrl_inner11.init('agmg',1e-1,200,1.0,0,'agmg1e-1',preprocess);
+				ctrl_inner11.init('agmg',1e-1,100,1.0,0,'agmg1e-1',preprocess);
 
 				% solver for C. It depends on the recostruction
 				ctrl_inner22=ctrl_solver;
@@ -141,10 +141,11 @@ function [ctrls, approach_descriptions] = ...
 				approach_string=strcat('SchurPrimal_',...
 															 'ground=',num2str(ground),'_',...
 															 'preprocess',num2str(preprocess),'_',...
-															 'diagscal=',num2str(diagonal_scaling),'_',...
-															 'outer=',ctrl_outer.approach,'_',...
-															 'prec=',outer_prec,'_',...
-															 'invS=',inverse11,'_',...
+															 'diagscal',num2str(diagonal_scaling),'_',...
+                                                                                                                         'rhsscal',num2str(scaling_rhs),'_',...
+															 'outer',ctrl_outer.approach,'_',...
+															 'prec',outer_prec,'_',...
+															 'invS',inverse11,'_',...
 															 'buildS',assembly_S,'_',...
 															 'permute',num2str(permute),'_',...
 															 'solverS=',ctrl_inner11.label);
@@ -152,6 +153,7 @@ function [ctrls, approach_descriptions] = ...
 				% append string
 				approach_descriptions=[approach_descriptions,approach_string];
 			end
+end %scaling
 		end
 	case 'simple'
 		% verbosity level in linear solver
@@ -161,7 +163,7 @@ function [ctrls, approach_descriptions] = ...
 		outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
 		for isolver=[3]
 			ctrl_outer=ctrl_solver;
-			ctrl_outer.init(outer_solvers{isolver},1e-05,800,0.0,0);
+			ctrl_outer.init(outer_solvers{isolver},1e-05,8000,0.0,1);
 
 			% left or right preconditioner
 			left_right='right';
@@ -177,7 +179,8 @@ function [ctrls, approach_descriptions] = ...
 			for outer_prec=outer_precs([1])
 				
 				% relax A
-				relax_inv11=0e-12;
+				relax_inv11=0e-10;
+                                direct_relax_A = 1e-12;
 
 				ctrl_inner11=ctrl_solver;
 				ctrl_inner11.init('diag',1e-1,20,1.0,1);
@@ -213,6 +216,7 @@ function [ctrls, approach_descriptions] = ...
 														'left_right',left_right,...
 														'ctrl_outer',ctrl_outer,...
 														'verbose',verbose,...
+                                                                                                                'direct_relax_A', direct_relax_A,...
 														'relax_inv11',relax_inv11,...
 														'ctrl_inner11',ctrl_inner11,...
 														'relax_inv22',relax_inv22,...
@@ -346,7 +350,7 @@ function [ctrls, approach_descriptions] = ...
 			nouter_precs=length(outer_precs);
 
 			% left or right preconditioner
-			left_right='left';
+			left_right='right';
 			% fgmres works only with right prec
 			if (strcmp(outer_solvers,'fgmres'))
 				left_right='right';
@@ -607,6 +611,111 @@ function [ctrls, approach_descriptions] = ...
 				end
 			end
 		end
+	case 'old_primal'
+		% set here outer olver controls
+		% set method (any krylov sovler implemented in matlab and fgmres for non stationary prec)
+		% tolerance
+		% max iterations
+		ctrl_outer = ctrl_solver;
+		ctrl_outer.init('fgmres',1e-5,400,0.0,0);
+
+		% preconditioner approach
+		% full, upper_triang, lower_triang
+		% see SchurAC_based_preconditioner 
+		outer_prec='full';
+
+		% reduce system to the primal schur complement 0=off, 1=on
+		solve_primal=0;
+
+		% permute entries to minimize bandwidth S.
+		% It will destroy its block structure.
+		permute=0;
+		
+		% select assembly of S=A+Mtt+(Mtx+Mtx')+Mxx
+		assembly_S_options=[...
+												 "full",...
+												 "A_Mtt",...
+												 "harmonic",...
+												 "A_Mtt_Mxx",...
+												 "A_Mtt_Mxx_lamped",...
+												 "A_Mtx_Mxt",...
+												 "A_Mtt_Mtx_Mxt",...
+												 "A_Mtt_Mtx_Mxt_blockdiagMxx"];
+		for assembly_S = assembly_S_options([1])
+
+			
+			% cycle approach for S inversion
+			% full:        :~S=S
+			% block_triang :~S=upper block triangular of S
+			% block_diag   :~S=block diagonal of S
+			inverses11=["full","block_triang","block_diag"];
+			for inverse11=inverses11(1)
+				
+
+				% scale system
+				diagonal_scaling=0;
+
+				% handle singularity of S. 
+				% ground==1 ground solution at zero in one node
+				% ground==0 no grounding
+				ground=0;
+				ground_node=1;
+
+				% S=S+relax*I	to remove kernel		
+				relax_inv11=1e-10;
+
+				% controls for primal Schur complement
+				ctrl_inner11=ctrl_solver;
+				ctrl_inner11.init('agmg',1e-1,200,1.0,0,'agmg1e-1');
+
+				% solver for C. It depends on the recostruction
+				ctrl_inner22=ctrl_solver;
+				if (rec==1)
+					ctrl_inner22.init('diag',... %approach
+														1e-6,... %tolerance
+														100,...% itermax
+														0.0,... %omega
+														0,'diag'); %verbose
+				else
+					ctrl_inner22.init('agmg',... %approach
+														1e-1,... %tolerance
+														100,...% itermax
+														0.0,... %omega
+														0,'agmg1e-1'); %verbose
+				end
+				
+				% store all controls
+				controls = struct('ground',ground,...
+													'ground_node',ground_node,...
+													'sol',solver_approach,...
+													'outer_prec',outer_prec,...
+													'solve_primal',solve_primal,...
+													'diagonal_scaling',diagonal_scaling,...
+													'assembly_S',assembly_S,...
+													'permute',permute,...
+													'ctrl_outer',ctrl_outer,...
+													'inverse11',inverse11,...
+													'relax_inv11',relax_inv11,...
+													'ctrl_inner11',ctrl_inner11,...
+													'ctrl_inner22',ctrl_inner22);
+
+				% append controls
+				ctrls=[ctrls,controls];
+				
+				% create strings with main controls
+				approach_string=strcat('oldprimal_',...
+															 'ground=',num2str(ground),'_',...
+															 'diagscal=',num2str(diagonal_scaling),'_',...
+															 'outer=',ctrl_outer.approach,'_',...
+															 'prec=',outer_prec,'_',...
+															 'invS=',inverse11,'_',...
+															 'solverS=',ctrl_inner11.label);
+
+				% append string
+				approach_descriptions=[approach_descriptions,approach_string];
+			end
+		end
+
 	case 'bb_full'
 		% global controls
 		verbose=0;
