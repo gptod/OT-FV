@@ -4,7 +4,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["gauss_plus"];%,"sin"];%"compression", "gauss"];
+test_cases =["gauss_wide"]%,"sin","gauss_wide"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
@@ -42,7 +42,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 for mesh_type = 5;
 	
 	% refine level. Available from 1 to 5
-	for h_i = 1;
+	for h_i = 5;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -69,11 +69,15 @@ for mesh_type = 5;
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		%for dt_i = 4;%4:-1:1
-		for dt_i = h_i
+		%for dt_i = 5
+		  for dt_i = 5
+		 
 			% number of time steps
-			N = 4*(2^(dt_i));
-
+		        if (mesh_type == 5)
+			  N = 4*(2^(dt_i))-1;
+			elseif (mesh_type == 6)
+			  N = 5*(2^(dt_i-1))-1; 
+                        end
 			% set problem dimension
 			ncell_phi=grid_phi.ncell
 			ncell_rho=grid_rho.ncell
@@ -151,7 +155,7 @@ for mesh_type = 5;
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["bb","simple","primal"];%, "simple","primal"];
+			for solver_approach=["simple"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
@@ -202,7 +206,10 @@ for mesh_type = 5;
 
 					% h5 with approximate solutions
 					IP_ctrl.save_h5=0;
-					IP_ctrl.file_h5=strcat(filename,'.h5');
+if strcmp(solver_approach,"bb")
+					   IP_ctrl.save_h5=1;
+                                        end 
+                                        IP_ctrl.file_h5=strcat(filename,'.h5');
 
 
 					% Define the functional as matlab symbolic function
