@@ -2396,12 +2396,6 @@ case 'bb'
 		% inverse of Diag(rho)
 		inv_Dr = sparse(1:Nr,1:Nr,(1./spdiags(Dr,0))',Nr,Nr);
 
-		% definition of A_rho=Atitle
-		% A_rho = rho-weighted Laplacian with N blocks and defiend on rho cells 
-		neit=size(JF.divt_rho,2);
-		rho=spdiags(-JF.ss,0);
-		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
-		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
 		
 		% matrix H
 		RHt = assembleRHt(N,ncellphi);
@@ -2420,6 +2414,18 @@ case 'bb'
 		Rst = blkdiag(Rst{:});
 		I_cellphi_cellrho = assembleIt(N-1,ncellphi,ncellrho,JF.I);
 
+extra_relax=0;%1.e-4;
+                if (strcmp(controls.mode_assemble_Arho,'project'))
+                    A_rho = rec_time * I_cellphi_cellrho' * JF.pp  * I_cellphi_cellrho * rec_time' ;
+                elseif (strcmp(controls.mode_assemble_Arho,'rho_space'))
+                 		% definition of A_rho=Atitle
+		% A_rho = rho-weighted Laplacian with N blocks and defiend on rho cells 
+		neit=size(JF.divt_rho,2);
+                
+		rho=spdiags(-JF.ss,0)+extra_relax;
+		rho_edge=spdiags(JF.Rst_rho*rho,0,neit,neit);
+		A_rho = - JF.divt_rho*(rho_edge)*JF.gradt_rho;
+                end 
 	
 		if ( strcmp(controls.mode_assemble_inverse22,'bbt'))
 			% we use that Bx^T = -Bx - (Laplacian phi)\cdot
@@ -2442,7 +2448,7 @@ case 'bb'
 			approx_S =  C*inv_Mrho*A_rho + S22;
 		elseif (controls.mode_apply_inverse22==2)
 			% C = -JF.rr + M Ds/Dr
-			approx_S =  -Dr * JF.rr + Ds*A_rho + Dr * S22;
+		  approx_S =  -(Dr+extra_relax*speye(Nr)) * JF.rr + Ds*A_rho + (Dr+extra_relax*speye(Nr)) * S22;
 		end
 
 		% set inverse 
@@ -2457,7 +2463,7 @@ case 'bb'
      							ctrl_inner22.verbose,...
      							'SCA',...
 		 							index_agmg);
-		inv_SCA.init(approx_S+1e-10*speye(Nr),ctrl_loc);
+		inv_SCA.init(approx_S+controls.relax4inv22*speye(Nr),ctrl_loc);
 		inv_SCA.cumulative_iter=0;
 		inv_SCA.cumulative_cpu=0;
 
