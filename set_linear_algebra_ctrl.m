@@ -399,6 +399,11 @@ end %scaling
 						% 'bbt' = we use the identity Bx^t = -B - Laplacian
 						mode_assemble_inverse22 = mode_assemble;
 						
+% how to create a Nr x Nr matrix similar to a rho-weighted Laplacian 
+% project : project the A matrix with time average (and space avarage if required)
+% rho_space : define the operator with finite volume in the rho_space
+mode_assemble_Arho = 'rho_space'
+
 					% for commute approach
 						% 1 = CA-BB y = g
 						% 2 = Ds A - Dr BB = Dr g
@@ -420,7 +425,7 @@ end %scaling
 						solvers={'agmg' ,'agmg'  ,'agmg' ,'direct','krylov' ,'krylov'  ,'incomplete','diag','krylov_no_prec'};
 						iters  ={1      ,10      ,400,1       ,1        ,10        ,  1          ,0,10};
 						label  ={'agmg1','agmg10','agmg1e-1','direct','krylov1','krylov10','incomplete','diag','purekrylov'};
-						relax4inv22=1e-12;
+						relax4inv22=0;%1e-8;
 
 
 						for precision_dual=1
@@ -448,7 +453,8 @@ end %scaling
 																'inverse22',inverse22,...
 																'relax4inv22',relax4inv22,...
 																'mode_apply_inverse22',mode_apply_inverse22,...
-																'mode_assemble_inverse22',mode_assemble_inverse22);
+																'mode_assemble_inverse22',mode_assemble_inverse22,...
+'mode_assemble_Arho',mode_assemble_Arho);
 							
 							
 							approach_string=strcat('bb_',...
@@ -456,7 +462,7 @@ end %scaling
 																		 'outer_prec',outer_prec,'_',...
 																		 'invA',ctrl_inner11.label,'_',...
 																		 'inverse22',label_inverse22,'_',...
-																		 'built',mode_assemble_inverse22,'_',...
+																		 'builtA','_',mode_assemble_Arho,'built',mode_assemble_inverse22,'_',...
 																		 'mode',num2str(mode_apply_inverse22),'_',...
 																		 "invSCA",ctrl_inner22.label);
 
