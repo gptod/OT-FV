@@ -131,10 +131,10 @@ elseif( strcmp(test_case,'compression'))
   bc_sol = 1;
   
 elseif (strcmp(test_case,'gauss_3d'))
-    
+  
   % Gaussian densities
-  initial =@(x,y,z) exp((-(x-0.3).^2-(y-0.3).^2-(z-0.3).^2)/0.05);
-  final =@(x,y,z) exp((-(x-0.7).^2-(y-0.7).^2-(z-0.7).^2)/0.05);
+  initial =@(x,y,z) exp((-(x-0.3).^2-(y-0.3).^2-(z-0.3).^2)/0.1);
+  final =@(x,y,z) exp((-(x-0.7).^2-(y-0.7).^2-(z-0.7).^2)/0.1);
   rho_in = initial(cc(:,1),cc(:,2),cc(:,3));
   mass = sum(area.*rho_in);
   rho_in = rho_in/mass; mass = sum(area.*rho_in); %normalization

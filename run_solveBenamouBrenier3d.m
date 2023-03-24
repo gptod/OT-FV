@@ -9,6 +9,7 @@ if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
 
+
 %
 % set some globals controls for reproducing experiments
 %
@@ -22,10 +23,11 @@ compute_err = 0; % compute errors with respect to exact solutions
 
 
 % refine level. Available from 1 to 5
-h = 8;
-% TEMPORAL DISCRETIZATION delta=1/N
-dt = 1;
-Ntime = 4*(2^(dt))-1;
+h_i = 0 
+h = 2^(3+h_i);
+% TEMPORAL DISCRETIZATION delta=1/(N+1)
+dt = 0;
+Ntime = 2^(3+h_i)-1;
 
 % recostruction used
 % rec == 1 : linear
@@ -43,6 +45,7 @@ if ~isfolder(folder)
 	mkdir(folder);
 end
 
+test_case_label = sprintf('%s_rec%d_h%d_N%d_',test_case,rec,h_i,dt);
 
 % grids for rho and phi (see TPFA_grid class)
 % are read from file
@@ -62,13 +65,26 @@ bc_density(test_case,grid_rho.cc,grid_rho.area);
 
 % set controls for Interior Point solver and linear solver
 IP_ctrl=IP_controls;
+
+
+
 IP_ctrl.eps_0 = 1e-5;
 IP_verbose = 2;
-[linear_solver_ctrl,label] = set_linear_algebra_ctrl('bb',rec);
+[linear_solver_ctrl,label] = set_linear_algebra_ctrl('simple',rec);
 
+
+linear_algebra_label=labels(1,i_ctrl);
+experiment_label = strcat(test_case_label,linear_algebra_label)
+% csv file with performance resume
+
+IP_ctrl.save_csv=1;
+IP_ctrl.file_csv=strcat(filename,'.csv');
+
+IP_ctrl.save_log=1;
+IP_ctrl.file_log=strcat(filename,'.log');
 	
-Nr = grid_rho.ncells * Ntime;
-Np = grid_phi.ncells * (Ntime + 1);
+Nr = grid_rho.ncells * Ntime
+Np = grid_phi.ncells * (Ntime + 1)
 	
 phi0 = ones(Np,1);
 rho0  = ones(Nr,1);
