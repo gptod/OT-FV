@@ -40,7 +40,7 @@ function [ctrls, approach_descriptions] = ...
 		% tolerance
 		% max iterations
 		ctrl_outer = ctrl_solver;
-		ctrl_outer.init('fgmres',1e-5,400,0.0,0);
+		ctrl_outer.init('fgmres',1e-5,200,0.0,0);
 
 		left_right = 'right';
 
@@ -98,7 +98,7 @@ function [ctrls, approach_descriptions] = ...
 				preprocess = 1;
 				
 				ctrl_inner11=ctrl_solver;
-				ctrl_inner11.init('agmg',1e-1,200,1.0,0,'agmg1e-1',preprocess);
+				ctrl_inner11.init('agmg',1e-1,100,1.0,0,'agmg1e-1',preprocess);
 
 				% solver for C. It depends on the recostruction
 				ctrl_inner22=ctrl_solver;
@@ -161,7 +161,7 @@ function [ctrls, approach_descriptions] = ...
 		outer_solvers={'bicgstab'  ,'gmres','fgmres' ,'pcg'};
 		for isolver=[3]
 			ctrl_outer=ctrl_solver;
-			ctrl_outer.init(outer_solvers{isolver},1e-05,800,0.0,0);
+			ctrl_outer.init(outer_solvers{isolver},1e-05,4000,0.0,0);
 
 			% left or right preconditioner
 			left_right='right';

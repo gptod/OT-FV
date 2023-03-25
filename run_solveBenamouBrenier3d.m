@@ -23,10 +23,10 @@ compute_err = 0; % compute errors with respect to exact solutions
 
 
 % refine level. Available from 1 to 5
-h_i = 0 
+for h_i = 0:3 
 h = 2^(3+h_i);
 % TEMPORAL DISCRETIZATION delta=1/(N+1)
-dt = 0;
+dt = h_i;
 Ntime = 2^(3+h_i)-1;
 
 % recostruction used
@@ -70,11 +70,17 @@ IP_ctrl=IP_controls;
 
 IP_ctrl.eps_0 = 1e-5;
 IP_verbose = 2;
-[linear_solver_ctrl,label] = set_linear_algebra_ctrl('simple',rec);
+approach='bb';
+[linear_solver_ctrl,labels] = set_linear_algebra_ctrl(approach,rec);
+folder_approach=strcat(folder,'/',approach,'/');
+if ~isfolder(folder_approach)
+	mkdir(folder_approach);
+end
 
 
-linear_algebra_label=labels(1,i_ctrl);
+linear_algebra_label=labels(1,1);
 experiment_label = strcat(test_case_label,linear_algebra_label)
+filename = strcat(folder_approach,experiment_label)
 % csv file with performance resume
 
 IP_ctrl.save_csv=1;
@@ -110,3 +116,4 @@ if (plot_figures)
 end
 
 
+end 
