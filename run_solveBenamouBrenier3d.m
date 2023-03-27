@@ -70,7 +70,7 @@ IP_ctrl=IP_controls;
 
 IP_ctrl.eps_0 = 1e-5;
 IP_verbose = 2;
-approach='bb';
+approach='primal';
 [linear_solver_ctrl,labels] = set_linear_algebra_ctrl(approach,rec);
 folder_approach=strcat(folder,'/',approach,'/');
 if ~isfolder(folder_approach)
