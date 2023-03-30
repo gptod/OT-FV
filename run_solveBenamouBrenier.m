@@ -5,7 +5,7 @@ close all
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
 test_cases = ["sin"];%,"compression"];
-for  test_case = test_cases;
+for  test_case = test_cases
 	test_case = test_case;
 	disp(test_case)
 
@@ -28,7 +28,7 @@ for  test_case = test_cases;
 
 	
 	% refine level. Available from 1 to 5
-	for h_i = 3;
+	for h_i = 1
 
 		% recostruction used
 		% rec == 1 : linear
@@ -62,7 +62,8 @@ for  test_case = test_cases;
 		for dt_i = 1
 			%for dt_i = h_i +1
 			% number of time steps
-			Ntime = 4*(2^(dt_i));
+			%Ntime = 4*(2^(dt_i));
+            Ntime = 4*(2^(dt_i))-1;
 
 			
 			%
@@ -78,12 +79,14 @@ for  test_case = test_cases;
 			
 			% solve with interior point
 			[phi,rho,ierr,info_solver] = solve_benamoubrenier(cells,nodes,Ntime,...
-																												rho_in,rho_f,...
-																												1, rec, 1e-5);
+															  rho_in,rho_f,...
+															  1, rec, 1e-5);
 			
 			% plot
 			if (plot_figures)
-				plot_rhos(grid_rho,rho_in,rho,rho_f)
+                Ndsp=3;
+                dsp=ceil(Ntime/(Ndsp+1)):ceil(Ntime/(Ndsp+1)):ceil(Ntime-Ntime/(Ndsp+1));
+				plot_rhos_2d(grid_rho,rho_in,rho,rho_f,dsp)
 			end
 		end % mesh size
 	end % time size

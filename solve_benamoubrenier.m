@@ -1,7 +1,7 @@
 function [phi,rho,ierr,info_solver] = solve_benamoubrenier(topol,coord,Ntime,...
-																					rho_initial,rho_final,...
-																					twogrids, rec, tol,...
-																					phi_initial_guess,rho_initial_guess)
+														   rho_initial,rho_final,...
+														   twogrids, rec, tol,...
+														   phi_initial_guess,rho_initial_guess)
 
 	% assemble structures with geometrical info 
 	grid_rho = TPFA_grid;
@@ -10,7 +10,7 @@ function [phi,rho,ierr,info_solver] = solve_benamoubrenier(topol,coord,Ntime,...
 		[grid_phi, I] = grid_rho.refine();
 	else
 		grid_phi = grid_rho;
-		I = speye(grid_rho.ncell);
+		I = speye(grid_rho.ncells);
 	end
 
 	% set controls for Interior Point solver and linear solver
@@ -21,15 +21,15 @@ function [phi,rho,ierr,info_solver] = solve_benamoubrenier(topol,coord,Ntime,...
 
 	
 	% check data and set initial solution
-	mass = grid_rho.area'*rho_initial
-	mass_final = grid_rho.area'*rho_final
+	mass = grid_rho.area'*rho_initial;
+	mass_final = grid_rho.area'*rho_final;
 	
 	if abs( mass - mass_final) > 1e-12
 		error('Initial and final denisity have different mass')
 	end
 	
-	Nr = grid_rho.ncell * Ntime;
-	Np = grid_phi.ncell * (Ntime + 1);
+	Nr = grid_rho.ncells * Ntime;
+	Np = grid_phi.ncells * (Ntime + 1);
 	
 	if exist('phi_initial_guess ','var') 
 		phi0 = phi_initial_guess;
@@ -50,8 +50,9 @@ function [phi,rho,ierr,info_solver] = solve_benamoubrenier(topol,coord,Ntime,...
 	% run solver
 	
 	[phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, rec, Ntime,...
-																								 IP_ctrl,linear_solver_ctrl,... 
-																								 rho_initial,rho_final, phi_rho_slack_initial_guess);
+												   IP_ctrl,linear_solver_ctrl,... 
+												   rho_initial,rho_final, phi_rho_slack_initial_guess);
 
 	ierr = info_solver.ierr;
+
 end
