@@ -10,7 +10,7 @@ for  test_case = test_cases;
 	disp(test_case)
 
 % select the directory where to store the results
-folder_runs='runs_20230208';
+folder_runs='runs_20230329';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
@@ -42,7 +42,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 for mesh_type = 5;
 	
 	% refine level. Available from 1 to 5
-	for h_i = 5;
+	for h_i = 1;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -70,7 +70,7 @@ for mesh_type = 5;
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
 		%for dt_i = 5
-		  for dt_i = 5
+		  for dt_i = 1
 		 
 			% number of time steps
 		        if (mesh_type == 5)
@@ -155,7 +155,7 @@ for mesh_type = 5;
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["simple"];
+			for solver_approach=["primal","bb","simple"];
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
