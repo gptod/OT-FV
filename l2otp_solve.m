@@ -117,7 +117,7 @@ function [phi,rho,slack,W2th,info_solver] = l2otp_solve(grid_rho, grid_phi,I, re
 
 
 	% Assemble matrices associated to spatial discretization
-
+	addpath(genpath('./assemble_tools/'));
 	% local matrices
 	local_ass = tic;
 	[mass_phi,mass_edge_phi,div_phi,grad_phi] = build_matrices(grid_phi);

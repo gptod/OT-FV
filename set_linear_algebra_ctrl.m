@@ -14,6 +14,8 @@ function [ctrls, approach_descriptions] = ...
 	% hss :: HSS preconditioner
 	% bb :: Commute approach
 
+	addpath(genpath('./linear_algebra/'));
+
 	% empty to list for appeings controls and labels
 	ctrls=struct([]);
 	approach_descriptions=[];
