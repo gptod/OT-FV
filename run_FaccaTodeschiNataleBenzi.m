@@ -4,7 +4,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases =["gauss_wide","sin","compression"];
+test_cases =["gauss_wide"];%,"sin","compression"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
