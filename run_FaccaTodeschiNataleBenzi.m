@@ -4,7 +4,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases =["gauss_wide"];%,"sin","compression"];
+test_cases =["gauss_wide","sin","compression"];
 for  test_case = test_cases;
 	test_case = test_case;
 	disp(test_case)
@@ -42,7 +42,7 @@ compute_err = 1; % compute errors with respect to exact solutions
 for mesh_type = 5;
 	
 	% refine level. Available from 1 to 5
-	for h_i = 2;
+	for h_i = 3;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -70,7 +70,7 @@ for mesh_type = 5;
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
 		%for dt_i = 5
-		  for dt_i = 2
+		  for dt_i = h_i
 		 
 				% number of time steps
 		    if (mesh_type == 5 || mesh_type == 2)
