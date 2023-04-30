@@ -4,13 +4,12 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases =["gauss_wide","sin","compression"];
+test_cases =["gauss_wide","sin","compression","gauss_3d"];
 for  test_case = test_cases;
-	test_case = test_case;
 	disp(test_case)
 
 % select the directory where to store the results
-folder_runs='runs_20230426';
+folder_runs='runs_test_realease';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
@@ -35,14 +34,24 @@ compute_err = 1; % compute errors with respect to exact solutions
 %
 
 % Different type of meshes
-% 1: 
-% 2:
-% 3:
-% 4,5,6: like 1,2,3 but with two grid level
-for mesh_type = 5;
+% 1: Triangular grid
+% 2: Two-level grids
+% 3: Cartesian gri
+% 4,5,6: like 1,2,3 but reordered
+
+
+if strcmp(test_case,'gauss_3d')
+	mesh_type = 1;
+	initial_h = 1;
+	last_h = 3;
+else
+	mesh_type = 5;
+	initial_h = 2;
+	last_h = 5;
+end
 	
 	% refine level. Available from 1 to 5
-	for h_i = 3;
+	for h_i = initial_h:last_h;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -62,19 +71,23 @@ for mesh_type = 5;
 		
 		% grids for rho and phi (see TPFA_grid class)
 		% are read from file
-		[grid_rho, grid_phi, I] = init_grids_2d(mesh_type, h_i);
-		
-		
+		if strcmp(test_case,'gauss_3d')
+			[grid_rho, grid_phi, I] = init_grids_3d(mesh_type, 2^(2+h_i));
+		else
+			[grid_rho, grid_phi, I] = init_grids_2d(mesh_type, h_i);
+		end
 		
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
 		%for dt_i = 5
-		  for dt_i = h_i
+		  for dt_i = initial_h:last_h
 		 
 				% number of time steps
 		    if (mesh_type == 5 || mesh_type == 2)
 					N = 4*(2^(dt_i))-1;
+				elseif (mesh_type == 1 || strcmp(test_cases,'gauss_3d'))
+					N = 2^(2+dt_i)-1; 
 				elseif (mesh_type == 6 || mesh_type == 3)
 					N = 5*(2^(dt_i-1))-1; 
         end
@@ -155,7 +168,7 @@ for mesh_type = 5;
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["bb","simple","simple"];
+			for solver_approach=["primal"];%"bb","simple",
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
@@ -277,7 +290,7 @@ if strcmp(solver_approach,"bb")
 				end	
 			end
 
-		end  % end mesh type
+			%end  % end mesh type
 	end % mesh size
 end % time size
 end  % test case

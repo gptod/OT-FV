@@ -23,7 +23,7 @@ compute_err = 0; % compute errors with respect to exact solutions
 
 
 % refine level. Available from 1 to 5
-for h_i = 3
+for h_i = 1
 h = 2^(3+h_i);
 % TEMPORAL DISCRETIZATION delta=1/(N+1)
 dt = h_i;
@@ -112,7 +112,7 @@ ierr = info_solver.ierr;
 if (plot_figures)
     Ndsp=3;
     dsp=ceil(Ntime/(Ndsp+1)):ceil(Ntime/(Ndsp+1)):ceil(Ntime-Ntime/(Ndsp+1));
-	plot_rhos_3d(grid_rho,rho_in,rho,rho_f,dsp)
+	plot_rhos(grid_rho,rho_in,rho,rho_f,dsp)
 end
 
 

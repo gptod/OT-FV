@@ -1,16 +1,17 @@
 clear
 close all
 
+mesh_type=5;
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin"];%,"compression"];
+test_cases = ["gauss_wide"];%,"compression"];
 for  test_case = test_cases
 	test_case = test_case;
 	disp(test_case)
 
 	% select the directory where to store the results
-	folder_runs='runs_BenamouBrenier';
+	folder_runs='runs_BenamouBrenier230426';
 	if ~isfolder(folder_runs)
 		mkdir(folder_runs);
 	end
@@ -49,10 +50,12 @@ for  test_case = test_cases
 		
 		% grids for rho and phi (see TPFA_grid class)
 		% are read from file
+		[grid_rho_read, grid_phi_read, I] = init_grids_2d(mesh_type, h_i);
+		cells = grid_rho_read.cells(:,2:4);
+		size(cells)
+		nodes = grid_rho_read.nodes;
+
 		
-		fn1 = 'meshes/mesh_gen/tri2/mesh1/coord.txt'; %coordinates
-		fn2 = 'meshes/mesh_gen/tri2/mesh1/topol.txt'; %topology
-		[nodes,cells] = get_mesh(fn1,fn2,0,0,0,0);
 		grid_rho = TPFA_grid;
 		grid_rho.init(cells,nodes);
 		
@@ -86,7 +89,7 @@ for  test_case = test_cases
 			if (plot_figures)
                 Ndsp=3;
                 dsp=ceil(Ntime/(Ndsp+1)):ceil(Ntime/(Ndsp+1)):ceil(Ntime-Ntime/(Ndsp+1));
-				plot_rhos_2d(grid_rho,rho_in,rho,rho_f,dsp)
+				plot_rhos(grid_rho,rho_in,rho,rho_f,dsp)
 			end
 		end % mesh size
 	end % time size
