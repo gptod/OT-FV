@@ -4,7 +4,7 @@ close all
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases =["gauss_wide","sin","compression","gauss_3d"];
+test_cases =["gauss_3d"]%"gauss_wide","sin","compression"];%,"gauss_3d"];
 for  test_case = test_cases;
 	disp(test_case)
 
@@ -42,12 +42,12 @@ compute_err = 1; % compute errors with respect to exact solutions
 
 if strcmp(test_case,'gauss_3d')
 	mesh_type = 1;
-	initial_h = 1;
+	initial_h = 3;
 	last_h = 3;
 else
 	mesh_type = 5;
-	initial_h = 2;
-	last_h = 5;
+        initial_h = 2;
+	last_h = 3;
 end
 	
 	% refine level. Available from 1 to 5
@@ -168,7 +168,7 @@ end
 			% "hss"
 			% "bb"
 			% (double quotes are important) 
-			for solver_approach=["primal"];%"bb","simple",
+			for solver_approach=["bb","simple","primal"];%
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 

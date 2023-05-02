@@ -22,8 +22,8 @@ compute_err = 0; % compute errors with respect to exact solutions
 %
 
 
-% refine level. Available from 1 to 5
-for h_i = 1
+% mesh level. Available from 0 to 2
+for h_i = 0
 h = 2^(3+h_i);
 % TEMPORAL DISCRETIZATION delta=1/(N+1)
 dt = h_i;
@@ -70,7 +70,7 @@ IP_ctrl=IP_controls;
 
 IP_ctrl.eps_0 = 1e-5;
 IP_verbose = 2;
-approach='bb';
+approach='primal';
 [linear_solver_ctrl,labels] = set_linear_algebra_ctrl(approach,rec);
 folder_approach=strcat(folder,'/',approach,'/');
 if ~isfolder(folder_approach)
