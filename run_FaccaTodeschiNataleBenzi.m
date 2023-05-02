@@ -1,16 +1,20 @@
+% This script will reproduce the experiment presented in
+% "Efficient preconditioners for solving dynamical optimal
+% transport via interior point methods" by E. Facca,
+% G. Todeschi, A. Natale and M. Benzi
+
 clear
 close all
 
 
 % set test case fixing intitial and final density.
 % See function boundary_bc for the available options.
-test_cases = ["sin","gauss","compression"];
+test_cases =["gauss_3d"]%"gauss_wide","sin","compression"];%,"gauss_3d"];
 for  test_case = test_cases;
-	test_case = test_case;
 	disp(test_case)
 
 % select the directory where to store the results
-folder_runs='FTNB_runs';
+folder_runs='runs_test_realease';
 if ~isfolder(folder_runs)
 	mkdir(folder_runs);
 end
@@ -35,14 +39,24 @@ compute_err = 1; % compute errors with respect to exact solutions
 %
 
 % Different type of meshes
-% 1: 
-% 2:
-% 3:
-% 4,5,6: like 1,2,3 but with two grid level
-for mesh_type = 5;
+% 1: Triangular grid
+% 2: Two-level grids
+% 3: Cartesian gri
+% 4,5,6: like 1,2,3 but reordered
+
+
+if strcmp(test_case,'gauss_3d')
+	mesh_type = 1;
+	initial_h = 1;
+	last_h = 3;
+else
+	mesh_type = 5;
+  initial_h = 2;
+	last_h = 5;
+end
 	
 	% refine level. Available from 1 to 5
-	for h_i = 1:2;
+	for h_i = initial_h:last_h;
 
 		% recostruction used
 		% rec == 1 : linear
@@ -62,20 +76,32 @@ for mesh_type = 5;
 		
 		% grids for rho and phi (see TPFA_grid class)
 		% are read from file
-		[grid_rho, grid_phi, I] = init_grids(mesh_type, h_i);
-
+		if strcmp(test_case,'gauss_3d')
+			[grid_rho, grid_phi, I] = init_grids_3d(mesh_type, 2^(2+h_i));
+		else
+			[grid_rho, grid_phi, I] = init_grids_2d(mesh_type, h_i);
+		end
+		
 		%
 		% TEMPORAL DISCRETIZATION delta=1/N
 		%
-		for dt_i = 2:3
-			% number of time steps
-			N=4*(2^(dt_i-1));
-
+		%for dt_i = 5
+		  for dt_i = initial_h:last_h
+		 
+				% number of time steps
+		    if (mesh_type == 5 || mesh_type == 2)
+					N = 4*(2^(dt_i))-1;
+				elseif (mesh_type == 1 || strcmp(test_cases,'gauss_3d'))
+					N = 2^(2+dt_i)-1; 
+				elseif (mesh_type == 6 || mesh_type == 3)
+					N = 5*(2^(dt_i-1))-1; 
+        end
 			% set problem dimension
-			ncell_phi=grid_phi.ncell;
-			ncell_rho=grid_rho.ncell;
-			Np=(N+1)*ncell_phi;
-			Nr=(N)*ncell_rho;
+			ncells_phi=grid_phi.ncells
+			ncells_rho=grid_rho.ncells
+			Np=(N+1)*ncells_phi
+			Nr=(N)*ncells_rho
+			
 
 
 			%
@@ -84,8 +110,21 @@ for mesh_type = 5;
 			% Set initial and final rho density
 			% In same cases the exact solution is known
 			[rho_in,rho_f,...
-			 mass,midpoint,exact_phi,exact_rho,exact_W2,bc_sol] = ...
+			 mass,midpoint,exact_phi_function,exact_rho_function,exact_W2,bc_sol] = ...
 			bc_density(test_case,grid_rho.cc,grid_rho.area);
+
+			% store exact solution 
+			phi_rho_slack_reference_solution = zeros(Np+2*Nr,1);
+			%exact_rho_vec=zeros(Nr,1);
+			if ( bc_sol == 1)
+				for k=1:N
+					t=k/(N+1);
+					rho_real = exact_rho_function(grid_rho.cc(:,1),grid_rho.cc(:,2),t);
+					rho_real = rho_real*mass/sum(rho_real.*grid_rho.area);
+					phi_rho_slack_reference_solution(Np+1+(k-1)*ncells_rho:Np+k*ncells_rho)=rho_real;
+				end
+			end			
+		
 
 			% set test case label
 			test_case_label = sprintf('%s_rec%d_mesh%d_h%d_N%0.5d_',test_case,rec,mesh_type,h_i,N);
@@ -129,11 +168,12 @@ for mesh_type = 5;
 			
 
 			% select a list of the approch we can use
-			% primal
-			% simple
-			% hss
-			% bb
-			for solver_approach=["primal", "simple", "hss","bb"];
+			% "primal"
+			% "simple"
+			% "hss"
+			% "bb"
+			% (double quotes are important) 
+			for solver_approach=["bb","simple","primal"];%
 				disp(solver_approach)
 				% for each solver approach this funciton generate a list
 				% of linear solve configurations. 
@@ -174,7 +214,7 @@ for mesh_type = 5;
 					logID = fopen(IP_ctrl.file_log,'w');
 					fprintf(logID,'mesh type      = %d\n',mesh_type);
 					fprintf(logID,'rec type       = %d\n',rec);
-					fprintf(logID,'ncellphi= %d ncellrho=%d n time step=%d \n',ncell_phi,ncell_rho,N);
+					fprintf(logID,'ncellphi= %d ncellrho=%d n time step=%d \n',ncells_phi,ncells_rho,N);
 					fclose(logID);	
 
 					% csv file with performance resume
@@ -184,14 +224,32 @@ for mesh_type = 5;
 
 					% h5 with approximate solutions
 					IP_ctrl.save_h5=0;
-					IP_ctrl.file_h5=strcat(filename,'.h5');
+if strcmp(solver_approach,"bb")
+					   IP_ctrl.save_h5=1;
+                                        end 
+                                        IP_ctrl.file_h5=strcat(filename,'.h5');
 
+
+					% Define the functional as matlab symbolic function
+					% for example:
+					% 
+					% then use symbolic2f_df_ddf to define the triples
+					% {function, derivative, second_derivate}
+					% used by the l2_solve
+					% `
+					% syms entropy(r);
+					% entropy = r*log(r);
+					% f_df_ddf = symbolic2f_df_ddf(entropy)
 					
 					% solve with interior point
 					[phi,rho,slack,approx_W2,info_solver] = ...                   % solver output and info
 					l2otp_solve(grid_rho, grid_phi,I, rec, N,...        % discretization 
 											IP_ctrl,linear_algebra_ctrl,...         % controls
-											rho_in,rho_f, uk(1:Np+Nr+Nr)); % inputs
+											rho_in,rho_f, uk(1:Np+Nr+Nr),... % inputs
+											... % optional arguments
+											'phi_rho_slack_reference_solution', phi_rho_slack_reference_solution, ... %reference solution
+											'extra_functional',	[]...,%f_df_ddf ... % extra functional 
+										 );
 
 					fprintf('%35s %1.4e \n','Approximated Wasserstein distance: ',approx_W2);
 					
@@ -202,10 +260,10 @@ for mesh_type = 5;
 
 						% rebuild some matrices
 						[mass_phi,mass_edge_phi,div_phi,grad_phi] = build_matrices(grid_phi);
-						gradt = assembleGradt(N,ncell_phi,size(grad_phi,1),grad_phi);
+						gradt = assembleGradt(N,ncells_phi,size(grad_phi,1),grad_phi);
 						Mst = assembleMst(N,size(grad_phi,1),mass_edge_phi);
-						RHt = assembleRHt(N,ncell_phi);
-						It = assembleIt(N,ncell_phi,ncell_rho,I);
+						RHt = assembleRHt(N,ncells_phi);
+						It = assembleIt(N,ncells_phi,ncells_rho,I);
 
 						% compute W2
 						%approx_W2 = compute_cost(grid_phi.ind,grid_phi.edges,grid_phi.mid,grid_phi.cc,...
@@ -216,7 +274,7 @@ for mesh_type = 5;
 						% compare w.r.t. exact solution
 						[err_cost,err_p,err_rhoth]=compute_errors(approx_W2,rho_in,rho,rho_f,phi,... % variable 
 																											grid_rho,grid_phi,RHt,It,... % geometry 
-																											mass,exact_W2,exact_rho,exact_phi); % exact formulas
+																											mass,exact_W2,exact_rho_function,exact_phi_function); % exact formulas
 						
 						msg=sprintf('%10s %1.4e \t %11s %1.4e \t %11s %1.4e','W2-error: ',...
 												err_cost,'phi-error: ',err_p,'rho-error: ',err_rhoth);
@@ -230,12 +288,14 @@ for mesh_type = 5;
 					
 					% plot
 					if (plot_figures)
-						plot_rhos(grid_rho,rho_in,rho,rho_f)
+                        Ndsp=3;
+                        dsp=ceil(Ntime/(Ndsp+1)):ceil(Ntime/(Ndsp+1)):ceil(Ntime-Ntime/(Ndsp+1));
+						plot_rhos(grid_rho,rho_in,rho,rho_f,dsp)
 					end
 				end	
 			end
 
-		end  % end mesh type
+			%end  % end mesh type
 	end % mesh size
 end % time size
 end  % test case

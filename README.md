@@ -26,7 +26,7 @@ The function "set_linear_algebra_controls.m" sets the controls used by the "solv
 
 ## Examples of usage
 Examples of usage is contained in the "run_NataleTodeschi.m"  reproducing the experiments in [1] and 
-"run_FaccaTodeschiNataleBenzi.m" file, which reproduces the linear algebra experiments described in [2].
+"run_FaccaTodeschiNataleBenzi.m" and "run_solveBenamouBrenier3d.m" file, which reproduces the linear algebra experiments described in [2].
 **Note that, in order to fully exploit the linear algebra capabilities of the solver, you need to install the multigrid solver [AGMG](http://agmg.eu/) solver (see agmg/README.md first)**.
 
 ## Mesh structure

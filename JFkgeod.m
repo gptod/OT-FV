@@ -5,10 +5,10 @@ function [JOC] = JFkgeod(N,Dt,divt,Mxt,Mxt2h,gradt,It,rhos,drhos,ddrhosa,uk,I,Rs
 Nt = N+1;
 ncell2h = size(Mxt2h,1)/Nt;
 ncell = size(Mxt,1)/Nt;
-nei = size(divt,2)/Nt;
+nsig_in = size(divt,2)/Nt;
 tnr2h = N*ncell2h;
 tnp = Nt*ncell;
-te = Nt*nei;
+te = Nt*nsig_in;
 phi = uk(1:tnp);
 rho = uk(tnp+1:tnp+tnr2h);
 s = uk(tnp+tnr2h+1:tnp+2*tnr2h);
@@ -66,6 +66,7 @@ JOC.Mxt=Mxt;
 				% store this diagonal
 Np=tnp;
 JOC.area2h=-spdiags(JOC.rs(1:ncell2h,1:ncell2h));
+JOC.area=spdiags(Mxt(1:ncell,1:ncell));
 JOC.areadomain=sum(JOC.area2h);
 
 
@@ -79,5 +80,11 @@ JOC.Rs=Rs;
 JOC.divt_rho=divt_rho;
 JOC.gradt_rho=gradt_rho;
 
+JOC.divt_phi=divt;
+JOC.gradt_phi=gradt;
+
+
+
 JOC.gradphi=gradphi;
+JOC.phi = phi;
 end

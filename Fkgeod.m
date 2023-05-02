@@ -35,6 +35,7 @@ OC.ncell=ncell;
 
 OC.rho_in=rho_in;
 OC.rho_f=rho_f;
+OC.phi = phi;
 
 end
 

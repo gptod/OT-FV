@@ -14,7 +14,7 @@ function [err_cost,err_p,err_rhoth]=compute_errors(W2,rho_in,rho,rho_final,phi,.
 	rho_all=[rho_in;rho;rho_final];
 	rhoa = RHt*It*rho_all;
 	
-	N=size(rho,1)/grid_rho.ncell;
+	N=size(rho,1)/grid_rho.ncells;
 	Nt=N+1;
 	
   % Compute the errors
@@ -26,9 +26,9 @@ function [err_cost,err_p,err_rhoth]=compute_errors(W2,rho_in,rho,rho_final,phi,.
     phi_real = exact_phi(grid_phi.cc(:,1),grid_phi.cc(:,2),t);
     rho_real = exact_rho(grid_rho.cc(:,1),grid_rho.cc(:,2),t);
     rho_real = rho_real*mass/sum(rho_real.*grid_rho.area);
-    rho_t = 0.5*(rho_all((k-1)*grid_rho.ncell+1:k*grid_rho.ncell)+rho_all(k*grid_rho.ncell+1:(k+1)*grid_rho.ncell));
+    rho_t = 0.5*(rho_all((k-1)*grid_rho.ncells+1:k*grid_rho.ncells)+rho_all(k*grid_rho.ncells+1:(k+1)*grid_rho.ncells));
     % error on the potential
-    err_p = err_p + (1/Nt)*sum( rhoa((k-1)*grid_phi.ncell+1:k*grid_phi.ncell).*grid_phi.area.*(phi_real-phi((k-1)*grid_phi.ncell+1:k*grid_phi.ncell)).^2 );
+    err_p = err_p + (1/Nt)*sum( rhoa((k-1)*grid_phi.ncells+1:k*grid_phi.ncells).*grid_phi.area.*(phi_real-phi((k-1)*grid_phi.ncells+1:k*grid_phi.ncells)).^2 );
     % error on the geodesic
     err_rhoth = err_rhoth + (1/Nt)*sum(grid_rho.area.*abs(rho_t-rho_real));
   end
