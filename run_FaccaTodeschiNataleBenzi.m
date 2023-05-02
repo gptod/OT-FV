@@ -1,3 +1,8 @@
+% This script will reproduce the experiment presented in
+% "Efficient preconditioners for solving dynamical optimal
+% transport via interior point methods" by E. Facca,
+% G. Todeschi, A. Natale and M. Benzi
+
 clear
 close all
 
@@ -42,12 +47,12 @@ compute_err = 1; % compute errors with respect to exact solutions
 
 if strcmp(test_case,'gauss_3d')
 	mesh_type = 1;
-	initial_h = 3;
+	initial_h = 1;
 	last_h = 3;
 else
 	mesh_type = 5;
-        initial_h = 2;
-	last_h = 3;
+  initial_h = 2;
+	last_h = 5;
 end
 	
 	% refine level. Available from 1 to 5
